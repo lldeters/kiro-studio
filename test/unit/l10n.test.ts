@@ -42,3 +42,22 @@ describe('manifest strings', () => {
     expect(used.filter((key) => english[key] === undefined)).toEqual([]);
   });
 });
+
+describe('walkthrough pages', () => {
+  const pages = ['install', 'sign-in', 'check'];
+  const read = (name: string): string => readFileSync(`resources/walkthrough/${name}.md`, 'utf8');
+  const codeSpans = (text: string): string[] => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? '');
+  const links = (text: string): string[] =>
+    [...text.matchAll(/\]\(([^)]+)\)|<(https?:[^>]+)>/g)].map((m) => m[1] ?? m[2] ?? '');
+
+  it('has a German page for every English one, which VS Code picks for a German window', () => {
+    for (const page of pages) expect(() => read(`${page}.de`), page).not.toThrow();
+  });
+
+  it('keeps the commands, links and code of the English page', () => {
+    for (const page of pages) {
+      expect(codeSpans(read(`${page}.de`)), page).toEqual(codeSpans(read(page)));
+      expect(links(read(`${page}.de`)), page).toEqual(links(read(page)));
+    }
+  });
+});
