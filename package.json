@@ -153,6 +153,11 @@
         "category": "Kiro Studio"
       },
       {
+        "command": "kiroStudio.answerPending",
+        "title": "%command.answerPending%",
+        "category": "Kiro Studio"
+      },
+      {
         "command": "kiroStudio.debug.newSession",
         "title": "%command.debug.newSession%",
         "category": "Kiro Studio"
@@ -296,7 +301,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vscode-test",
-    "l10n:export": "vscode-l10n-dev export --outDir ./l10n ./src",
+    "l10n:export": "tsx scripts/l10n-export.ts",
     "package": "npm run build:prod && vsce package --no-dependencies -o dist/kiro-studio.vsix",
     "vscode:prepublish": "npm run build:prod",
     "probe": "tsx scripts/probe-acp.ts",
@@ -309,7 +314,6 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.5",
     "@types/vscode": "1.93.0",
-    "@vscode/l10n-dev": "^0.0.35",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",

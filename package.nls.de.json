@@ -19,6 +19,7 @@
   "command.showProtocolLog": "Protokoll anzeigen",
   "command.showKiroLogs": "Kiro-Logs öffnen",
   "command.openWalkthrough": "Erste Schritte öffnen",
+  "command.answerPending": "Offene Kiro-Anfrage beantworten",
   "command.debug.newSession": "Debug: Neue Session",
   "command.debug.sendPrompt": "Debug: Prompt senden",
   "command.debug.cancel": "Debug: Turn abbrechen",
