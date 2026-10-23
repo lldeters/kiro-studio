@@ -234,13 +234,20 @@ button.secondary:hover:not(:disabled) {
   color: var(--vscode-errorForeground);
 }
 /* Composer */
-.composer {
+.composer-wrap {
   flex: none;
+  position: relative;
+  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.composer {
   display: flex;
   align-items: flex-end;
   gap: 6px;
   padding: 8px;
-  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.composer .attach {
+  height: 26px;
+  flex: none;
 }
 .composer textarea {
   flex: 1;
@@ -650,4 +657,86 @@ details.tool > summary::-webkit-details-marker {
 }
 .context.danger {
   color: var(--vscode-errorForeground);
+}
+
+/* Attachments and the pop-up lists */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+.chips.sent {
+  padding: 4px 0 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0 2px 0 6px;
+  border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, currentColor));
+  border-radius: 10px;
+  font-size: 0.9em;
+  background: var(--vscode-badge-background, transparent);
+  color: var(--vscode-badge-foreground, inherit);
+}
+.chips.sent .chip {
+  padding-right: 6px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+}
+.chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chip-thumb {
+  width: 16px;
+  height: 16px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+.chip .icon-button {
+  height: 18px;
+  line-height: 16px;
+  padding: 0 4px;
+  color: inherit;
+}
+.suggest {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 100%;
+  margin-bottom: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 5;
+  background: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-editorSuggestWidget-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border, var(--vscode-panel-border)));
+  border-radius: 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+}
+.suggest-item {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.suggest-item.selected {
+  background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+.suggest-label {
+  flex: none;
+  font-weight: 600;
+}
+.suggest-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
 }

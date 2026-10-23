@@ -144,6 +144,7 @@ export function itemView(item: TranscriptItem): ItemView {
         kind: item.kind,
         text: item.text,
         replay: item.replay,
+        ...(item.attachments === undefined ? {} : { attachments: item.attachments }),
         ...(item.subtaskId === undefined ? {} : { subtaskId: item.subtaskId }),
       };
   }

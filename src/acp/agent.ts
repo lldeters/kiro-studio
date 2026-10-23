@@ -13,6 +13,7 @@ import { KiroConnection, type ClientFeatures, type ConnectionClosed } from './co
 import { Dispatcher, type BroadcastEvent } from './dispatcher';
 import { describeError, isConnectionClosed } from './errors';
 import { FsHandler, type FileSystemPort, type WriteGate } from './handlers/fs';
+import type { PromptInput } from './prompt';
 import { PermissionBroker } from './handlers/permissions';
 import { type Session, SessionStore, type TurnOutcome } from './sessions';
 import { parseConfigOptions } from './types';
@@ -359,12 +360,13 @@ export class KiroAgent {
   // -------------------------------------------------------------------------------------------------------------
 
   /** Sends one prompt and resolves when the turn is over. Errors become notices in the session, not exceptions. */
-  async prompt(sessionId: string, text: string): Promise<TurnOutcome> {
+  async prompt(sessionId: string, input: string | PromptInput): Promise<TurnOutcome> {
     const session = this.requireSession(sessionId);
     if (session.busy) throw new Error('A turn is already running in this session');
-    session.beginTurn(text);
+    const { text, blocks = [], labels = [] } = typeof input === 'string' ? { text: input } : input;
+    session.beginTurn(text, labels);
     try {
-      const { stopReason } = await this.ready.prompt(sessionId, [{ type: 'text', text }]);
+      const { stopReason } = await this.ready.prompt(sessionId, [{ type: 'text', text }, ...blocks]);
       session.endTurn({ stopReason });
       return { stopReason };
     } catch (error) {

@@ -12,6 +12,22 @@ export type TurnPhaseView = 'idle' | 'starting' | 'running' | 'awaitingApproval'
 export type ToolState = 'waiting' | 'running' | 'done' | 'failed';
 export type ApprovalKind = 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always';
 
+/** Something the user adds to a prompt besides text. The host turns it into content blocks when the prompt is sent. */
+export type AttachmentView =
+  | { kind: 'file'; path: string }
+  | { kind: 'folder'; path: string }
+  | { kind: 'problems' }
+  | { kind: 'gitDiff' }
+  /** `data` is base64. */
+  | { kind: 'image'; mimeType: string; data: string; name: string };
+
+/** What the user can pick through the host (a file list, a folder dialog, the open editor, `.kiro` files). */
+export type ContextKind = 'file' | 'folder' | 'current' | 'steering' | 'spec';
+
+export const MAX_ATTACHMENTS = 12;
+export const MAX_IMAGE_BASE64_CHARS = 7_000_000;
+export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
+
 export interface ItemView {
   id: number;
   kind: 'user' | 'assistant' | 'thought' | 'tool' | 'notice';
@@ -22,6 +38,8 @@ export interface ItemView {
   level?: 'info' | 'warning' | 'error';
   /** Set on everything a sub-agent does. */
   subtaskId?: string;
+  /** User messages: short names of what was attached. */
+  attachments?: string[];
   replay: boolean;
 }
 
@@ -147,7 +165,9 @@ export type HostMessage =
   | { type: 'tabs'; tabs: TabView[]; activeId?: string }
   | { type: 'status'; setup: SetupView; agent: AgentView; capabilities: ChatCapabilities }
   | { type: 'session'; session: SessionView }
-  | { type: 'patch'; patch: SessionPatch };
+  | { type: 'patch'; patch: SessionPatch }
+  /** The answer to `pickContext`; the webview adds these to the draft. */
+  | { type: 'contextPicked'; attachments: AttachmentView[] };
 
 /** Commands the webview may ask the host to run. Anything else is ignored. */
 export const WEBVIEW_COMMANDS = [
@@ -168,7 +188,8 @@ export type WebviewMessage =
   | { type: 'newSession' }
   | { type: 'selectSession'; id: string }
   | { type: 'closeSession'; id: string }
-  | { type: 'send'; sessionId: string; text: string }
+  | { type: 'send'; sessionId: string; text: string; attachments: AttachmentView[] }
+  | { type: 'pickContext'; kind: ContextKind }
   | { type: 'cancel'; sessionId: string }
   | { type: 'answer'; sessionId: string; approvalId: number; kind: ApprovalKind }
   | { type: 'setConfig'; sessionId: string; configId: string; value: string }
@@ -183,6 +204,42 @@ export type WebviewMessage =
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const MAX_COPY_CHARS = 1_000_000;
+const CONTEXT_KINDS: readonly string[] = ['file', 'folder', 'current', 'steering', 'spec'];
+
+/** Missing means no attachments; anything malformed rejects the whole message. */
+function parseAttachments(raw: unknown): AttachmentView[] | undefined {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_ATTACHMENTS) return undefined;
+  const result: AttachmentView[] = [];
+  for (const entry of raw as unknown[]) {
+    if (!isObject(entry)) return undefined;
+    switch (entry.kind) {
+      case 'file':
+      case 'folder':
+        if (typeof entry.path !== 'string' || entry.path === '') return undefined;
+        result.push({ kind: entry.kind, path: entry.path });
+        break;
+      case 'problems':
+      case 'gitDiff':
+        result.push({ kind: entry.kind });
+        break;
+      case 'image':
+        if (
+          typeof entry.mimeType !== 'string' ||
+          !(IMAGE_TYPES as readonly string[]).includes(entry.mimeType) ||
+          typeof entry.data !== 'string' ||
+          entry.data.length > MAX_IMAGE_BASE64_CHARS ||
+          typeof entry.name !== 'string'
+        )
+          return undefined;
+        result.push({ kind: 'image', mimeType: entry.mimeType, data: entry.data, name: entry.name });
+        break;
+      default:
+        return undefined;
+    }
+  }
+  return result;
+}
 const KINDS: readonly string[] = ['allow_once', 'allow_always', 'reject_once', 'reject_always'];
 
 /** Validates a message from the webview. The host never trusts the shape of what a webview posts. */
@@ -201,7 +258,14 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'send': {
       const sessionId = str('sessionId');
       const text = str('text');
-      return sessionId === undefined || text === undefined ? undefined : { type: 'send', sessionId, text };
+      const attachments = parseAttachments(raw.attachments);
+      if (sessionId === undefined || text === undefined || attachments === undefined) return undefined;
+      return { type: 'send', sessionId, text, attachments };
+    }
+    case 'pickContext': {
+      const kind = str('kind');
+      if (kind === undefined || !CONTEXT_KINDS.includes(kind)) return undefined;
+      return { type: 'pickContext', kind: kind as ContextKind };
     }
     case 'cancel': {
       const sessionId = str('sessionId');

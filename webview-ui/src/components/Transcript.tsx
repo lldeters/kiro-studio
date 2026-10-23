@@ -68,6 +68,15 @@ const Item = memo(function Item({
         <div className="message user">
           <div className="author">{t('You')}</div>
           <div className="text">{item.text}</div>
+          {item.attachments && (
+            <div className="chips sent">
+              {item.attachments.map((label, index) => (
+                <span className="chip" key={index}>
+                  <span className="chip-label">{label}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       );
     case 'assistant':

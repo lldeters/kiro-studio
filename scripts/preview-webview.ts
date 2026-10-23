@@ -56,7 +56,7 @@ const server = createServer((request, response) => {
       const injected = `<style>:root{${Object.entries(theme)
         .map(([k, v]) => `--vscode-${k}:${v}`)
         .join(';')}}body{margin:0}</style>
-<script nonce="${nonce}">document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('vscode-${themeName}'));window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m)});</script>`;
+<script nonce="${nonce}">document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('vscode-${themeName}'));window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m),getState:()=>undefined,setState:()=>{}});</script>`;
       response.setHeader('content-type', 'text/html');
       response.end(page.replace('</head>', `${injected}</head>`));
       return;
@@ -92,6 +92,12 @@ try {
     else await page.evaluate((m) => window.postMessage(m, '*'), step as never);
   }
   await page.waitForTimeout(Number(option('wait', '600')));
+  const typed = option('type', '');
+  if (typed) {
+    await page.locator('textarea').click();
+    await page.keyboard.type(typed);
+    await page.waitForTimeout(200);
+  }
   await page.screenshot({ path: out });
   const posted = await page.evaluate(() => (window as unknown as { __posted: unknown[] }).__posted);
   console.log(`saved ${out} (${width}x${height}); the page posted ${JSON.stringify(posted)}`);

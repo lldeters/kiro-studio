@@ -143,6 +143,37 @@ function conversation(): HostMessage[] {
   return [init([session, other]), { type: 'session', session: tracker.full(session) }];
 }
 
+/** An idle session with slash commands, for the input menus. */
+function idle(): HostMessage[] {
+  const session = new Session('sess_preview_c', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'on', model: 'auto' }),
+  });
+  session.title = 'Ask something';
+  feed(
+    session,
+    {
+      sessionUpdate: 'available_commands_update',
+      availableCommands: [
+        { name: 'help', description: 'Show what Kiro can do' },
+        { name: 'agent', description: 'Switch to another agent', input: { hint: '<name>' } },
+        { name: 'compact', description: 'Summarise the conversation to free context' },
+        {
+          name: 'frontend-style',
+          description: 'Steering: our frontend conventions',
+          _meta: { kiro: { type: 'steering' } },
+        },
+      ],
+    },
+    u.contextUsage(23),
+  );
+  session.beginTurn('What does this project do?', ['README.md']);
+  feed(session, u.agent('It is a VS Code extension.', { messageId: 'x' }));
+  session.endTurn({ stopReason: 'end_turn' });
+  return [init([session]), { type: 'session', session: new PatchTracker('posix').full(session) }];
+}
+
 const setupOnly = (setup: SetupView): HostMessage[] => [init([], { setup })];
 
 /** Messages, and pauses in milliseconds between them. */
@@ -176,6 +207,7 @@ function streaming(): Step[] {
 export const SCENARIOS: Record<string, Step[]> = {
   conversation: conversation(),
   streaming: streaming(),
+  idle: idle(),
   empty: [init([])],
   connecting: [init([], { phase: 'starting' })],
   cliMissing: setupOnly('cliMissing'),

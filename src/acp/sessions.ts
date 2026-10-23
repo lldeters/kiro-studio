@@ -29,6 +29,8 @@ export interface TranscriptMessage {
   replay: boolean;
   messageKey?: string;
   subtaskId?: string;
+  /** User messages: short names of what was attached (files, problems, images). */
+  attachments?: string[];
 }
 export interface TranscriptTool {
   kind: 'tool';
@@ -430,8 +432,14 @@ export class Session {
   // -------------------------------------------------------------------------------------------------------------
 
   /** The prompt request is about to be sent. The user's text goes into the transcript because Kiro does not echo it. */
-  beginTurn(userText: string): void {
-    this.transcript.push({ kind: 'user', id: this.nextItemId++, text: userText, replay: false });
+  beginTurn(userText: string, attachments: string[] = []): void {
+    this.transcript.push({
+      kind: 'user',
+      id: this.nextItemId++,
+      text: userText,
+      replay: false,
+      ...(attachments.length === 0 ? {} : { attachments }),
+    });
     this.changes.emit('transcript');
     this.turnStarted = false;
     this.setPhase('starting');

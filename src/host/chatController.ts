@@ -9,6 +9,7 @@ import { currentPlatform, isInsideAny, normalizeAgentPath } from '../util/paths'
 import {
   parseWebviewMessage,
   type AgentView,
+  type AttachmentView,
   type ChatCapabilities,
   type HostMessage,
   type SessionPatch,
@@ -18,6 +19,8 @@ import {
 } from '../shared/chatProtocol';
 import { UI_MESSAGES } from '../shared/uiMessages';
 import { PatchTracker, tabView } from '../view/chatPresenter';
+import { resolveAttachments, type SkipReason } from '../view/promptContext';
+import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
 import type { SetupController } from './setup';
 import type { Settings } from './settings';
@@ -194,8 +197,13 @@ export class ChatController implements vscode.Disposable {
           await this.host.closeSession(message.id);
           return;
         case 'send':
-          this.send(message.sessionId, message.text);
+          await this.send(message.sessionId, message.text, message.attachments);
           return;
+        case 'pickContext': {
+          const attachments = await pickContext(message.kind);
+          if (attachments.length > 0) sink.send({ type: 'contextPicked', attachments });
+          return;
+        }
         case 'cancel':
           await this.host.agent?.cancel(message.sessionId);
           return;
@@ -245,13 +253,35 @@ export class ChatController implements vscode.Disposable {
     await this.host.newSession();
   }
 
-  private send(sessionId: string, text: string): void {
+  /** Sessions whose prompt is being put together (reading `git diff` can take a moment); a second send waits out. */
+  private readonly preparing = new Set<string>();
+
+  private async send(sessionId: string, text: string, attachments: AttachmentView[]): Promise<void> {
     const agent = this.host.agent;
     const session = agent?.store.get(sessionId);
-    if (!agent || !session || text.trim() === '') return;
-    // The prompt settles when the turn is over; errors become notices in the session, so nothing is thrown here
-    // except for a turn that is already running.
-    agent.prompt(sessionId, text).catch((error: unknown) => session.addNotice('error', describeError(error)));
+    if (!agent || !session || (text.trim() === '' && attachments.length === 0)) return;
+    if (this.preparing.has(sessionId) || session.busy) return;
+    this.preparing.add(sessionId);
+    try {
+      const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+      const context = await resolveAttachments(
+        attachments,
+        contextDeps({
+          roots: [...folders, ...(session.cwd ? [session.cwd] : [])],
+          base: session.cwd ?? folders[0],
+          imageSupported: agent.capabilities?.prompt.image ?? false,
+        }),
+      );
+      for (const skipped of context.skipped)
+        session.addNotice('warning', skippedMessage(skipped.reason, skipped.label));
+      // The prompt settles when the turn is over; errors become notices in the session, so only a turn that is
+      // already running throws.
+      agent
+        .prompt(sessionId, { text, blocks: context.blocks, labels: context.labels })
+        .catch((error: unknown) => session.addNotice('error', describeError(error)));
+    } finally {
+      this.preparing.delete(sessionId);
+    }
   }
 
   /**
@@ -287,4 +317,17 @@ export class ChatController implements vscode.Disposable {
 
 function isPatch(value: SessionPatch | SessionView): value is SessionPatch {
   return 'sessionId' in value;
+}
+
+function skippedMessage(reason: SkipReason, label: string): string {
+  switch (reason) {
+    case 'outside':
+      return vscode.l10n.t('Not sent: {0} is outside the workspace.', label);
+    case 'missing':
+      return vscode.l10n.t('Not sent: {0} does not exist.', label);
+    case 'empty':
+      return vscode.l10n.t('Not sent: there is nothing in {0}.', label);
+    case 'unsupported':
+      return vscode.l10n.t('Not sent: the Kiro CLI does not accept {0}.', label);
+  }
 }

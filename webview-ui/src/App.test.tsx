@@ -72,7 +72,7 @@ describe('chat app', () => {
     expect(outbox).toEqual([]);
 
     fireEvent.keyDown(box, { key: 'Enter' });
-    expect(outbox).toEqual([{ type: 'send', sessionId: 's1', text: 'Fix it' }]);
+    expect(outbox).toEqual([{ type: 'send', sessionId: 's1', text: 'Fix it', attachments: [] }]);
     expect(box.value).toBe('');
   });
 

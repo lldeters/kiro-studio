@@ -1,5 +1,6 @@
 import type {
   AgentView,
+  AttachmentView,
   ChatCapabilities,
   HostMessage,
   SessionPatch,
@@ -21,6 +22,8 @@ export interface ChatState {
   autonomySetting: 'supervised' | 'autopilot';
   /** Only the active session is kept; the host sends a session in full when it becomes active. */
   sessions: Record<string, SessionView>;
+  /** Attachments the host picked for the draft; the composer takes them and clears the list. */
+  picked: AttachmentView[];
 }
 
 export const initialState: ChatState = {
@@ -33,6 +36,7 @@ export const initialState: ChatState = {
   capabilities: { image: false, compact: false },
   autonomySetting: 'supervised',
   sessions: {},
+  picked: [],
 };
 
 function applyPatch(session: SessionView, patch: SessionPatch): SessionView {
@@ -75,5 +79,7 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
       if (!current) return state;
       return { ...state, sessions: { ...state.sessions, [current.id]: applyPatch(current, message.patch) } };
     }
+    case 'contextPicked':
+      return { ...state, picked: [...state.picked, ...message.attachments] };
   }
 }

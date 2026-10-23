@@ -61,6 +61,16 @@ export const UI_MESSAGES = [
   'Supervised: Kiro asks before it changes files. Click to switch to Autopilot.',
   'Context used: {0}%',
   'Compact the context',
+  // Context menu and attachments
+  'Files from the workspace',
+  'A folder',
+  'The open file',
+  'Errors and warnings',
+  'Uncommitted changes',
+  'Steering files',
+  'Specs',
+  'Add context (#)',
+  'Remove {0}',
   // Composer
   'Ask Kiro…',
   'Send',
