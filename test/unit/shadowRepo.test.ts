@@ -201,12 +201,13 @@ describe('ShadowRepo', () => {
 
   it('handles file names with spaces, apostrophes, # and non-ASCII characters', async () => {
     const before = await repo.snapshot('before');
-    await write('dir with space/größe 'x' #1.txt', 'x\n');
+    const odd = "dir with space/größe 'x' #1.txt";
+    await write(odd, 'x\n');
     const after = await repo.snapshot('after');
     const files = await repo.changes(before, after);
-    expect(files.map((f) => f.path)).toEqual(['dir with space/größe 'x' #1.txt']);
+    expect(files.map((f) => f.path)).toEqual([odd]);
     await repo.revert(before, after, files);
-    expect(await exists('dir with space/größe 'x' #1.txt')).toBe(false);
+    expect(await exists(odd)).toBe(false);
   });
 
   it('runs overlapping operations one after another', async () => {
