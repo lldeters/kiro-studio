@@ -227,6 +227,24 @@ export class KiroConnection {
     );
   }
 
+  /**
+   * `session/fork` (still unstable in ACP, so it is sent by name): a new session that starts from the state of an
+   * existing one. Only when the agent advertises it. The parameters follow the ACP draft: the session, the folder and
+   * the MCP servers (Kiro keeps its own, so none are sent).
+   */
+  forkSession(params: { sessionId: string; cwd: string }): Promise<unknown> {
+    if (!this._capabilities?.session.fork) throw new Error('The Kiro CLI does not support forking sessions');
+    return withTimeout(
+      this.agent.request<unknown, unknown>('session/fork', {
+        sessionId: params.sessionId,
+        cwd: params.cwd,
+        mcpServers: [],
+      }),
+      this.timeouts.session,
+      'session/fork',
+    );
+  }
+
   /** Resolves with the stop reason when the turn is over; the turn lasts as long as this promise is pending. */
   async prompt(sessionId: string, prompt: acp.ContentBlock[]): Promise<{ stopReason: string }> {
     const request: acp.PromptRequest = { sessionId, prompt };

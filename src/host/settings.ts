@@ -47,6 +47,17 @@ export class Settings implements AgentSettings {
     return level === 'off' || level === 'verbose' ? level : 'messages';
   }
 
+  /** Fires when the hooks setting changes; the hooks view shows whether hooks are on. */
+  onDidChangeHooks(listener: () => void): vscode.Disposable {
+    return vscode.workspace.onDidChangeConfiguration((event) => {
+      if (Settings.changed(event, 'hooks.enabled')) listener();
+    });
+  }
+
+  setHooksEnabled(value: boolean): Thenable<void> {
+    return this.config.update('hooks.enabled', value, vscode.ConfigurationTarget.Global);
+  }
+
   setAutonomy(value: Autonomy): Thenable<void> {
     return this.config.update('autonomy', value, vscode.ConfigurationTarget.Global);
   }

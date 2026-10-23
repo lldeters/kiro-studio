@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "files": { "command": "npx", "args": ["-y", "files-server"], "disabled": true }
+  }
+}

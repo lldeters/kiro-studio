@@ -72,6 +72,42 @@
           "visibility": "visible"
         },
         {
+          "id": "kiroStudio.sessions",
+          "name": "%views.sessions%",
+          "visibility": "visible",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
+          "id": "kiroStudio.specs",
+          "name": "%views.specs%",
+          "visibility": "collapsed",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
+          "id": "kiroStudio.steering",
+          "name": "%views.steering%",
+          "visibility": "collapsed",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
+          "id": "kiroStudio.hooks",
+          "name": "%views.hooks%",
+          "visibility": "collapsed",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
+          "id": "kiroStudio.mcp",
+          "name": "%views.mcp%",
+          "visibility": "collapsed",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
+          "id": "kiroStudio.agents",
+          "name": "%views.agents%",
+          "visibility": "collapsed",
+          "contextualTitle": "Kiro Studio"
+        },
+        {
           "id": "kiroStudio.status",
           "name": "%views.status%",
           "visibility": "visible"
@@ -108,6 +144,46 @@
         "view": "kiroStudio.status",
         "when": "kiroStudio.state == checking",
         "contents": "%viewsWelcome.checking%"
+      },
+      {
+        "view": "kiroStudio.sessions",
+        "when": "kiroStudio.state != ready",
+        "contents": "%viewsWelcome.sessions.setup%"
+      },
+      {
+        "view": "kiroStudio.sessions",
+        "when": "kiroStudio.state == ready && !kiroStudio.agentReady",
+        "contents": "%viewsWelcome.sessions.disconnected%"
+      },
+      {
+        "view": "kiroStudio.sessions",
+        "when": "kiroStudio.state == ready && kiroStudio.agentReady",
+        "contents": "%viewsWelcome.sessions.empty%"
+      },
+      {
+        "view": "kiroStudio.specs",
+        "when": "true",
+        "contents": "%viewsWelcome.specs%"
+      },
+      {
+        "view": "kiroStudio.steering",
+        "when": "true",
+        "contents": "%viewsWelcome.steering%"
+      },
+      {
+        "view": "kiroStudio.hooks",
+        "when": "true",
+        "contents": "%viewsWelcome.hooks%"
+      },
+      {
+        "view": "kiroStudio.mcp",
+        "when": "true",
+        "contents": "%viewsWelcome.mcp%"
+      },
+      {
+        "view": "kiroStudio.agents",
+        "when": "true",
+        "contents": "%viewsWelcome.agents%"
       }
     ],
     "commands": [
@@ -198,6 +274,169 @@
         "command": "kiroStudio.debug.cancel",
         "title": "%command.debug.cancel%",
         "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.sessions.refresh",
+        "title": "%command.sessions.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.sessions.search",
+        "title": "%command.sessions.search%",
+        "category": "Kiro Studio",
+        "icon": "$(search)"
+      },
+      {
+        "command": "kiroStudio.sessions.clearSearch",
+        "title": "%command.sessions.clearSearch%",
+        "category": "Kiro Studio",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "kiroStudio.sessions.showAll",
+        "title": "%command.sessions.showAll%",
+        "category": "Kiro Studio",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "kiroStudio.sessions.showWorkspace",
+        "title": "%command.sessions.showWorkspace%",
+        "category": "Kiro Studio",
+        "icon": "$(root-folder)"
+      },
+      {
+        "command": "kiroStudio.sessions.open",
+        "title": "%command.sessions.open%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.sessions.fork",
+        "title": "%command.sessions.fork%",
+        "category": "Kiro Studio",
+        "icon": "$(repo-forked)"
+      },
+      {
+        "command": "kiroStudio.sessions.rename",
+        "title": "%command.sessions.rename%",
+        "category": "Kiro Studio",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "kiroStudio.specs.refresh",
+        "title": "%command.specs.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.steering.refresh",
+        "title": "%command.steering.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.steering.new",
+        "title": "%command.steering.new%",
+        "category": "Kiro Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "kiroStudio.steering.generate",
+        "title": "%command.steering.generate%",
+        "category": "Kiro Studio",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "kiroStudio.steering.delete",
+        "title": "%command.steering.delete%",
+        "category": "Kiro Studio",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "kiroStudio.steering.showBuiltin",
+        "title": "%command.steering.showBuiltin%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.hooks.refresh",
+        "title": "%command.hooks.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.hooks.new",
+        "title": "%command.hooks.new%",
+        "category": "Kiro Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "kiroStudio.hooks.toggle",
+        "title": "%command.hooks.toggle%",
+        "category": "Kiro Studio",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "kiroStudio.hooks.toggleFeature",
+        "title": "%command.hooks.toggleFeature%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.mcp.refresh",
+        "title": "%command.mcp.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.mcp.openConfig",
+        "title": "%command.mcp.openConfig%",
+        "category": "Kiro Studio",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "kiroStudio.mcp.add",
+        "title": "%command.mcp.add%",
+        "category": "Kiro Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "kiroStudio.mcp.toggle",
+        "title": "%command.mcp.toggle%",
+        "category": "Kiro Studio",
+        "icon": "$(debug-pause)"
+      },
+      {
+        "command": "kiroStudio.mcp.remove",
+        "title": "%command.mcp.remove%",
+        "category": "Kiro Studio",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "kiroStudio.agents.refresh",
+        "title": "%command.agents.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.agents.new",
+        "title": "%command.agents.new%",
+        "category": "Kiro Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "kiroStudio.agents.use",
+        "title": "%command.agents.use%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.panel.refresh",
+        "title": "%command.panel.refresh%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.openFile",
+        "title": "%command.openFile%",
+        "category": "Kiro Studio"
       }
     ],
     "menus": {
@@ -221,6 +460,195 @@
           "command": "kiroStudio.restart",
           "when": "view == kiroStudio.status",
           "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.sessions.search",
+          "when": "view == kiroStudio.sessions && !kiroStudio.sessionsSearching",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.sessions.clearSearch",
+          "when": "view == kiroStudio.sessions && kiroStudio.sessionsSearching",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.sessions.showAll",
+          "when": "view == kiroStudio.sessions && !kiroStudio.sessionsAll",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.sessions.showWorkspace",
+          "when": "view == kiroStudio.sessions && kiroStudio.sessionsAll",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.sessions.refresh",
+          "when": "view == kiroStudio.sessions",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kiroStudio.specs.refresh",
+          "when": "view == kiroStudio.specs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.steering.new",
+          "when": "view == kiroStudio.steering",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.steering.generate",
+          "when": "view == kiroStudio.steering",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.steering.refresh",
+          "when": "view == kiroStudio.steering",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kiroStudio.hooks.new",
+          "when": "view == kiroStudio.hooks",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.hooks.refresh",
+          "when": "view == kiroStudio.hooks",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.mcp.add",
+          "when": "view == kiroStudio.mcp",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.mcp.openConfig",
+          "when": "view == kiroStudio.mcp",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kiroStudio.mcp.refresh",
+          "when": "view == kiroStudio.mcp",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kiroStudio.agents.new",
+          "when": "view == kiroStudio.agents",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.agents.refresh",
+          "when": "view == kiroStudio.agents",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kiroStudio.openFile",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.sessions.open",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.sessions.fork",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.sessions.rename",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.steering.delete",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.steering.showBuiltin",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.hooks.toggle",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.mcp.toggle",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.mcp.remove",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.agents.use",
+          "when": "false"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "kiroStudio.sessions.fork",
+          "when": "view == kiroStudio.sessions && viewItem =~ /canFork/",
+          "group": "inline@1"
+        },
+        {
+          "command": "kiroStudio.sessions.rename",
+          "when": "view == kiroStudio.sessions && viewItem =~ /canRename/",
+          "group": "inline@2"
+        },
+        {
+          "command": "kiroStudio.sessions.fork",
+          "when": "view == kiroStudio.sessions && viewItem =~ /canFork/",
+          "group": "1_session@1"
+        },
+        {
+          "command": "kiroStudio.sessions.rename",
+          "when": "view == kiroStudio.sessions && viewItem =~ /canRename/",
+          "group": "1_session@2"
+        },
+        {
+          "command": "kiroStudio.steering.delete",
+          "when": "view == kiroStudio.steering && viewItem == steeringFile",
+          "group": "inline"
+        },
+        {
+          "command": "kiroStudio.steering.delete",
+          "when": "view == kiroStudio.steering && viewItem == steeringFile",
+          "group": "9_modification"
+        },
+        {
+          "command": "kiroStudio.hooks.toggle",
+          "when": "view == kiroStudio.hooks && viewItem =~ /^hook /",
+          "group": "inline"
+        },
+        {
+          "command": "kiroStudio.hooks.toggle",
+          "when": "view == kiroStudio.hooks && viewItem =~ /^hook /",
+          "group": "1_toggle"
+        },
+        {
+          "command": "kiroStudio.mcp.toggle",
+          "when": "view == kiroStudio.mcp && viewItem =~ /^mcpServer/",
+          "group": "inline@1"
+        },
+        {
+          "command": "kiroStudio.mcp.remove",
+          "when": "view == kiroStudio.mcp && viewItem =~ /^mcpServer/",
+          "group": "inline@2"
+        },
+        {
+          "command": "kiroStudio.mcp.toggle",
+          "when": "view == kiroStudio.mcp && viewItem =~ /^mcpServer/",
+          "group": "1_toggle"
+        },
+        {
+          "command": "kiroStudio.mcp.remove",
+          "when": "view == kiroStudio.mcp && viewItem =~ /^mcpServer/",
+          "group": "9_modification"
+        },
+        {
+          "command": "kiroStudio.agents.use",
+          "when": "view == kiroStudio.agents && viewItem == agentMode",
+          "group": "inline"
         }
       ]
     },

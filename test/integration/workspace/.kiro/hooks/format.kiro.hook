@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "name": "Format on save",
+  "description": "Runs the formatter when a file is saved",
+  "version": "1",
+  "when": { "type": "fileEdited", "patterns": ["**/*.ts"] },
+  "then": { "type": "askAgent", "prompt": "Format the file." }
+}

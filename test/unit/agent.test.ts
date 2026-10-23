@@ -121,6 +121,61 @@ describe('new session', () => {
       },
     ]);
   });
+
+  it('follows the pages of the session list', async () => {
+    const h = make();
+    h.fake.on('session/list', (params) =>
+      params.cursor === undefined
+        ? { sessions: [{ sessionId: 'a', title: 'A' }], nextCursor: 'page-2' }
+        : params.cursor === 'page-2'
+          ? { sessions: [{ sessionId: 'b' }], nextCursor: 'page-3' }
+          : { sessions: [{ sessionId: 'c' }] },
+    );
+    expect((await h.agent.listSessions()).map((s) => s.sessionId)).toEqual(['a', 'b', 'c']);
+    expect(h.fake.requestsOf('session/list').map((m) => rec(m.params).cursor)).toEqual([undefined, 'page-2', 'page-3']);
+  });
+
+  it('stops following pages after a limit, so that an agent that never ends cannot loop forever', async () => {
+    const h = make();
+    h.fake.on('session/list', () => ({ sessions: [{ sessionId: 'x' }], nextCursor: 'again' }));
+    await h.agent.listSessions();
+    expect(h.fake.requestsOf('session/list').length).toBe(20);
+  });
+});
+
+describe('fork and rename', () => {
+  it('forks a session into a new one in the same folder, which keeps its own state', async () => {
+    const h = make();
+    const original = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const fork = await h.agent.forkSession(original.id, '/ws');
+    expect(fork.id).not.toBe(original.id);
+    expect(fork.cwd).toBe('/ws');
+    expect(fork.status).toBe('ready');
+    expect(h.agent.store.get(fork.id)).toBe(fork);
+    expect(h.fake.requestsOf('session/fork')[0]?.params).toEqual({
+      sessionId: original.id,
+      cwd: '/ws',
+      mcpServers: [],
+    });
+  });
+
+  it('renames only when the agent advertises the method', async () => {
+    const without = make();
+    const first = await without.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await expect(without.agent.renameSession(first.id, 'New name')).rejects.toBeInstanceOf(ExtensionNotAdvertisedError);
+    expect(without.fake.requestsOf('_kiro/session/rename')).toHaveLength(0);
+    await without.agent.dispose();
+
+    const withRename = make({ fake: { extensionMethods: ['_kiro/session/rename'] } });
+    withRename.fake.on('_kiro/session/rename', () => ({}));
+    const second = await withRename.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await withRename.agent.renameSession(second.id, 'New name');
+    expect(second.title).toBe('New name');
+    expect(withRename.fake.requestsOf('_kiro/session/rename')[0]?.params).toEqual({
+      sessionId: second.id,
+      title: 'New name',
+    });
+  });
 });
 
 describe('prompt', () => {

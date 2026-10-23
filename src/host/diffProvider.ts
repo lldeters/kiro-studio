@@ -61,6 +61,15 @@ export class DiffProvider implements vscode.TextDocumentContentProvider, vscode.
     }
   }
 
+  /** Shows a text that is not a file (a built-in steering document, say), read-only, with the syntax of its name. */
+  async openText(name: string, text: string): Promise<void> {
+    const key = `/${++this.counter}/text/${name}`;
+    this.contents.set(key, text);
+    this.forget();
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.from({ scheme: SCHEME, path: key }));
+    await vscode.window.showTextDocument(document, { preview: true });
+  }
+
   /** Old diffs stay readable while their editors are open, but the map does not grow without limit. */
   private forget(): void {
     while (this.contents.size > KEEP * 2) {

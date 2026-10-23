@@ -14,6 +14,7 @@ export interface KiroStudioApi {
   readonly sessionCount: number;
   readonly chatReady: boolean;
   readonly checkpointCount: number;
+  panelLabels(view: string): Promise<string[]>;
   sendPrompt(text: string): Promise<void>;
   readonly firstCheck: Promise<void>;
 }
@@ -50,5 +51,14 @@ export async function waitFor(condition: () => boolean, what: string, timeoutMs 
   while (!condition()) {
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
     await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+/** Like {@link waitFor} for a condition that needs an `await`. */
+export async function waitForAsync(condition: () => Promise<boolean>, what: string, timeoutMs = 20_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${what}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }

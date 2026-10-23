@@ -205,6 +205,8 @@ export class FakeAgent {
             _meta: { kiro: { agentMode: 'vibe', source: 'local', status: 'idle' } },
           })),
         };
+      case 'session/fork':
+        return this.newSession(str(params.cwd) ?? '/ws');
       case 'session/set_config_option':
         return this.setOption(str(params.sessionId) ?? '', str(params.configId) ?? '', String(params.value));
       case 'session/prompt':

@@ -76,13 +76,39 @@ function serve() {
           id,
           result: {
             protocolVersion: 1,
-            agentCapabilities: { loadSession: true, promptCapabilities: { image: true } },
+            agentCapabilities: {
+              loadSession: true,
+              promptCapabilities: { image: true },
+              sessionCapabilities: { list: {} },
+            },
             agentInfo: { name: 'Kiro CLI', version: '2.33.1' },
           },
         });
       case 'session/new':
         if (params && typeof params.cwd === 'string') cwd = params.cwd;
         return send({ id, result: { sessionId: 'fake-session-1', configOptions } });
+      case 'session/list':
+        return send({
+          id,
+          result: {
+            sessions: [
+              {
+                sessionId: 'fake-session-1',
+                cwd,
+                title: 'Fake session',
+                updatedAt: new Date().toISOString(),
+                _meta: { kiro: { agentMode: 'vibe', source: 'local', status: 'idle' } },
+              },
+              {
+                sessionId: 'older-session',
+                cwd,
+                title: 'An older session',
+                updatedAt: '2026-01-01T00:00:00.000Z',
+                _meta: { kiro: { agentMode: 'vibe', source: 'local', status: 'idle' } },
+              },
+            ],
+          },
+        });
       case 'session/load':
         return send({ id, result: { configOptions } });
       case 'session/prompt': {

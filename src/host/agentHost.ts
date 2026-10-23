@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { KiroAgent } from '../acp/agent';
+import type { BroadcastEvent } from '../acp/dispatcher';
 import { CheckpointService } from '../checkpoints/service';
 import { ShadowRepo } from '../checkpoints/shadowRepo';
 import type { Session } from '../acp/sessions';
@@ -23,6 +24,9 @@ export const ACP_ARGS = ['acp', '--agent-engine=v3', '--auth-method=cli'] as con
 
 export class AgentHost implements vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
+  private readonly broadcasts = new vscode.EventEmitter<BroadcastEvent>();
+  /** What Kiro pushes unprompted (MCP status, steering documents, the session list…). One stream for every agent of the window. */
+  readonly onDidBroadcast = this.broadcasts.event;
   /** Fires when the agent is created, changes state, or any of its sessions change. */
   readonly onDidChange = this.changed.event;
 
@@ -167,6 +171,7 @@ export class AgentHost implements vscode.Disposable {
         approvalChanges.dispose();
       },
       agent.status.on(() => this.notify()),
+      agent.broadcasts.on((event) => this.broadcasts.fire(event)),
       agent.store.added.on((session) => {
         this.subscriptions.push(session.changes.on(() => this.notify()));
         this.notify();
@@ -192,5 +197,6 @@ export class AgentHost implements vscode.Disposable {
     for (const unsubscribe of this.subscriptions.splice(0)) unsubscribe();
     await agent?.dispose();
     this.changed.dispose();
+    this.broadcasts.dispose();
   }
 }

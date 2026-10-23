@@ -5,6 +5,7 @@ import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
 import { DiffProvider } from './host/diffProvider';
+import { KiroPanel, PANEL_VIEWS, type PanelViewId } from './host/panel/panel';
 import { createProtocolChannel } from './host/logger';
 import { SetupController, type UiState } from './host/setup';
 import { Settings } from './host/settings';
@@ -19,6 +20,8 @@ export interface KiroStudioApi {
   readonly sessionCount: number;
   /** True while a chat webview is showing and has told the host that its page is loaded. */
   readonly chatReady: boolean;
+  /** The labels at the top of a Kiro panel view (`sessions`, `specs`, `steering`, `hooks`, `mcp`, `agents`). */
+  panelLabels(view: string): Promise<string[]>;
   /** How many turns of the active session left a checkpoint (changed files). */
   readonly checkpointCount: number;
   /** Sends a prompt in the active session, like the chat does, and resolves when the turn is over. */
@@ -48,6 +51,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   const debug = new DebugChat(agentHost);
   const diffs = new DiffProvider();
   const chat = new ChatController(agentHost, setup, settings, diffs);
+  const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
   agentHost.suppressApprovalPrompt = () => chat.visible;
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
@@ -58,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     debug,
     chat,
     diffs,
+    panel,
     vscode.window.registerWebviewViewProvider(
       ChatViewProvider.viewType,
       new ChatViewProvider(context.extensionUri, chat),
@@ -91,6 +96,8 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     get agentPhase() {
       return agentHost.agent?.state.phase ?? 'stopped';
     },
+    panelLabels: (view) =>
+      (PANEL_VIEWS as readonly string[]).includes(view) ? panel.labels(view as PanelViewId) : Promise.resolve([]),
     get checkpointCount() {
       return agentHost.activeSession?.checkpoints.size ?? 0;
     },

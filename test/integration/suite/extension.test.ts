@@ -2,7 +2,16 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { activate, canRunFakeCli, createFakeCli, EXTENSION_ID, recheck, setCliPath, waitFor } from '../support';
+import {
+  activate,
+  canRunFakeCli,
+  createFakeCli,
+  EXTENSION_ID,
+  recheck,
+  setCliPath,
+  waitFor,
+  waitForAsync,
+} from '../support';
 
 interface Manifest {
   contributes: { commands: { command: string }[]; views: Record<string, { id: string }[]> };
@@ -112,6 +121,38 @@ suite('Kiro Studio', () => {
       } finally {
         fs.rmSync(output, { force: true });
       }
+    });
+
+    test('lists the sessions of the agent in the Kiro panel and opens an earlier one', async () => {
+      const api = await activate();
+      await setCliPath(createFakeCli('ready'));
+      await recheck();
+      await vscode.commands.executeCommand('kiroStudio.newSession');
+      await waitFor(() => api.sessionCount >= 1 && api.agentPhase === 'ready', 'a session');
+      await vscode.commands.executeCommand('kiroStudio.sessions.refresh');
+      await waitForAsync(
+        async () => (await api.panelLabels('sessions')).includes('An older session'),
+        'the session list of the agent',
+      );
+
+      const before = api.sessionCount;
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      await vscode.commands.executeCommand('kiroStudio.sessions.open', 'older-session', folder);
+      await waitFor(() => api.sessionCount > before, 'the earlier session to be loaded');
+    });
+  });
+
+  suite('Kiro panel files', () => {
+    test('shows what is in the .kiro folder of the workspace', async () => {
+      const api = await activate();
+      const has = async (view: string, label: string): Promise<boolean> =>
+        (await api.panelLabels(view)).includes(label);
+      assert.deepStrictEqual(await api.panelLabels('specs'), ['demo']);
+      assert.ok(await has('steering', 'This workspace'));
+      assert.ok(await has('hooks', 'Format on save'));
+      assert.ok(await has('hooks', 'Hooks are off in Kiro Studio'), 'the hooks setting is off by default');
+      assert.ok(await has('mcp', 'This workspace'));
+      assert.ok(await has('agents', 'Your agents'));
     });
   });
 });

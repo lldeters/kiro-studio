@@ -83,6 +83,8 @@ export interface SessionSummary {
 }
 
 const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000, 16_000, 30_000];
+/** A safety limit for `session/list`: 20 pages are far more sessions than anyone browses. */
+const MAX_LIST_PAGES = 20;
 
 export class KiroAgent {
   readonly store = new SessionStore();
@@ -326,16 +328,24 @@ export class KiroAgent {
     return session;
   }
 
+  /** All sessions the agent lists (for a folder, or for every folder), following the pages it hands out. */
   async listSessions(cwd?: string): Promise<SessionSummary[]> {
     await this.start();
-    const result = await this.ready.listSessions(cwd === undefined ? {} : { cwd });
-    return arr(rec(result).sessions).flatMap((entry) => {
-      const record = rec(entry);
-      const sessionId = str(record.sessionId);
-      if (sessionId === undefined) return [];
-      const meta = rec(rec(record._meta).kiro);
-      return [
-        {
+    const all: SessionSummary[] = [];
+    let cursor: string | undefined;
+    for (let page = 0; page < MAX_LIST_PAGES; page++) {
+      const result = rec(
+        await this.ready.listSessions({
+          ...(cwd === undefined ? {} : { cwd }),
+          ...(cursor === undefined ? {} : { cursor }),
+        }),
+      );
+      for (const entry of arr(result.sessions)) {
+        const record = rec(entry);
+        const sessionId = str(record.sessionId);
+        if (sessionId === undefined) continue;
+        const meta = rec(rec(record._meta).kiro);
+        all.push({
           sessionId,
           ...opt('cwd', str(record.cwd)),
           ...opt('title', str(record.title)),
@@ -343,9 +353,34 @@ export class KiroAgent {
           ...opt('status', str(meta.status)),
           ...opt('source', str(meta.source)),
           ...opt('agentMode', str(meta.agentMode)),
-        },
-      ];
-    });
+        });
+      }
+      cursor = str(result.nextCursor);
+      if (cursor === undefined || cursor === '') break;
+    }
+    return all;
+  }
+
+  /** A new session that continues from an existing one. Throws when the agent does not offer forking. */
+  async forkSession(sessionId: string, cwd: string): Promise<Session> {
+    await this.start();
+    const result = await this.ready.forkSession({ sessionId, cwd });
+    const forkedId = str(rec(result).sessionId);
+    if (forkedId === undefined) throw new Error('The Kiro CLI did not return a session id');
+    const session = this.store.create(forkedId, { cwd });
+    this.dispatcher.sessionRegistered(forkedId);
+    session.applySessionResult(result);
+    return session;
+  }
+
+  /** Renames a session. Only works when the agent advertises `_kiro/session/rename`. */
+  async renameSession(sessionId: string, title: string): Promise<void> {
+    await this.callExtension('_kiro/session/rename', { sessionId, title });
+    const session = this.store.get(sessionId);
+    if (session) {
+      session.title = title;
+      session.changes.emit('title');
+    }
   }
 
   async closeSession(sessionId: string): Promise<void> {
