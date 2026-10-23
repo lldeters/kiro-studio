@@ -3,9 +3,9 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0, 1 und 2 sind umgesetzt (Phase 1 siehe Abschnitt 9, Phase 2 Abschnitt 10). Beides ist gebaut, getestet und
-per CI geprüft (Linux, macOS, Windows; VS Code 1.93.0 und stable), aber noch nicht gegen deine echte CLI durchgespielt.
-Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8, 9 und 10).**
+**Status: Phase 0 bis 3 sind umgesetzt (Phase 1 siehe Abschnitt 9, Phase 2 Abschnitt 10, Phase 3 Abschnitt 11). Alles ist gebaut,
+getestet und per CI geprüft (Linux, macOS, Windows; VS Code 1.93.0 und stable), aber noch nicht gegen deine echte CLI
+durchgespielt. Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8 bis 11).**
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -349,4 +349,60 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
    „Änderungen ansehen“ → „Zurücknehmen“; die Datei verschwindet wieder.
 3. Autopilot umschalten, nochmal einen Auftrag geben: es wird nicht mehr gefragt, im Chat steht „Automatisch erlaubt“.
 4. Ansicht ausblenden und wieder einblenden (Entwurf bleibt), `#` und `/` in der Eingabe ausprobieren.
+
+## 11. Phase 3: Stand, Abweichungen und Annahmen
+
+### Was gebaut ist
+
+Sechs Ansichten im Kiro-Studio-Container (unter dem Chat), gelesen aus den `.kiro`-Dateien und aus dem, was Kiro schickt:
+
+- **Sitzungen:** `session/list` (alle Seiten) plus die Live-Updates `_kiro/sessions/changed` (Teilobjekte nach `sessionId`
+  zusammengeführt) `[V]`; Standard: nur Sitzungen dieses Arbeitsbereichs, umschaltbar auf alle Ordner; Suche; Öffnen lädt
+  die Sitzung samt Replay in einen Chat-Tab; Abzweigen und Umbenennen nur, wenn die CLI es anbietet.
+- **Specs:** Spec-Ordner mit Anforderungen, Entwurf, Aufgaben und dem Fortschritt aus den Checkboxen von `tasks.md`.
+- **Steering:** Dateien des Arbeitsbereichs und aus `~/.kiro` mit Einbindungsart (immer, bei passenden Dateien, auf Anfrage),
+  dazu die eingebauten Dokumente aus dem Broadcast; neue Datei, löschen (in den Papierkorb), „Kiro schreiben lassen“.
+- **Hooks:** Dateien mit Ereignis und Muster, ein-/ausschalten, neu; **laufen nur mit Opt-in** (Entscheidung E4), die Ansicht
+  bietet den Schalter an und warnt, dass dann auch deine globalen Hooks laufen.
+- **MCP:** Server aus `mcp.json` (Arbeitsbereich und `~/.kiro`) mit Live-Status; hinzufügen (immer zuerst ausgeschaltet),
+  ein-/ausschalten, entfernen. Werte von `env` werden nie gelesen oder angezeigt, nur die Namen.
+- **Agents:** die Agents der aktiven Sitzung (anklicken = verwenden) und deine eigenen Agent-Dateien; neu anlegen.
+
+Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfolge, Einrückung bleiben).
+
+### Abweichungen vom Phasenplan (und warum)
+
+| Geplant | Umgesetzt | Grund |
+| --- | --- | --- |
+| Spec-Assistent „Neue Spec“ | Phase 4 | gehört zum Spec-Workflow; Phase 3 zeigt und öffnet Specs. |
+| Sitzung löschen | nicht umgesetzt | `session/delete` ist angekündigt, die Parameter sind ungeprüft. |
+| Hook-Zustand live aus `_kiro/hooks/*` | Liste aus den Dateien | Die Nachrichten nach dem Opt-in sind nicht beobachtet `[P]`; die Ansicht aktualisiert sich bei jeder solchen Nachricht, zeigt aber nur Dateien. |
+| MCP-Server neu starten | nicht umgesetzt | `_kiro/mcp/resetServer` wird nicht angekündigt `[V]`. |
+| `~/.kiro` beobachten | liest beim Einblenden und Aktualisieren | VS Code beobachtet Ordner außerhalb des Arbeitsbereichs nicht verlässlich. |
+| Powers, Wissensbasis, Memory | nicht im Plan, nicht umgesetzt | Die Methoden sind angekündigt, aber nicht Teil der Aufgabe. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A13 | `session/list` ohne `cwd` liefert die Sitzungen aller Ordner. | Schlägt es fehl, wird mit dem Arbeitsbereichsordner erneut gefragt; „alle Ordner“ zeigt dann nur Sitzungen, die per Broadcast bekannt werden. |
+| A14 | `session/fork` nimmt `{ sessionId, cwd, mcpServers: [] }` (ACP-Entwurf) und antwortet wie `session/new`. | „Abzweigen“ zeigt eine Fehlermeldung. Es erscheint nur, wenn die CLI die Fähigkeit ankündigt. |
+| A15 | `_kiro/session/rename` nimmt `{ sessionId, title }`. | Die 2.33.1 kündigt die Methode gar nicht an; „Umbenennen“ erscheint dort nicht. |
+| A16 | Formate von `.kiro.hook`, Agent-JSON, `mcp.json` und der Steering-Frontmatter entsprechen dem, was die Kiro-IDE schreibt; `tasks.md` hat Checkbox-Zeilen (E3, noch keine echte Spec gesehen). | Dateien, die nicht passen, erscheinen trotzdem in der Liste, mit Fehlertext bzw. ohne Fortschritt. |
+| A17 | Einträge von `_kiro/mcp/status` haben Name und Status (unter üblichen Schlüsseln); beobachtet wurde nur die leere Liste. | Server ohne erkennbaren Status zeigen „nicht gestartet“; die Konfiguration bleibt sichtbar. |
+| A18 | Eingebaute Steering-Dokumente tragen im Broadcast eine `uri` mit `builtin:`; Dateien des Nutzers erkenne ich an den Dateien selbst. | Eingebaute Dokumente erscheinen nicht, oder Dateien doppelt; die Dateiansicht bleibt richtig. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- Die Ansichten „Sitzungen“ ist offen, die anderen fünf sind eingeklappt.
+- Sitzungen: nur dieser Arbeitsbereich (Umschalter in der Titelleiste).
+- Ein neuer MCP-Server wird **ausgeschaltet** angelegt, ein neuer Hook ebenfalls.
+- Der Agent startet nicht beim Einblenden der Ansicht „Sitzungen“; sie wartet, bis eine Sitzung läuft.
+
+### Abnahme bei dir
+
+1. In einem Projekt mit `.kiro`-Ordner (oder einem neuen): die fünf Datei-Ansichten aufklappen, „Neue Steering-Datei“ anlegen.
+2. „Kiro schreiben lassen“ in der Steering-Ansicht: Kiro soll `product.md`, `tech.md`, `structure.md` anlegen.
+3. Eine Sitzung starten, dann in „Sitzungen“ eine frühere öffnen (das Gespräch erscheint im Chat).
+4. MCP: „Server hinzufügen“, dann einschalten und eine neue Sitzung starten; der Status sollte sich ändern.
 

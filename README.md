@@ -8,7 +8,7 @@ Agent Client Protocol (ACP).
 
 ## Status
 
-**Phases 0 to 2 are done: setup, connection and the chat.** It has not been tried against a real Kiro CLI by anyone
+**Phases 0 to 3 are done: setup, connection, the chat and the Kiro panel.** It has not been tried against a real Kiro CLI by anyone
 but the author's probe runs yet, so expect rough edges. What exists:
 
 - Finds the Kiro CLI, checks that it is new enough (V3 engine) and that you are signed in, and shows the result in
@@ -21,9 +21,12 @@ but the author's probe runs yet, so expect rough edges. What exists:
   always asks. See [docs/PLAN.md](docs/PLAN.md), decision E1.
 - **Checkpoints:** every turn that changes files leaves a card with "View changes" and "Revert", backed by a separate
   Git repository in the extension's storage (yours is never touched; needs Git). Sessions export to Markdown.
+- The **Kiro panel**: your earlier sessions (open, search, fork where the CLI allows it), and your specs, steering
+  files, hooks, MCP servers and custom agents, read from `.kiro` and `~/.kiro`, with the actions to create, switch on
+  and off, and remove them. Edits keep your comments and formatting. Hooks only run when you turn them on.
 - Keeps the connection alive (restart with back-off, sessions resume) and ends the whole process tree on exit.
 
-Next: the Kiro panel (3), specs (4), polish (5).
+Next: the spec workflows (4), polish (5).
 
 - [docs/PLAN.md](docs/PLAN.md): architecture decisions, phases, risks, open questions (German)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the pieces fit together

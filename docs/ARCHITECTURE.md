@@ -7,12 +7,12 @@ This file describes how the pieces fit together. Phases, risks and open question
 [PLAN.md](PLAN.md); wire-level facts live in [protocol-notes.md](protocol-notes.md). Keep this file in
 step with the code after every phase.
 
-**State after Phase 2:** the foundation (CLI discovery, the complete ACP layer, status UI) and the chat exist: a
-webview with Markdown, highlighted code, diagrams, tool cards, inline permission questions, a toolbar, slash commands
-and context attachments, diffs, checkpoints with revert, and an export to Markdown. The Kiro panel contents, specs and
-polish are still target design and are marked *(planned)*. Facts proven by the probe on a real Kiro CLI 2.33.1
-(Windows 11), by recordings or by reading the SDK are marked *(proven)*; behaviour that is implemented from
-documentation only is listed in PLAN.md under "Assumptions".
+**State after Phase 3:** the foundation (CLI discovery, the complete ACP layer, status UI), the chat (webview with
+Markdown, code, diagrams, tool cards, inline permission questions, toolbar, slash commands and attachments, diffs,
+checkpoints with revert, export) and the Kiro panel (views for sessions, specs, steering, hooks, MCP servers and
+agents). The spec workflows and polish are still target design and are marked *(planned)*. Facts proven by the probe
+on a real Kiro CLI 2.33.1 (Windows 11), by recordings or by reading the SDK are marked *(proven)*; behaviour that is
+implemented from documentation only is listed in PLAN.md under "Assumptions".
 
 ## Principles
 
@@ -41,7 +41,9 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ chatController.ts .. talks to the chat webviews: sends changes (30 ms), validates and carries out requests
 │   ├─ chatView.ts ........ the sidebar view and the editor-tab variant; the page is built by src/view/chatHtml.ts
 │   ├─ promptContext.ts ... pickers (files, folders, steering, specs) and readers (git diff, problems) for attachments
-│   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors
+│   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors and read-only texts
+│   ├─ panel/ ............. panel.ts (state, commands, actions), kiroFiles.ts (VS Code reader, watcher on `.kiro`),
+│   │                       treeProvider.ts (nodes -> tree items)
 │   ├─ setup.ts, settings.ts, approvalUi.ts, fsPort.ts, statusBar.ts, statusView.ts, quickMenu.ts, commands.ts,
 │   │   debugChat.ts, logger.ts
 │
@@ -51,10 +53,16 @@ VS Code window (extension host, extensionKind: workspace)
 ├─ src/view/ ............... pure view models, tested without VS Code
 │   ├─ chatPresenter.ts ... session store -> what the webview renders; `PatchTracker` computes what changed
 │   ├─ promptContext.ts ... attachments -> ACP content blocks (links only inside the workspace)
+│   ├─ panelTrees.ts ...... the nodes of the six Kiro panel views (labels, icons, context flags, commands)
 │   ├─ exportMarkdown.ts, chatHtml.ts, statusModel.ts, statusTree.ts, transcriptPrinter.ts
 │
 ├─ src/checkpoints/ ........ no `vscode`: git.ts (runs `git`), shadowRepo.ts (the shadow repository),
 │                            service.ts (records turns, sides of a diff, revert)
+│
+├─ src/workspace/ .......... no `vscode`: readers and editors of the `.kiro` files behind the Kiro panel:
+│                            frontmatter, steering, specs (task progress), hooks, mcp (config, edits, status broadcast),
+│                            agents, jsonEdit (jsonc-parser edits that keep comments and indentation), sessionList
+│                            (the merged list of sessions); they read through a small `FileReader`
 │
 ├─ src/kiro/cli.ts ......... locate the CLI, `--version`, `acp --help`, `whoami`, login invocation -> SetupState
 │
@@ -70,8 +78,7 @@ VS Code window (extension host, extensionKind: workspace)
 │
 ├─ src/util/ ............... json helpers, emitter, async helpers, path normalisation, redaction, protocol log
 │
-├─ (planned) workspace/ .... file watchers + parsers: specs, steering, hooks, mcp, agents (jsonc-parser edits)
-└─ (planned) editor/ ....... CodeLens for tasks.md
+└─ (planned) editor/ ....... CodeLens for tasks.md, the spec view
 
 webview-ui/ ................ React app (own tsconfig, built by Vite to dist/webview): state.ts (pure reducer),
                              store.ts (Zustand, drafts), components/, highlight.ts (Shiki, lazy), styles.css
@@ -189,15 +196,28 @@ chat webview is showing, the QuickPick stays closed; when the chat is hidden, th
 A script (`npm run preview`) renders the webview in Chromium with a mock VS Code API and a theme, using messages from
 the real store and presenter, for screenshots without starting VS Code.
 
-## Files shared with the Kiro IDE *(planned)*
+## The Kiro panel
 
-Specs, steering, hooks, MCP settings and custom agents are plain files under `.kiro/` and `~/.kiro/`. They are
-read through watchers and parsers in `workspace/`; JSON edits preserve formatting (`jsonc-parser`). Actions
-(create a spec, generate steering) go through prompts or advertised commands, not through invented methods.
-Live state that only the agent knows comes from `_kiro/*` broadcasts and advertised request methods, whichever the
-installed CLI provides. Kiro 2.33.1 pushes `_kiro/mcp/status` (full snapshot), `_kiro/steering/documents_changed`
-(documents with content), `_kiro/tools/didChange` (tool tags) and `_kiro/sessions/changed` (partial objects, merged by
-`sessionId`) *(proven)*. Hook state arrives only after the client opted in to hooks.
+Specs, steering, hooks, MCP settings and custom agents are plain files under `.kiro/` (workspace) and `~/.kiro/`
+(all workspaces), shared with the Kiro IDE. Six views in the Kiro Studio container show them:
+
+| View | Source | Actions |
+| --- | --- | --- |
+| Sessions | `session/list` (all pages), then the live `_kiro/sessions/changed` broadcasts, merged by `sessionId` (they carry partial objects) *(proven shape)* | open (`session/load`, the replay fills a chat tab), fork and rename only when the CLI offers them, search, workspace/all folders |
+| Specs | `.kiro/specs/<name>/{requirements,design,tasks}.md`, progress from the checkboxes of `tasks.md` | open documents |
+| Steering | `.kiro/steering/*.md`, `~/.kiro/steering`, and the built-in documents of `_kiro/steering/documents_changed` (`uri: builtin:…`) | new file, delete, let Kiro write the foundational files (a prompt), show built-in text |
+| Hooks | `.kiro/hooks/*.kiro.hook`, `~/.kiro/hooks`; they only run when `kiroStudio.hooks.enabled` is on (decision E4), and the view offers the switch | new, turn one on or off, open |
+| MCP | `.kiro/settings/mcp.json`, `~/.kiro/settings/mcp.json`; live state from the `_kiro/mcp/status` broadcast | add (always switched off first), turn on or off, remove, open |
+| Agents | the agents of the active session (`mode` option) and `.kiro/agents/*.json`, `~/.kiro/agents` | use in this session, new, open |
+
+What a view says is decided by pure functions (`src/view/panelTrees.ts`); the files are read through a `FileReader` so
+that the readers (`src/workspace`) are tested with a map. `.kiro` of the workspace is watched (changes merged to one
+refresh); `~/.kiro` is read again when a view comes into sight or is refreshed. Edits of JSON files go through
+`jsonc-parser`, so comments, key order and indentation stay as they were; `env` and `header` values of MCP servers are
+never read out, only their names. The sessions view starts empty and explains itself until the agent is running; it
+fetches the list as soon as the connection is ready. A broadcast reaches the panel through one stream of the host that
+survives restarts of the agent. Formats that are Kiro's (hooks, agents, `tasks.md`, the MCP status entries) are read
+leniently: a file that does not parse is still listed, with the error.
 
 ## Checkpoints and revert
 
@@ -220,7 +240,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
 - **Unit (Vitest, `npm test`):** the protocol layer against a scripted fake agent over in-memory streams (streaming,
   replay, cancel, approvals, late config advertisements, process crash, restart and resume, early notifications,
   write ordering, turn hooks), the dispatcher, parsers, CLI discovery with an injected environment, redaction, path
-  handling, the presenter and patch tracker, attachment resolution, the shadow repository and checkpoint service
+  handling, the readers and editors of the `.kiro` files and the panel trees, a consistency test of the manifest
+  (menus, welcome content, views, titles), the presenter and patch tracker, attachment resolution, the shadow repository and checkpoint service
   **against real `git`** in temporary folders (including that the user's repository is untouched), the Markdown
   export, message validation, and a coverage test that every runtime message, webview message and manifest string has a
   German translation. `spawnTransport` is tested with a real process tree on POSIX.
@@ -233,7 +254,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
   inside VS Code.
 - **Integration (`@vscode/test-cli`, `npm run test:integration`):** activation, every manifest command registered,
   that the chat page loads (script, style, content security policy), setup states, agent start, session, restart, and a
-  turn that writes a file: checkpoint recorded (real Git, real storage) and session exported. The fake CLI is a shell
+  turn that writes a file: checkpoint recorded (real Git, real storage) and session exported, the panel showing the
+  sessions of the agent and the `.kiro` fixtures of the test workspace, opening an earlier session. The fake CLI is a shell
   script, so those tests are skipped on Windows. They need a VS Code download, which is why CI runs them.
 - **Fixtures:** handwritten and Kiro-shaped (`test/support/kiro.ts`); third-party recordings are not committed.
 - **CI (`.github/workflows/ci.yml`):** typecheck, lint, format check, unit and webview tests and build on Windows,
