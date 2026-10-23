@@ -199,14 +199,14 @@ describe('ShadowRepo', () => {
     });
   });
 
-  it('handles file names with spaces, quotes and non-ASCII characters', async () => {
+  it('handles file names with spaces, apostrophes, # and non-ASCII characters', async () => {
     const before = await repo.snapshot('before');
-    await write('dir with space/größe "x".txt', 'x\n');
+    await write('dir with space/größe 'x' #1.txt', 'x\n');
     const after = await repo.snapshot('after');
     const files = await repo.changes(before, after);
-    expect(files.map((f) => f.path)).toEqual(['dir with space/größe "x".txt']);
+    expect(files.map((f) => f.path)).toEqual(['dir with space/größe 'x' #1.txt']);
     await repo.revert(before, after, files);
-    expect(await exists('dir with space/größe "x".txt')).toBe(false);
+    expect(await exists('dir with space/größe 'x' #1.txt')).toBe(false);
   });
 
   it('runs overlapping operations one after another', async () => {
