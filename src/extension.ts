@@ -32,6 +32,8 @@ export interface KiroStudioApi {
   startSpec(workflow: SpecWorkflow, name: string, description: string): Promise<void>;
   /** The text of the last message the user sent in the active session. */
   readonly lastUserMessage: string | undefined;
+  /** True while the active session is in the middle of a turn. */
+  readonly activeBusy: boolean;
   /** The agent (mode) of the active session. */
   readonly activeMode: string | undefined;
   /** How many spec views are open, and how many of those have loaded their page. */
@@ -131,6 +133,9 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
         if (item?.kind === 'user') return item.text;
       }
       return undefined;
+    },
+    get activeBusy() {
+      return agentHost.activeSession?.busy ?? false;
     },
     get activeMode() {
       const session = agentHost.activeSession;

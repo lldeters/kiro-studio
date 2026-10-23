@@ -183,6 +183,8 @@ suite('Kiro Studio', () => {
         assert.match(api.lastUserMessage ?? '', /named "password-reset" in \.kiro\/specs\/password-reset\//);
         assert.match(api.lastUserMessage ?? '', /requirements\.md/);
         assert.strictEqual(api.activeMode, 'spec');
+        // The next test must not start while this turn is still running: a busy session makes the extension ask.
+        await waitFor(() => !api.activeBusy, 'the turn to end');
       });
 
       test('runs a task of the list by its line', async () => {
@@ -191,6 +193,7 @@ suite('Kiro Studio', () => {
         await recheck();
         await vscode.commands.executeCommand('kiroStudio.newSession');
         await waitFor(() => api.sessionCount >= 1 && api.agentPhase === 'ready', 'a session');
+        await waitFor(() => !api.activeBusy, 'the session to be idle');
         // Line 3 (zero-based) of the demo list is "- [ ] 2. Add a test".
         await vscode.commands.executeCommand('kiroStudio.specs.runTask', path.join(specDir(), 'tasks.md'), 3, '2');
         await waitFor(
