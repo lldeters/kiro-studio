@@ -13,8 +13,10 @@ const escapeRegExp = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * case-insensitively.
  */
 export function homePattern(home: string): RegExp | undefined {
+  // A trivial home such as "/" must not produce patterns: the encoded variants ("%2F") would match unrelated text.
+  if (home.length <= 3) return undefined;
   const variants = new Set<string>();
-  const add = (v: string) => { if (v.length > 3) variants.add(v); };
+  const add = (v: string) => variants.add(v);
   const slashes = home.replace(/\\/g, '/');
   add(home);
   add(slashes);
@@ -22,7 +24,13 @@ export function homePattern(home: string): RegExp | undefined {
   add(encodeURIComponent(home));
   add(encodeURIComponent(encodeURIComponent(home)));
   if (variants.size === 0) return undefined;
-  return new RegExp([...variants].sort((a, b) => b.length - a.length).map(escapeRegExp).join('|'), 'gi');
+  return new RegExp(
+    [...variants]
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp)
+      .join('|'),
+    'gi',
+  );
 }
 
 export interface Redactor {

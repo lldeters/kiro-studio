@@ -23,7 +23,7 @@ import { PassThrough, Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath } from 'node:url';
 import * as acp from '@agentclientprotocol/sdk/unstable';
-import { createRedactor } from './redact.js';
+import { createRedactor } from '../src/util/redact.js';
 
 // ---------------------------------------------------------------------------------------
 // Small helpers
@@ -144,29 +144,75 @@ function parseArgs(argv: string[]): Options {
       return v as T;
     };
     switch (flag) {
-      case '--cli': o.cli = value(); break;
-      case '--acp-args': o.acpArgs = value().split(/\s+/).filter(Boolean); break;
-      case '--prompt': o.prompt = value(); break;
-      case '--no-prompt': o.noPrompt = true; break;
-      case '--autopilot': o.autopilot = oneOf(value(), ['on', 'off', 'keep'] as const); break;
-      case '--model': o.model = value(); break;
-      case '--mode': o.mode = value(); break;
-      case '--protocol-version': o.protocolVersion = Number.parseInt(value(), 10); break;
-      case '--approve': o.approve = oneOf(value(), ['safe', 'none'] as const); break;
-      case '--review': o.review = oneOf(value(), ['accept', 'reject'] as const); break;
-      case '--no-fs': o.fs = false; break;
-      case '--terminal': o.terminal = true; break;
-      case '--hooks': o.hooks = true; break;
-      case '--no-extensions': o.extensions = false; break;
-      case '--timeout': o.timeoutSec = Number.parseInt(value(), 10); break;
-      case '--exit-wait': o.exitWaitSec = Number.parseInt(value(), 10); break;
-      case '--kiro-debug': o.kiroDebug = true; break;
-      case '--include-kiro-log': o.includeKiroLog = true; break;
-      case '--keep-dir': o.keepDir = true; break;
-      case '--out': o.out = value(); break;
-      case '--no-redact': o.redact = false; break;
-      case '--help': case '-h': o.help = true; break;
-      default: throw new Error(`Unknown option: ${flag}\n\n${HELP}`);
+      case '--cli':
+        o.cli = value();
+        break;
+      case '--acp-args':
+        o.acpArgs = value().split(/\s+/).filter(Boolean);
+        break;
+      case '--prompt':
+        o.prompt = value();
+        break;
+      case '--no-prompt':
+        o.noPrompt = true;
+        break;
+      case '--autopilot':
+        o.autopilot = oneOf(value(), ['on', 'off', 'keep'] as const);
+        break;
+      case '--model':
+        o.model = value();
+        break;
+      case '--mode':
+        o.mode = value();
+        break;
+      case '--protocol-version':
+        o.protocolVersion = Number.parseInt(value(), 10);
+        break;
+      case '--approve':
+        o.approve = oneOf(value(), ['safe', 'none'] as const);
+        break;
+      case '--review':
+        o.review = oneOf(value(), ['accept', 'reject'] as const);
+        break;
+      case '--no-fs':
+        o.fs = false;
+        break;
+      case '--terminal':
+        o.terminal = true;
+        break;
+      case '--hooks':
+        o.hooks = true;
+        break;
+      case '--no-extensions':
+        o.extensions = false;
+        break;
+      case '--timeout':
+        o.timeoutSec = Number.parseInt(value(), 10);
+        break;
+      case '--exit-wait':
+        o.exitWaitSec = Number.parseInt(value(), 10);
+        break;
+      case '--kiro-debug':
+        o.kiroDebug = true;
+        break;
+      case '--include-kiro-log':
+        o.includeKiroLog = true;
+        break;
+      case '--keep-dir':
+        o.keepDir = true;
+        break;
+      case '--out':
+        o.out = value();
+        break;
+      case '--no-redact':
+        o.redact = false;
+        break;
+      case '--help':
+      case '-h':
+        o.help = true;
+        break;
+      default:
+        throw new Error(`Unknown option: ${flag}\n\n${HELP}`);
     }
   }
   if (!Number.isInteger(o.protocolVersion) || o.timeoutSec <= 0 || Number.isNaN(o.timeoutSec) || !(o.exitWaitSec > 0)) {
@@ -197,7 +243,10 @@ class Recorder {
   private readonly wirePath: string;
   private readonly stderrPath: string;
 
-  constructor(readonly dir: string, private readonly redact: boolean) {
+  constructor(
+    readonly dir: string,
+    private readonly redact: boolean,
+  ) {
     fs.mkdirSync(dir, { recursive: true });
     this.wirePath = path.join(dir, 'wire.ndjson');
     this.stderrPath = path.join(dir, 'stderr.log');
@@ -243,16 +292,29 @@ class Recorder {
     try {
       const msg = rec(JSON.parse(line));
       this.count(`${direction === 'out' ? 'client→agent' : 'agent→client'} ${this.label(msg, direction)}`);
-      entry = { t: this.elapsed(), dir: direction === 'out' ? 'client→agent' : 'agent→client', msg: this.redact ? redactDeep(msg) : msg };
+      entry = {
+        t: this.elapsed(),
+        dir: direction === 'out' ? 'client→agent' : 'agent→client',
+        msg: this.redact ? redactDeep(msg) : msg,
+      };
     } catch {
       this.unparseableLines++;
-      entry = { t: this.elapsed(), dir: direction === 'out' ? 'client→agent' : 'agent→client', raw: this.redact ? redactText(line) : line };
+      entry = {
+        t: this.elapsed(),
+        dir: direction === 'out' ? 'client→agent' : 'agent→client',
+        raw: this.redact ? redactText(line) : line,
+      };
     }
     fs.appendFileSync(this.wirePath, JSON.stringify(entry) + '\n');
   }
 
   note(text: string, data?: unknown): void {
-    const entry = { t: this.elapsed(), dir: 'note', text, ...(data === undefined ? {} : { data: this.redact ? redactDeep(data) : data }) };
+    const entry = {
+      t: this.elapsed(),
+      dir: 'note',
+      text,
+      ...(data === undefined ? {} : { data: this.redact ? redactDeep(data) : data }),
+    };
     fs.appendFileSync(this.wirePath, JSON.stringify(entry) + '\n');
   }
 
@@ -302,10 +364,21 @@ interface RunResult {
 function run(cmd: string, args: string[], timeoutMs: number, env?: NodeJS.ProcessEnv): Promise<RunResult> {
   const started = Date.now();
   return new Promise((resolve) => {
-    execFile(cmd, args, { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024, env: env ?? process.env }, (err, stdout, stderr) => {
-      const code = err ? (err as NodeJS.ErrnoException).code ?? 1 : 0;
-      resolve({ exitCode: code, stdout: String(stdout), stderr: String(stderr), ms: Date.now() - started, ...(err ? { error: err.message.split('\n')[0] ?? 'failed' } : {}) });
-    });
+    execFile(
+      cmd,
+      args,
+      { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024, env: env ?? process.env },
+      (err, stdout, stderr) => {
+        const code = err ? ((err as NodeJS.ErrnoException).code ?? 1) : 0;
+        resolve({
+          exitCode: code,
+          stdout: String(stdout),
+          stderr: String(stderr),
+          ms: Date.now() - started,
+          ...(err ? { error: err.message.split('\n')[0] ?? 'failed' } : {}),
+        });
+      },
+    );
   });
 }
 
@@ -331,9 +404,7 @@ async function locateCli(explicit: string | undefined): Promise<{ path?: string;
   const fromEnv = check(process.env.KIRO_CLI_PATH, 'KIRO_CLI_PATH');
   if (fromEnv) return fromEnv;
 
-  const names = process.platform === 'win32'
-    ? ['kiro-cli.exe', 'kiro-cli.cmd', 'kiro-cli.bat']
-    : ['kiro-cli'];
+  const names = process.platform === 'win32' ? ['kiro-cli.exe', 'kiro-cli.cmd', 'kiro-cli.bat'] : ['kiro-cli'];
   for (const dir of (process.env.PATH ?? '').split(path.delimiter).filter(Boolean)) {
     for (const name of names) {
       const found = check(path.join(dir, name), 'PATH');
@@ -351,7 +422,9 @@ async function locateCli(explicit: string | undefined): Promise<{ path?: string;
   const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
   for (const candidate of [
     path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'kiro-cli.exe' : 'kiro-cli'),
-    ...(process.platform === 'win32' ? [path.join(localAppData, 'Kiro-Cli', 'kiro-cli.exe')] : ['/usr/local/bin/kiro-cli', '/opt/homebrew/bin/kiro-cli']),
+    ...(process.platform === 'win32'
+      ? [path.join(localAppData, 'Kiro-Cli', 'kiro-cli.exe')]
+      : ['/usr/local/bin/kiro-cli', '/opt/homebrew/bin/kiro-cli']),
   ]) {
     const found = check(candidate, 'candidate');
     if (found) return found;
@@ -368,9 +441,12 @@ async function killTree(proc: ChildProcess): Promise<void> {
 
 function kiroLogCandidates(): string[] {
   switch (process.platform) {
-    case 'win32': return [path.join(os.tmpdir(), 'kiro-log', 'logs', 'kiro-chat.log')];
-    case 'darwin': return [path.join(process.env.TMPDIR ?? os.tmpdir(), 'kiro-log', 'kiro-chat.log')];
-    default: return [path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'kiro-log', 'kiro-chat.log')];
+    case 'win32':
+      return [path.join(os.tmpdir(), 'kiro-log', 'logs', 'kiro-chat.log')];
+    case 'darwin':
+      return [path.join(process.env.TMPDIR ?? os.tmpdir(), 'kiro-log', 'kiro-chat.log')];
+    default:
+      return [path.join(process.env.XDG_RUNTIME_DIR ?? os.tmpdir(), 'kiro-log', 'kiro-chat.log')];
   }
 }
 
@@ -393,7 +469,12 @@ interface Decision {
   summary: Json;
 }
 
-function decidePermission(params: Json, workDir: string, mode: Options['approve'], review: Options['review']): Decision {
+function decidePermission(
+  params: Json,
+  workDir: string,
+  mode: Options['approve'],
+  review: Options['review'],
+): Decision {
   const options = arr(params.options).map(rec);
   const meta = rec(rec(params._meta).kiro);
   const consent = rec(meta.consent);
@@ -433,9 +514,19 @@ function decidePermission(params: Json, workDir: string, mode: Options['approve'
 // ---------------------------------------------------------------------------------------
 
 const KNOWN_UPDATES = new Set([
-  'user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update', 'plan',
-  'plan_update', 'plan_removed', 'available_commands_update', 'current_mode_update', 'config_option_update',
-  'session_info_update', 'usage_update',
+  'user_message_chunk',
+  'agent_message_chunk',
+  'agent_thought_chunk',
+  'tool_call',
+  'tool_call_update',
+  'plan',
+  'plan_update',
+  'plan_removed',
+  'available_commands_update',
+  'current_mode_update',
+  'config_option_update',
+  'session_info_update',
+  'usage_update',
 ]);
 
 /** Read-only `_kiro/*` methods the probe may call, and only if the agent advertised them. */
@@ -463,12 +554,20 @@ async function main(): Promise<number> {
   const log = (s: string) => process.stdout.write(`${s}\n`);
 
   const summary: Json = {
-    probe: { startedAt: new Date().toISOString(), platform: `${process.platform} ${os.release()} ${process.arch}`, node: process.version, options: { ...opts, cli: undefined } },
+    probe: {
+      startedAt: new Date().toISOString(),
+      platform: `${process.platform} ${os.release()} ${process.arch}`,
+      node: process.version,
+      options: { ...opts, cli: undefined },
+    },
     workDir: opts.redact ? '<temp dir>' : workDir,
     findings: [] as string[],
   };
   const findings = summary.findings as string[];
-  const finding = (s: string) => { findings.push(s); log(`  ! ${s}`); };
+  const finding = (s: string) => {
+    findings.push(s);
+    log(`  ! ${s}`);
+  };
   let child: ChildProcess | undefined;
   let exited: { code: number | null; signal: NodeJS.Signals | null; atMs: number } | undefined;
   let exitCode = 0;
@@ -492,7 +591,12 @@ async function main(): Promise<number> {
 
     // 1. Locate and interrogate the CLI ------------------------------------------------
     const located = await locateCli(opts.cli);
-    summary.cliLookup = recorder.safe({ via: located.via, found: located.path, triedCount: located.tried.length, lastTried: located.tried.slice(-4) });
+    summary.cliLookup = recorder.safe({
+      via: located.via,
+      found: located.path,
+      triedCount: located.tried.length,
+      lastTried: located.tried.slice(-4),
+    });
     if (!located.path) {
       finding('kiro-cli not found. Pass --cli <path> or set KIRO_CLI_PATH. Install: https://kiro.dev/docs/cli/');
       finish();
@@ -508,16 +612,28 @@ async function main(): Promise<number> {
     ]);
     // `whoami` may print a "Profile:" block after the JSON line (Identity Center); decode the first line only.
     let whoamiParsed: unknown = null;
-    try { whoamiParsed = JSON.parse(whoami.stdout.split(/\r?\n/)[0] ?? ''); } catch { /* keep null */ }
+    try {
+      whoamiParsed = JSON.parse(whoami.stdout.split(/\r?\n/)[0] ?? '');
+    } catch {
+      /* keep null */
+    }
     summary.cli = recorder.safe({
       version: { ...version, stdout: version.stdout.trim() },
-      whoami: { exitCode: whoami.exitCode, parsedFirstLine: whoamiParsed, rawStdout: whoami.stdout, stderr: whoami.stderr.trim() },
+      whoami: {
+        exitCode: whoami.exitCode,
+        parsedFirstLine: whoamiParsed,
+        rawStdout: whoami.stdout,
+        stderr: whoami.stderr.trim(),
+      },
       acpHelp: { exitCode: acpHelp.exitCode, stdout: acpHelp.stdout, stderr: acpHelp.stderr },
     });
     log(`  version: ${version.stdout.trim() || `(exit ${version.exitCode})`}`);
     const loggedIn = whoami.exitCode === 0;
     log(`  whoami: ${loggedIn ? 'logged in' : `NOT logged in (exit ${whoami.exitCode}) - run "kiro-cli login"`}`);
-    if (!loggedIn) finding('whoami failed; the prompt step is skipped. Handshake/session behaviour while logged out is still recorded.');
+    if (!loggedIn)
+      finding(
+        'whoami failed; the prompt step is skipped. Handshake/session behaviour while logged out is still recorded.',
+      );
 
     // 2. Spawn the ACP server ------------------------------------------------------------
     const env = { ...process.env, ...(opts.kiroDebug ? { KIRO_LOG_LEVEL: 'debug' } : {}) };
@@ -525,10 +641,21 @@ async function main(): Promise<number> {
     child = proc;
     const toChild = new PassThrough();
     toChild.pipe(proc.stdin);
-    toChild.on('data', lineSplitter((line) => recorder.wireLine('out', line)));
-    proc.stdout.on('data', lineSplitter((line) => recorder.wireLine('in', line)));
-    proc.stderr.on('data', lineSplitter((line) => recorder.stderrLine(line)));
-    proc.stdin.on('error', () => { /* the exit handler reports the crash */ });
+    toChild.on(
+      'data',
+      lineSplitter((line) => recorder.wireLine('out', line)),
+    );
+    proc.stdout.on(
+      'data',
+      lineSplitter((line) => recorder.wireLine('in', line)),
+    );
+    proc.stderr.on(
+      'data',
+      lineSplitter((line) => recorder.stderrLine(line)),
+    );
+    proc.stdin.on('error', () => {
+      /* the exit handler reports the crash */
+    });
 
     const exitPromise = new Promise<void>((resolve) => {
       proc.once('exit', (code, signal) => {
@@ -590,26 +717,46 @@ async function main(): Promise<number> {
     );
     const stream: acp.Stream = {
       writable: rawStream.writable,
-      readable: rawStream.readable.pipeThrough(new TransformStream<acp.AnyMessage, acp.AnyMessage>({
-        transform(message, controller) {
-          const isNotification = 'method' in message && !('id' in message);
-          const divert = isNotification && (message.method === 'session/update' || message.method.startsWith('_'));
-          if (!divert) { controller.enqueue(message); return; }
-          try { onNotification(message as acp.AnyNotification); } catch (e) { recorder.note('notification handler failed', describeError(e)); }
-        },
-      })),
+      readable: rawStream.readable.pipeThrough(
+        new TransformStream<acp.AnyMessage, acp.AnyMessage>({
+          transform(message, controller) {
+            const isNotification = 'method' in message && !('id' in message);
+            const divert = isNotification && (message.method === 'session/update' || message.method.startsWith('_'));
+            if (!divert) {
+              controller.enqueue(message);
+              return;
+            }
+            try {
+              onNotification(message as acp.AnyNotification);
+            } catch (e) {
+              recorder.note('notification handler failed', describeError(e));
+            }
+          },
+        }),
+      ),
     };
 
     // 4. Client handlers (agent -> client requests) --------------------------------------
     const permissions: Json[] = [];
-    const terminals = new Map<string, { proc: ChildProcess; output: string; truncated: boolean; limit: number; done: Promise<{ exitCode: number | null; signal: string | null }> }>();
+    const terminals = new Map<
+      string,
+      {
+        proc: ChildProcess;
+        output: string;
+        truncated: boolean;
+        limit: number;
+        done: Promise<{ exitCode: number | null; signal: string | null }>;
+      }
+    >();
     const guard = (p: string): string => {
       const abs = toFsPath(p, workDir);
-      if (!isInside(workDir, abs)) throw new acp.RequestError(-32602, 'Path is outside the probe workspace', { path: p });
+      if (!isInside(workDir, abs))
+        throw new acp.RequestError(-32602, 'Path is outside the probe workspace', { path: p });
       return abs;
     };
 
-    const app = acp.client({ name: 'kiro-studio-probe' })
+    const app = acp
+      .client({ name: 'kiro-studio-probe' })
       .onRequest(acp.methods.client.session.requestPermission, (ctx) => {
         const decision = decidePermission(rec(ctx.params), workDir, opts.approve, opts.review);
         permissions.push(decision.summary);
@@ -625,7 +772,10 @@ async function main(): Promise<number> {
         });
         const lines = text.split('\n');
         const from = Math.max((ctx.params.line ?? 1) - 1, 0);
-        const content = ctx.params.line || ctx.params.limit ? lines.slice(from, ctx.params.limit ? from + ctx.params.limit : undefined).join('\n') : text;
+        const content =
+          ctx.params.line || ctx.params.limit
+            ? lines.slice(from, ctx.params.limit ? from + ctx.params.limit : undefined).join('\n')
+            : text;
         return { content };
       })
       .onRequest(acp.methods.client.fs.writeTextFile, async (ctx) => {
@@ -634,10 +784,14 @@ async function main(): Promise<number> {
         await fs.promises.writeFile(file, ctx.params.content, 'utf8');
         return {};
       })
-      .onRequest('_kiro/openExternalUrl', (p: unknown) => rec(p), (ctx) => {
-        recorder.note('_kiro/openExternalUrl requested (not opened by the probe)', ctx.params);
-        return {};
-      });
+      .onRequest(
+        '_kiro/openExternalUrl',
+        (p: unknown) => rec(p),
+        (ctx) => {
+          recorder.note('_kiro/openExternalUrl requested (not opened by the probe)', ctx.params);
+          return {};
+        },
+      );
 
     if (opts.terminal) {
       app
@@ -645,17 +799,33 @@ async function main(): Promise<number> {
           const p = ctx.params;
           const cwd = p.cwd ? guard(p.cwd) : workDir;
           const limit = p.outputByteLimit ?? 1_000_000;
-          const child2 = spawn(p.command, p.args ?? [], { cwd, windowsHide: true, env: { ...process.env, ...Object.fromEntries((p.env ?? []).map((e) => [e.name, e.value])) } });
-          const entry = { proc: child2, output: '', truncated: false, limit, done: undefined as unknown as Promise<{ exitCode: number | null; signal: string | null }> };
+          const child2 = spawn(p.command, p.args ?? [], {
+            cwd,
+            windowsHide: true,
+            env: { ...process.env, ...Object.fromEntries((p.env ?? []).map((e) => [e.name, e.value])) },
+          });
+          const entry = {
+            proc: child2,
+            output: '',
+            truncated: false,
+            limit,
+            done: undefined as unknown as Promise<{ exitCode: number | null; signal: string | null }>,
+          };
           const append = (b: Buffer) => {
             entry.output += b.toString('utf8');
-            if (Buffer.byteLength(entry.output) > limit) { entry.output = entry.output.slice(-limit); entry.truncated = true; }
+            if (Buffer.byteLength(entry.output) > limit) {
+              entry.output = entry.output.slice(-limit);
+              entry.truncated = true;
+            }
           };
           child2.stdout?.on('data', append);
           child2.stderr?.on('data', append);
           entry.done = new Promise((resolve) => {
             child2.once('exit', (exitCode, signal) => resolve({ exitCode, signal }));
-            child2.once('error', (err) => { append(Buffer.from(String(err.message))); resolve({ exitCode: 127, signal: null }); });
+            child2.once('error', (err) => {
+              append(Buffer.from(String(err.message)));
+              resolve({ exitCode: 127, signal: null });
+            });
           });
           const terminalId = `probe-term-${terminals.size + 1}`;
           terminals.set(terminalId, entry);
@@ -665,7 +835,11 @@ async function main(): Promise<number> {
           const t = terminals.get(ctx.params.terminalId);
           if (!t) throw new acp.RequestError(-32602, 'Unknown terminal');
           const state = await Promise.race([t.done, Promise.resolve(undefined)]);
-          return { output: t.output, truncated: t.truncated, ...(state ? { exitStatus: { exitCode: state.exitCode, signal: state.signal } } : {}) };
+          return {
+            output: t.output,
+            truncated: t.truncated,
+            ...(state ? { exitStatus: { exitCode: state.exitCode, signal: state.signal } } : {}),
+          };
         })
         .onRequest(acp.methods.client.terminal.waitForExit, async (ctx) => {
           const t = terminals.get(ctx.params.terminalId);
@@ -673,8 +847,15 @@ async function main(): Promise<number> {
           const { exitCode, signal } = await t.done;
           return { exitCode, signal };
         })
-        .onRequest(acp.methods.client.terminal.kill, (ctx) => { terminals.get(ctx.params.terminalId)?.proc.kill(); return {}; })
-        .onRequest(acp.methods.client.terminal.release, (ctx) => { terminals.get(ctx.params.terminalId)?.proc.kill(); terminals.delete(ctx.params.terminalId); return {}; });
+        .onRequest(acp.methods.client.terminal.kill, (ctx) => {
+          terminals.get(ctx.params.terminalId)?.proc.kill();
+          return {};
+        })
+        .onRequest(acp.methods.client.terminal.release, (ctx) => {
+          terminals.get(ctx.params.terminalId)?.proc.kill();
+          terminals.delete(ctx.params.terminalId);
+          return {};
+        });
     }
 
     // 5. The conversation -----------------------------------------------------------------
@@ -701,13 +882,23 @@ async function main(): Promise<number> {
       const kiroCaps = rec(rec(caps._meta).kiro);
       const extensionMethods = arr(kiroCaps.extensionMethods).filter((m): m is string => typeof m === 'string');
       const sessionCaps = rec(caps.sessionCapabilities);
-      log(`     protocolVersion ${init.protocolVersion}, extensionMethods: ${extensionMethods.length}, loadSession: ${String(caps.loadSession)}`);
-      if (init.protocolVersion !== opts.protocolVersion) finding(`agent answered protocolVersion ${init.protocolVersion} to our ${opts.protocolVersion}`);
-      if (extensionMethods.length === 0) finding('no _meta.kiro.extensionMethods advertised; this may not be the V3 engine (check "kiro-cli --version" and the acp --help output).');
+      log(
+        `     protocolVersion ${init.protocolVersion}, extensionMethods: ${extensionMethods.length}, loadSession: ${String(caps.loadSession)}`,
+      );
+      if (init.protocolVersion !== opts.protocolVersion)
+        finding(`agent answered protocolVersion ${init.protocolVersion} to our ${opts.protocolVersion}`);
+      if (extensionMethods.length === 0)
+        finding(
+          'no _meta.kiro.extensionMethods advertised; this may not be the V3 engine (check "kiro-cli --version" and the acp --help output).',
+        );
 
       log('  -> session/new');
       const newStarted = Date.now();
-      const created = await withTimeout(cx.request(acp.methods.agent.session.new, { cwd: workDir, mcpServers: [] }), 120_000, 'session/new');
+      const created = await withTimeout(
+        cx.request(acp.methods.agent.session.new, { cwd: workDir, mcpServers: [] }),
+        120_000,
+        'session/new',
+      );
       timings.sessionNew = Date.now() - newStarted;
       sessionId = created.sessionId;
       if (Array.isArray(created.configOptions)) configOptions = created.configOptions;
@@ -715,18 +906,36 @@ async function main(): Promise<number> {
       // Kiro advertises `model`/`effortLevel` late (see docs/protocol-notes.md section 3). Wait for silence so
       // the report can say whether the advertisement ever comes without being asked for.
       await recorder.settle(1500, 8000);
-      const modelAdvertised = arr(configOptions).map(rec).some((o) => o.id === 'model');
+      const modelAdvertised = arr(configOptions)
+        .map(rec)
+        .some((o) => o.id === 'model');
       summary.modelAdvertisedWithoutWrite = modelAdvertised;
       if (!modelAdvertised) finding('no "model" config option appeared within 1.5 s of silence after session/new');
 
-      const optionById = (id: string) => arr(configOptions).map(rec).find((o) => o.id === id);
-      const hasValue = (id: string, value: string) => arr(optionById(id)?.options).map(rec).some((o) => o.value === value);
+      const optionById = (id: string) =>
+        arr(configOptions)
+          .map(rec)
+          .find((o) => o.id === id);
+      const hasValue = (id: string, value: string) =>
+        arr(optionById(id)?.options)
+          .map(rec)
+          .some((o) => o.value === value);
       const setOption = async (configId: string, value: string) => {
-        if (!optionById(configId)) { finding(`config option "${configId}" is not advertised; not set`); return; }
-        if (!hasValue(configId, value)) { finding(`config option "${configId}" has no value "${value}"; not set`); return; }
+        if (!optionById(configId)) {
+          finding(`config option "${configId}" is not advertised; not set`);
+          return;
+        }
+        if (!hasValue(configId, value)) {
+          finding(`config option "${configId}" has no value "${value}"; not set`);
+          return;
+        }
         log(`  -> session/set_config_option ${configId}=${value}`);
         try {
-          const r = await withTimeout(cx.request(acp.methods.agent.session.setConfigOption, { sessionId, configId, value }), 30_000, 'set_config_option');
+          const r = await withTimeout(
+            cx.request(acp.methods.agent.session.setConfigOption, { sessionId, configId, value }),
+            30_000,
+            'set_config_option',
+          );
           if (Array.isArray(r.configOptions)) configOptions = r.configOptions;
         } catch (e) {
           finding(`set_config_option ${configId}=${value} failed: ${errorMessage(e)}`);
@@ -741,7 +950,10 @@ async function main(): Promise<number> {
       if (!opts.noPrompt && loggedIn) {
         log(`  -> session/prompt "${opts.prompt}"`);
         const started = Date.now();
-        const turn = cx.request(acp.methods.agent.session.prompt, { sessionId, prompt: [{ type: 'text', text: opts.prompt }] });
+        const turn = cx.request(acp.methods.agent.session.prompt, {
+          sessionId,
+          prompt: [{ type: 'text', text: opts.prompt }],
+        });
         try {
           const result = await withTimeout(turn, opts.timeoutSec * 1000, 'session/prompt');
           summary.prompt = { stopReason: result.stopReason, ms: Date.now() - started, response: recorder.safe(result) };
@@ -751,7 +963,11 @@ async function main(): Promise<number> {
           finding(`prompt did not complete cleanly: ${errorMessage(e)}`);
           if (String(errorMessage(e)).includes('timed out')) {
             await cx.notify(acp.methods.agent.session.cancel, { sessionId });
-            await withTimeout(turn.catch(() => undefined), 10_000, 'cancel').catch(() => finding('turn did not end within 10 s of session/cancel'));
+            await withTimeout(
+              turn.catch(() => undefined),
+              10_000,
+              'cancel',
+            ).catch(() => finding('turn did not end within 10 s of session/cancel'));
           }
         }
         await recorder.settle(600);
@@ -761,8 +977,12 @@ async function main(): Promise<number> {
       if (sessionCaps.list) {
         try {
           log('  -> session/list');
-          summary.sessionList = recorder.safe(await withTimeout(cx.request(acp.methods.agent.session.list, { cwd: workDir }), 20_000, 'session/list'));
-        } catch (e) { summary.sessionList = { error: describeError(e) }; }
+          summary.sessionList = recorder.safe(
+            await withTimeout(cx.request(acp.methods.agent.session.list, { cwd: workDir }), 20_000, 'session/list'),
+          );
+        } catch (e) {
+          summary.sessionList = { error: describeError(e) };
+        }
       }
       if (opts.extensions) {
         const results: Json = {};
@@ -771,7 +991,10 @@ async function main(): Promise<number> {
           for (const params of [{ sessionId }, {}]) {
             try {
               log(`  -> ${method} ${JSON.stringify(params).slice(0, 40)}`);
-              results[method] = { params, result: recorder.safe(await withTimeout(cx.request<unknown, Json>(method, params), 20_000, method)) };
+              results[method] = {
+                params,
+                result: recorder.safe(await withTimeout(cx.request<unknown, Json>(method, params), 20_000, method)),
+              };
               break;
             } catch (e) {
               results[method] = { params, error: describeError(e) };
@@ -784,11 +1007,20 @@ async function main(): Promise<number> {
       await recorder.settle(300);
 
       summary.sessionState = recorder.safe({
-        configOptions: arr(configOptions).map(rec).map((o) => ({
-          id: o.id, category: o.category, type: o.type, currentValue: o.currentValue,
-          values: arr(o.options).map(rec).map((v) => v.value),
-        })),
-        commands: arr(commands).map(rec).map((c) => ({ name: c.name, type: str(rec(rec(c._meta).kiro).type), hint: str(rec(c.input).hint) })),
+        configOptions: arr(configOptions)
+          .map(rec)
+          .map((o) => ({
+            id: o.id,
+            category: o.category,
+            type: o.type,
+            currentValue: o.currentValue,
+            values: arr(o.options)
+              .map(rec)
+              .map((v) => v.value),
+          })),
+        commands: arr(commands)
+          .map(rec)
+          .map((c) => ({ name: c.name, type: str(rec(rec(c._meta).kiro).type), hint: str(rec(c.input).hint) })),
         kiroUpdateKinds: [...kiroKinds].sort(),
         unknownUpdateTypes: [...unknownUpdates],
         otherNotificationMethods: [...extraNotifications].sort(),
@@ -799,8 +1031,11 @@ async function main(): Promise<number> {
       summary.permissions = recorder.safe(permissions);
 
       if (sessionCaps.close) {
-        try { await withTimeout(cx.request(acp.methods.agent.session.close, { sessionId }), 15_000, 'session/close'); }
-        catch (e) { finding(`session/close failed: ${errorMessage(e)}`); }
+        try {
+          await withTimeout(cx.request(acp.methods.agent.session.close, { sessionId }), 15_000, 'session/close');
+        } catch (e) {
+          finding(`session/close failed: ${errorMessage(e)}`);
+        }
       }
     });
 
@@ -817,11 +1052,17 @@ async function main(): Promise<number> {
     summary.process = { exitedOnStdinClose, stdinClosedAtMs: stdinClosedAt, exit: exited ?? null };
 
     // 7. What actually happened on disk and through the client capabilities -----------------
-    summary.workDirContents = recorder.safe(fs.readdirSync(workDir).map((name) => {
-      const full = path.join(workDir, name);
-      const stat = fs.statSync(full);
-      return { name, bytes: stat.size, ...(stat.isFile() && stat.size <= 2048 ? { content: fs.readFileSync(full, 'utf8') } : {}) };
-    }));
+    summary.workDirContents = recorder.safe(
+      fs.readdirSync(workDir).map((name) => {
+        const full = path.join(workDir, name);
+        const stat = fs.statSync(full);
+        return {
+          name,
+          bytes: stat.size,
+          ...(stat.isFile() && stat.size <= 2048 ? { content: fs.readFileSync(full, 'utf8') } : {}),
+        };
+      }),
+    );
     const usedByAgent = (m: string) => [...recorder.observed.keys()].some((k) => k === `agent→client request ${m}`);
     summary.clientCapabilityUsage = {
       'fs/read_text_file': usedByAgent('fs/read_text_file'),
@@ -829,7 +1070,9 @@ async function main(): Promise<number> {
       'terminal/create': usedByAgent('terminal/create'),
       advertised: clientCapabilities,
     };
-    log(`  kiro used fs/write_text_file: ${String(usedByAgent('fs/write_text_file'))}, fs/read_text_file: ${String(usedByAgent('fs/read_text_file'))}, terminal/create: ${String(usedByAgent('terminal/create'))}`);
+    log(
+      `  kiro used fs/write_text_file: ${String(usedByAgent('fs/write_text_file'))}, fs/read_text_file: ${String(usedByAgent('fs/read_text_file'))}, terminal/create: ${String(usedByAgent('terminal/create'))}`,
+    );
 
     if (opts.includeKiroLog) {
       for (const candidate of kiroLogCandidates()) {
@@ -858,7 +1101,10 @@ async function main(): Promise<number> {
   return exitCode;
 }
 
-main().then((code) => process.exit(code), (e: unknown) => {
-  process.stderr.write(`${errorMessage(e)}\n`);
-  process.exit(1);
-});
+main().then(
+  (code) => process.exit(code),
+  (e: unknown) => {
+    process.stderr.write(`${errorMessage(e)}\n`);
+    process.exit(1);
+  },
+);

@@ -56,23 +56,29 @@ const check = (label: string, schemaName: string, value: unknown, where: string)
   tally.set(label, entry);
 };
 
-fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).forEach((line, index) => {
-  const entry = JSON.parse(line) as WireEntry;
-  const msg = entry.msg;
-  if (!msg) return;
-  const where = `line ${index + 1}`;
-  if (entry.dir === 'client→agent' && msg.id !== undefined && msg.method) requestMethods.set(msg.id, msg.method);
-  if (entry.dir !== 'agent→client') return;
-  if (msg.method === 'session/update' && msg.id === undefined) check('session/update', 'zSessionNotification', msg.params, where);
-  else if (msg.method === 'session/request_permission') check('session/request_permission', 'zRequestPermissionRequest', msg.params, where);
-  else if (!msg.method && msg.id !== undefined && 'result' in msg) {
-    const method = requestMethods.get(msg.id);
-    const schemaName = method ? RESPONSE_SCHEMAS[method] : undefined;
-    if (method && schemaName) check(`response ${method}`, schemaName, msg.result, where);
-  }
-});
+fs.readFileSync(file, 'utf8')
+  .split('\n')
+  .filter(Boolean)
+  .forEach((line, index) => {
+    const entry = JSON.parse(line) as WireEntry;
+    const msg = entry.msg;
+    if (!msg) return;
+    const where = `line ${index + 1}`;
+    if (entry.dir === 'client→agent' && msg.id !== undefined && msg.method) requestMethods.set(msg.id, msg.method);
+    if (entry.dir !== 'agent→client') return;
+    if (msg.method === 'session/update' && msg.id === undefined)
+      check('session/update', 'zSessionNotification', msg.params, where);
+    else if (msg.method === 'session/request_permission')
+      check('session/request_permission', 'zRequestPermissionRequest', msg.params, where);
+    else if (!msg.method && msg.id !== undefined && 'result' in msg) {
+      const method = requestMethods.get(msg.id);
+      const schemaName = method ? RESPONSE_SCHEMAS[method] : undefined;
+      if (method && schemaName) check(`response ${method}`, schemaName, msg.result, where);
+    }
+  });
 
-for (const [label, { ok, bad }] of tally) process.stdout.write(`${label.padEnd(36)} ok ${String(ok).padStart(4)}   rejected ${bad}\n`);
+for (const [label, { ok, bad }] of tally)
+  process.stdout.write(`${label.padEnd(36)} ok ${String(ok).padStart(4)}   rejected ${bad}\n`);
 if (tally.size === 0) process.stdout.write('No validatable agent messages found.\n');
 for (const failure of failures.slice(0, 20)) process.stdout.write(`REJECTED ${failure}\n`);
 process.exit(failures.length > 0 ? 1 : 0);
