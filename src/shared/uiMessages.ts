@@ -43,6 +43,7 @@ export const UI_MESSAGES = [
   'Copy',
   'The diagram could not be drawn.',
   '… {0} more lines',
+  'The change is too large to compare line by line. The new text:',
   // Approvals
   'Allow once',
   'Always allow',

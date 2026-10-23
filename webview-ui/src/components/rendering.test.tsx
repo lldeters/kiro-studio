@@ -5,6 +5,7 @@ import type { PlanEntryView, ToolView } from '../../../src/shared/chatProtocol';
 import { initialState } from '../state';
 import { useChat } from '../store';
 import { outbox } from '../vscode';
+import { DiffView } from './DiffView';
 import { Markdown, parseFileReference } from './Markdown';
 import { PlanPanel } from './PlanPanel';
 import { ToolCard } from './ToolCard';
@@ -232,5 +233,20 @@ describe('highlight cache', () => {
       document.body.classList.remove('vscode-light');
     }
     expect(cachedHighlight(code, 'not-a-language')).toBeUndefined();
+  });
+});
+
+describe('diff of very large files', () => {
+  it('shows the new text without freezing the page when the files are too different to compare', () => {
+    let seed = 3;
+    const random = (): number => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const file = (): string =>
+      Array.from({ length: 6000 }, (_, i) => `line ${i} ${Math.floor(random() * 1e9)}`).join('\n');
+    const start = performance.now();
+    const { container } = render(<DiffView oldText={file()} newText={file()} />);
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(screen.getByText('The change is too large to compare line by line. The new text:')).toBeTruthy();
+    expect(container.querySelectorAll('.diff-line.add').length).toBe(300);
+    expect(screen.getByText('… 5700 more lines')).toBeTruthy();
   });
 });

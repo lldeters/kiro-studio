@@ -39,20 +39,76 @@ function pretty(value: unknown, limit: number): string | undefined {
   }
 }
 
-/** Lines added and removed between two texts. Very large texts are not diffed; only their size difference shows. */
+/** How long a line diff may take. A rewritten file of 100 KB takes seconds, and the host has one thread. */
+const DIFF_TIMEOUT_MS = 40;
+const MAX_CACHED_COUNTS = 500;
+const counts = new Map<string, { added: number; removed: number }>();
+
+/** A cheap fingerprint of a text, so that the counts of a diff that was done before are found again. */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 0x01000193);
+  return `${text.length}:${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * Lines added and removed, when no exact line diff is affordable: the lines that only the new text has, and the lines
+ * that only the old text has, as multisets. Moved lines count as unchanged, so this is a lower bound; it is exact when
+ * lines were only added, removed or edited in place.
+ */
+function estimateLineChanges(oldText: string, newText: string): { added: number; removed: number } {
+  const left = new Map<string, number>();
+  for (const line of oldText.split('\n')) left.set(line, (left.get(line) ?? 0) + 1);
+  let added = 0;
+  for (const line of newText.split('\n')) {
+    const n = left.get(line) ?? 0;
+    if (n > 0) left.set(line, n - 1);
+    else added++;
+  }
+  let removed = 0;
+  for (const n of left.values()) removed += n;
+  // A text that ends with a newline has an empty last "line" that is no line; when only one of the two has it, it is
+  // counted on one side only.
+  const newEnds = newText.endsWith('\n');
+  const oldEnds = oldText.endsWith('\n');
+  return {
+    added: Math.max(0, added - (newEnds && !oldEnds ? 1 : 0)),
+    removed: Math.max(0, removed - (oldEnds && !newEnds ? 1 : 0)),
+  };
+}
+
+/**
+ * Lines added and removed between two texts. The exact diff is used while it is quick; for very large or very different
+ * texts the estimate of {@link estimateLineChanges} takes over, so that showing a session never waits for a diff. The
+ * result is remembered: a session is turned into a view again every time it is switched to.
+ */
 export function countLineChanges(oldText: string | null, newText: string): { added: number; removed: number } {
   if (oldText === null || oldText === '') return { added: lineCount(newText), removed: 0 };
-  if (oldText.length + newText.length > MAX_DIFF_CHARS) {
-    const delta = lineCount(newText) - lineCount(oldText);
-    return { added: Math.max(delta, 0), removed: Math.max(-delta, 0) };
+  if (oldText === newText) return { added: 0, removed: 0 };
+  const key = `${fingerprint(oldText)}|${fingerprint(newText)}`;
+  const known = counts.get(key);
+  if (known) return known;
+
+  let result: { added: number; removed: number } | undefined;
+  if (oldText.length + newText.length <= MAX_DIFF_CHARS) {
+    const parts = diffLines(oldText, newText, { timeout: DIFF_TIMEOUT_MS });
+    if (parts !== undefined) {
+      let added = 0;
+      let removed = 0;
+      for (const part of parts) {
+        if (part.added) added += part.count ?? 0;
+        else if (part.removed) removed += part.count ?? 0;
+      }
+      result = { added, removed };
+    }
   }
-  let added = 0;
-  let removed = 0;
-  for (const part of diffLines(oldText, newText)) {
-    if (part.added) added += part.count ?? 0;
-    else if (part.removed) removed += part.count ?? 0;
+  result ??= estimateLineChanges(oldText, newText);
+  counts.set(key, result);
+  for (const oldest of counts.keys()) {
+    if (counts.size <= MAX_CACHED_COUNTS) break;
+    counts.delete(oldest);
   }
-  return { added, removed };
+  return result;
 }
 
 function lineCount(text: string): number {

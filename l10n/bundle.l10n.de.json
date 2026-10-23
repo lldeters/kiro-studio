@@ -190,6 +190,7 @@
   "Revert {0} files to their state before this turn?": "{0} Dateien auf den Stand vor diesem Durchlauf zurücksetzen?",
   "Revert {0} to its state before this turn?": "{0} auf den Stand vor diesem Durchlauf zurücksetzen?",
   "Reverted": "Zurückgenommen",
+  "Reverted one file to its state before the turn.": "Eine Datei wurde auf den Stand vor dem Durchgang zurückgesetzt.",
   "Reverted {0} files to their state before the turn.": "{0} Dateien auf den Stand vor dem Durchlauf zurückgesetzt.",
   "Review": "Prüfung",
   "Runs remotely": "Läuft entfernt",
@@ -230,6 +231,7 @@
   "The Kiro CLI keeps stopping. Click for options.": "Die Kiro CLI beendet sich immer wieder. Klicke für Optionen.",
   "The Kiro CLI was not found.": "Die Kiro CLI wurde nicht gefunden.",
   "The Kiro CLI was not found. Click for options.": "Die Kiro CLI wurde nicht gefunden. Klicke für Optionen.",
+  "The change is too large to compare line by line. The new text:": "Die Änderung ist zu groß für einen Zeilenvergleich. Der neue Text:",
   "The connection to Kiro was lost. Trying to reconnect ({0}).": "Die Verbindung zu Kiro ist abgebrochen. Neuverbindung wird versucht ({0}).",
   "The connection to the Kiro CLI was lost. Trying to reconnect.": "Die Verbindung zur Kiro CLI ist abgebrochen. Neuverbindung wird versucht.",
   "The connection to this session was lost.": "Die Verbindung zu dieser Sitzung ist abgebrochen.",
@@ -312,6 +314,5 @@
   "{0} min ago": "vor {0} Min.",
   "{0} of {1} tasks": "{0} von {1} Aufgaben",
   "{0} tools": "{0} Werkzeuge",
-  "… {0} more lines": "… {0} weitere Zeilen",
-  "Reverted one file to its state before the turn.": "Eine Datei wurde auf den Stand vor dem Durchgang zurückgesetzt."
+  "… {0} more lines": "… {0} weitere Zeilen"
 }

@@ -26,9 +26,33 @@ describe('countLineChanges', () => {
     expect(countLineChanges('a\nb\nc\n', 'a\nx\nc\nd\n')).toEqual({ added: 2, removed: 1 });
   });
 
-  it('does not diff huge texts, only their size difference', () => {
+  it('does not diff huge texts line by line, but still counts what was added and removed', () => {
     const big = 'x\n'.repeat(250_000);
     expect(countLineChanges(big, `${big}y\n`)).toEqual({ added: 1, removed: 0 });
+    expect(countLineChanges(`${big}a\nb\n`, `${big}c\n`)).toEqual({ added: 1, removed: 2 });
+  });
+
+  it('does not make a session wait for the diff of two large, very different files', () => {
+    // A rewritten file of about 100 KB takes seconds with an exact line diff.
+    let seed = 7;
+    const random = (): number => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    const file = (): string =>
+      Array.from({ length: 6000 }, (_, i) => `line ${i} ${random() < 0.5 ? 'same' : Math.floor(random() * 1e9)}`).join(
+        '\n',
+      ) + '\n';
+    const before = file();
+    const after = file();
+    const start = performance.now();
+    const counts = countLineChanges(before, after);
+    expect(performance.now() - start).toBeLessThan(1000);
+    expect(counts.added).toBeGreaterThan(2000);
+    expect(counts.removed).toBeGreaterThan(2000);
+    // The second time it is known.
+    expect(countLineChanges(before, after)).toBe(counts);
+  });
+
+  it('counts an unchanged text as no change', () => {
+    expect(countLineChanges('a\nb\n', 'a\nb\n')).toEqual({ added: 0, removed: 0 });
   });
 });
 

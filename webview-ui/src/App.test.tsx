@@ -162,6 +162,25 @@ describe('chat app', () => {
     expect(status.textContent).toContain('Kiro: Done');
   });
 
+  it('shows the session the host sends when the user switches tabs, although the tab list was not sent again', () => {
+    render(<App />);
+    const other = session({ id: 's2', items: [item(1, 'user', 'Question two'), item(2, 'assistant', 'Answer two')] });
+    receive(
+      init({
+        tabs: [
+          { id: 's1', title: 'One', busy: false, attention: false, lost: false },
+          { id: 's2', title: 'Two', busy: false, attention: false, lost: false },
+        ],
+      }),
+      { type: 'session', session: session() },
+    );
+    expect(screen.getByText('Hi there')).toBeTruthy();
+    receive({ type: 'session', session: other });
+    expect(screen.getByText('Answer two')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Two' }).getAttribute('aria-current')).toBe('true');
+    expect(screen.getByPlaceholderText('Ask Kiro…')).toBeTruthy();
+  });
+
   it('offers to start a session when there is none', () => {
     render(<App />);
     receive(init({ tabs: [], activeId: undefined }));

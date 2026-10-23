@@ -29,6 +29,14 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 
 ### Fixed
 
+- Switching between sessions left the chat empty or very late: the host sent the new session but not which tab is
+  active, so the page kept looking for the old one. The tab list now includes the active session, and the page follows the
+  session it is sent.
+- A line diff of two large, very different files (a rewritten file of 100 KB takes seconds) froze the extension host
+  whenever such a session was shown, and froze the page when its diff was opened. Diffs now give up after a few
+  milliseconds and fall back to an estimate (host) or to showing the new text (page); counts are remembered.
+- A failure while building one session no longer leaves the page without it: nothing is marked as sent, the error goes
+  to the protocol log, and the next change tries again.
 - "Reverted one file" instead of "Reverted 1 files".
 
 ### Known limits

@@ -231,6 +231,7 @@
   "The Kiro CLI keeps stopping. Click for options.": "The Kiro CLI keeps stopping. Click for options.",
   "The Kiro CLI was not found.": "The Kiro CLI was not found.",
   "The Kiro CLI was not found. Click for options.": "The Kiro CLI was not found. Click for options.",
+  "The change is too large to compare line by line. The new text:": "The change is too large to compare line by line. The new text:",
   "The connection to Kiro was lost. Trying to reconnect ({0}).": "The connection to Kiro was lost. Trying to reconnect ({0}).",
   "The connection to the Kiro CLI was lost. Trying to reconnect.": "The connection to the Kiro CLI was lost. Trying to reconnect.",
   "The connection to this session was lost.": "The connection to this session was lost.",

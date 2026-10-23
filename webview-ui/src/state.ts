@@ -94,7 +94,8 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
     case 'status':
       return { ...state, setup: message.setup, agent: message.agent, capabilities: message.capabilities };
     case 'session':
-      return { ...state, sessions: { [message.session.id]: message.session } };
+      // The host sends a full session only for the one on show, so it is the active one whatever the tab list said last.
+      return { ...state, activeId: message.session.id, sessions: { [message.session.id]: message.session } };
     case 'patch': {
       const current = state.sessions[message.patch.sessionId];
       if (!current) return state;

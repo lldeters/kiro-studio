@@ -13,13 +13,12 @@ import {
   type AttachmentView,
   type ChatCapabilities,
   type HostMessage,
-  type SessionPatch,
-  type SessionView,
   type SetupView,
   type WebviewMessage,
 } from '../shared/chatProtocol';
 import { UI_MESSAGES } from '../shared/uiMessages';
-import { PatchTracker, sessionView, tabView, toolView } from '../view/chatPresenter';
+import { sessionView, toolView } from '../view/chatPresenter';
+import { ChatSync, type SyncInput } from '../view/chatSync';
 import { exportMarkdown } from '../view/exportMarkdown';
 import { resolveAttachments, type SkipReason } from '../view/promptContext';
 import { contextDeps, pickContext } from './promptContext';
@@ -30,15 +29,12 @@ import type { Settings } from './settings';
 
 const FLUSH_MS = 30;
 
-/** What one open webview has been sent, so that it receives only changes. */
+/** One open webview: what it has been sent is kept by its `ChatSync`. */
 class Sink {
   ready = false;
   /** False while the sidebar view or tab is hidden. */
   visible = true;
-  tracker: PatchTracker | undefined;
-  trackedId: string | undefined;
-  tabs = '';
-  status = '';
+  readonly sync = new ChatSync();
 
   constructor(readonly webview: vscode.Webview) {}
 
@@ -57,6 +53,7 @@ export class ChatController implements vscode.Disposable {
     private readonly setup: SetupController,
     private readonly settings: Settings,
     private readonly diffs: DiffProvider,
+    private readonly log?: { info(text: string): void },
   ) {
     this.subscriptions.push(
       host.onDidChange(() => this.schedule()),
@@ -123,61 +120,40 @@ export class ChatController implements vscode.Disposable {
     };
   }
 
-  private sendInit(sink: Sink): void {
+  private input(): SyncInput {
     const { setup, agent } = this.view();
-    const sessions = this.host.agent?.store.all() ?? [];
-    sink.tabs = JSON.stringify(sessions.map(tabView));
-    sink.status = JSON.stringify([setup, agent, this.capabilities()]);
-    sink.trackedId = undefined;
-    sink.send({
-      type: 'init',
-      strings: Object.fromEntries(UI_MESSAGES.map((message) => [message, vscode.l10n.t(message)])),
-      tabs: sessions.map(tabView),
-      ...(this.host.activeSession === undefined ? {} : { activeId: this.host.activeSession.id }),
+    return {
+      sessions: this.host.agent?.store.all() ?? [],
+      active: this.host.activeSession,
       setup,
       agent,
       capabilities: this.capabilities(),
-      autonomySetting: this.settings.autonomy(),
-    });
-    this.flush(sink, true);
+    };
   }
 
-  private flush(sink: Sink, afterInit = false): void {
-    const sessions = this.host.agent?.store.all() ?? [];
-    const active = this.host.activeSession;
+  private sendInit(sink: Sink): void {
+    this.deliver(sink, () =>
+      sink.sync.init(this.input(), {
+        strings: Object.fromEntries(UI_MESSAGES.map((message) => [message, vscode.l10n.t(message)])),
+        autonomySetting: this.settings.autonomy(),
+      }),
+    );
+  }
 
-    const tabs = JSON.stringify(sessions.map(tabView));
-    if (tabs !== sink.tabs) {
-      sink.tabs = tabs;
-      sink.send({
-        type: 'tabs',
-        tabs: sessions.map(tabView),
-        ...(active === undefined ? {} : { activeId: active.id }),
-      });
-    }
+  private flush(sink: Sink): void {
+    this.deliver(sink, () => sink.sync.update(this.input()));
+  }
 
-    const { setup, agent } = this.view();
-    const status = JSON.stringify([setup, agent, this.capabilities()]);
-    if (status !== sink.status) {
-      sink.status = status;
-      sink.send({ type: 'status', setup, agent, capabilities: this.capabilities() });
+  /**
+   * Builds the messages and sends them. An error while building them (a session with a shape nobody expected) must not
+   * stop the other pages or the timer, and is written to the protocol log; the next change tries again.
+   */
+  private deliver(sink: Sink, build: () => HostMessage[]): void {
+    try {
+      for (const message of build()) sink.send(message);
+    } catch (error) {
+      this.log?.info(`The chat could not be updated: ${describeError(error)}`);
     }
-
-    if (!active) {
-      sink.trackedId = undefined;
-      return;
-    }
-    if (sink.trackedId !== active.id || !sink.tracker) {
-      sink.trackedId = active.id;
-      sink.tracker = new PatchTracker();
-      sink.send({ type: 'session', session: sink.tracker.full(active) });
-      return;
-    }
-    if (afterInit) return;
-    const change = sink.tracker.diff(active);
-    if (change === undefined) return;
-    if (isPatch(change)) sink.send({ type: 'patch', patch: change });
-    else sink.send({ type: 'session', session: change });
   }
 
   // -------------------------------------------------------------------------------------------------------------
@@ -445,10 +421,6 @@ export class ChatController implements vscode.Disposable {
     for (const s of this.subscriptions) s.dispose();
     this.sinks.clear();
   }
-}
-
-function isPatch(value: SessionPatch | SessionView): value is SessionPatch {
-  return 'sessionId' in value;
 }
 
 function skippedMessage(reason: SkipReason, label: string): string {
