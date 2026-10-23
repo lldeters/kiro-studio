@@ -30,7 +30,14 @@ suite('Kiro Studio', () => {
   test('is an installed extension of this window with a view container', () => {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert.ok(extension, 'extension is installed');
-    assert.strictEqual(manifest().contributes.views['kiro-studio']?.[0]?.id, 'kiroStudio.status');
+    const views = manifest().contributes.views['kiro-studio']?.map((view) => view.id);
+    assert.deepStrictEqual(views, ['kiroStudio.chat', 'kiroStudio.status']);
+  });
+
+  test('opens the chat view and its page reports that it loaded', async () => {
+    const api = await activate();
+    await vscode.commands.executeCommand('kiroStudio.openChat');
+    await waitFor(() => api.chatReady, 'the chat page to load (script, style and policy)');
   });
 
   test('reports a missing CLI when the configured path does not exist', async () => {

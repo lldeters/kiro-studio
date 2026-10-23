@@ -12,6 +12,7 @@ export interface KiroStudioApi {
   readonly uiState: string;
   readonly agentPhase: string;
   readonly sessionCount: number;
+  readonly chatReady: boolean;
   readonly firstCheck: Promise<void>;
 }
 

@@ -16,6 +16,8 @@ export interface KiroStudioApi {
   readonly agentPhase: string;
   /** Sessions the agent currently knows (including lost ones that are being resumed). */
   readonly sessionCount: number;
+  /** True while a chat webview is showing and has told the host that its page is loaded. */
+  readonly chatReady: boolean;
   /** Resolves when the first check of the Kiro CLI is done. */
   readonly firstCheck: Promise<void>;
 }
@@ -75,6 +77,9 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     },
     get agentPhase() {
       return agentHost.agent?.state.phase ?? 'stopped';
+    },
+    get chatReady() {
+      return chat.visible;
     },
     get sessionCount() {
       return agentHost.agent?.store.all().length ?? 0;
