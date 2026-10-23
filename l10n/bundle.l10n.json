@@ -169,11 +169,16 @@
   "You are not signed in to Kiro.": "You are not signed in to Kiro.",
   "You are not signed in to Kiro. Click for options.": "You are not signed in to Kiro. Click for options.",
   "active": "active",
+  "just now": "just now",
   "now: Autopilot": "now: Autopilot",
   "now: Supervised": "now: Supervised",
+  "yesterday": "yesterday",
   "{0} (changes by Kiro)": "{0} (changes by Kiro)",
   "{0} (new file, by Kiro)": "{0} (new file, by Kiro)",
   "{0} changed after Kiro's turn and would lose your changes:": "{0} changed after Kiro's turn and would lose your changes:",
   "{0} credits": "{0} credits",
+  "{0} days ago": "{0} days ago",
+  "{0} h ago": "{0} h ago",
+  "{0} min ago": "{0} min ago",
   "… {0} more lines": "… {0} more lines"
 }

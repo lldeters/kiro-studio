@@ -169,11 +169,16 @@
   "You are not signed in to Kiro.": "Du bist nicht bei Kiro angemeldet.",
   "You are not signed in to Kiro. Click for options.": "Du bist nicht bei Kiro angemeldet. Klicke für Optionen.",
   "active": "aktiv",
+  "just now": "gerade eben",
   "now: Autopilot": "jetzt: Autopilot",
   "now: Supervised": "jetzt: Supervised",
+  "yesterday": "gestern",
   "{0} (changes by Kiro)": "{0} (Änderungen von Kiro)",
   "{0} (new file, by Kiro)": "{0} (neue Datei, von Kiro)",
   "{0} changed after Kiro's turn and would lose your changes:": "{0} wurden nach Kiros Durchlauf geändert und würden deine Änderungen verlieren:",
   "{0} credits": "{0} Credits",
+  "{0} days ago": "vor {0} Tagen",
+  "{0} h ago": "vor {0} Std.",
+  "{0} min ago": "vor {0} Min.",
   "… {0} more lines": "… {0} weitere Zeilen"
 }
