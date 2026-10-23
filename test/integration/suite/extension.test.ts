@@ -40,7 +40,16 @@ suite('Kiro Studio', () => {
     const extension = vscode.extensions.getExtension(EXTENSION_ID);
     assert.ok(extension, 'extension is installed');
     const views = manifest().contributes.views['kiro-studio']?.map((view) => view.id);
-    assert.deepStrictEqual(views, ['kiroStudio.chat', 'kiroStudio.status']);
+    assert.deepStrictEqual(views, [
+      'kiroStudio.chat',
+      'kiroStudio.sessions',
+      'kiroStudio.specs',
+      'kiroStudio.steering',
+      'kiroStudio.hooks',
+      'kiroStudio.mcp',
+      'kiroStudio.agents',
+      'kiroStudio.status',
+    ]);
   });
 
   test('opens the chat view and its page reports that it loaded', async () => {
