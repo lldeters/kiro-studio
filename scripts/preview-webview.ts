@@ -13,7 +13,7 @@ import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { chromium } from 'playwright-core';
 import { chatHtml } from '../src/view/chatHtml';
-import { SCENARIOS, THEMES } from './preview-scenarios';
+import { SCENARIOS, THEME_CLASSES, THEMES } from './preview-scenarios';
 
 const args = process.argv.slice(2);
 const option = (name: string, fallback: string): string => {
@@ -59,7 +59,7 @@ const server = createServer((request, response) => {
       const injected = `<style>:root{${Object.entries(theme)
         .map(([k, v]) => `--vscode-${k}:${v}`)
         .join(';')}}body{margin:0}</style>
-<script nonce="${nonce}">document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('vscode-${themeName}'));window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m),getState:()=>undefined,setState:()=>{}});</script>`;
+<script nonce="${nonce}">document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('${THEME_CLASSES[themeName] ?? 'vscode-dark'}'));window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m),getState:()=>undefined,setState:()=>{}});</script>`;
       response.setHeader('content-type', 'text/html');
       response.end(page.replace('</head>', `${injected}</head>`));
       return;

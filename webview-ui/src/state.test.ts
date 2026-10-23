@@ -140,6 +140,62 @@ describe('chat state', () => {
   });
 });
 
+describe('announcements for screen readers', () => {
+  const withMeta = (extra: Partial<SessionMeta>): HostMessage => ({
+    type: 'patch',
+    patch: { sessionId: 's1', itemsFrom: 0, items: [], tools: [], meta: { ...meta, ...extra } },
+  });
+  const question = (id: number, title: string) => ({
+    id,
+    title,
+    type: 'tool_approval' as const,
+    files: [],
+    options: [{ kind: 'allow_once' as const, name: 'Allow once' }],
+  });
+  const start = run([init, { type: 'session', session: session('s1') }]);
+
+  it('says nothing for the first state of a session', () => {
+    expect(start.announcement).toBeUndefined();
+  });
+
+  it('announces a new question with its title', () => {
+    const state = run([withMeta({ phase: 'awaitingApproval', approvals: [question(1, 'Write File')] })], start);
+    expect(state.announcement).toEqual({ seq: 1, kind: 'question', title: 'Write File' });
+  });
+
+  it('announces the question that is new, not the ones that were waiting already', () => {
+    const one = run([withMeta({ phase: 'awaitingApproval', approvals: [question(1, 'Write File')] })], start);
+    const two = run(
+      [withMeta({ phase: 'awaitingApproval', approvals: [question(1, 'Write File'), question(2, 'Run Command')] })],
+      one,
+    );
+    expect(two.announcement).toEqual({ seq: 2, kind: 'question', title: 'Run Command' });
+  });
+
+  it('announces the end of a turn, once', () => {
+    const running = run([withMeta({ phase: 'running' })], start);
+    expect(running.announcement).toBeUndefined();
+    const done = run([withMeta({ phase: 'idle' })], running);
+    expect(done.announcement).toEqual({ seq: 1, kind: 'done' });
+    const again = run([withMeta({ phase: 'idle' })], done);
+    expect(again.announcement).toBe(done.announcement);
+  });
+
+  it('numbers the announcements so that the same words can be said again', () => {
+    let state = run([withMeta({ phase: 'running' }), withMeta({ phase: 'idle' })], start);
+    state = run([withMeta({ phase: 'running' }), withMeta({ phase: 'idle' })], state);
+    expect(state.announcement).toEqual({ seq: 2, kind: 'done' });
+  });
+
+  it('does not announce a change in a text patch', () => {
+    const state = run(
+      [{ type: 'patch', patch: { sessionId: 's1', itemsFrom: 0, items: [item(1, 'assistant', 'Hi')], tools: [] } }],
+      start,
+    );
+    expect(state.announcement).toBeUndefined();
+  });
+});
+
 describe('translate', () => {
   it('uses the translation, falls back to the English text and fills placeholders', () => {
     expect(translate({ Send: 'Senden' }, 'Send', [])).toBe('Senden');

@@ -117,13 +117,49 @@ describe('chat app', () => {
       { type: 'session', session: session() },
     );
     fireEvent.click(screen.getByText('Two'));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Close session' })[0]!);
+    fireEvent.click(screen.getByRole('button', { name: 'Close session: One' }));
     fireEvent.click(screen.getByRole('button', { name: 'New session' }));
     expect(outbox).toEqual([
       { type: 'selectSession', id: 's2' },
       { type: 'closeSession', id: 's1' },
       { type: 'newSession' },
     ]);
+  });
+
+  it('tells a screen reader about a question at once and about the end of a turn politely', () => {
+    render(<App />);
+    receive(init(), { type: 'session', session: session() });
+    const alert = screen.getByRole('alert');
+    const status = screen.getAllByRole('status')[0]!;
+    expect(alert.textContent).toBe('');
+    receive({
+      type: 'patch',
+      patch: {
+        sessionId: 's1',
+        itemsFrom: 0,
+        items: [],
+        tools: [],
+        meta: {
+          ...meta,
+          phase: 'awaitingApproval',
+          approvals: [
+            {
+              id: 1,
+              title: 'Write File',
+              type: 'tool_approval',
+              files: [],
+              options: [{ kind: 'allow_once', name: 'Allow' }],
+            },
+          ],
+        },
+      },
+    });
+    expect(alert.textContent).toContain('Waiting for your answer: Write File');
+    receive({
+      type: 'patch',
+      patch: { sessionId: 's1', itemsFrom: 0, items: [], tools: [], meta: { ...meta, phase: 'idle' } },
+    });
+    expect(status.textContent).toContain('Kiro: Done');
   });
 
   it('offers to start a session when there is none', () => {

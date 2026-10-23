@@ -8,6 +8,7 @@
 export const UI_MESSAGES = [
   // Header and tabs
   'New session',
+  'Sessions',
   'Close session',
   'The connection to this session was lost.',
   // Setup and connection states

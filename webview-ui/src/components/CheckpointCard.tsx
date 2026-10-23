@@ -1,6 +1,7 @@
 import type { CheckpointFileView, CheckpointView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
 import { post } from '../vscode';
+import { Disclosure } from './Disclosure';
 
 const STATUS_ICON: Record<CheckpointFileView['status'], string> = {
   added: 'diff-added',
@@ -17,38 +18,32 @@ export function CheckpointCard({ checkpoint, sessionId }: { checkpoint: Checkpoi
   const open = files.filter((f) => !f.reverted);
   const base = { sessionId, checkpointId: checkpoint.id } as const;
 
+  const head = (
+    <>
+      <span className="codicon codicon-history" aria-hidden="true" />
+      <span className="checkpoint-title">
+        {files.length === 1 ? t('Kiro changed one file') : t('Kiro changed {0} files', files.length)}
+      </span>
+    </>
+  );
+  const tail = (
+    <>
+      <span className="stat">
+        <span className="added">+{added}</span> <span className="removed">−{removed}</span>
+      </span>
+      <span className="checkpoint-actions">
+        <button className="secondary" onClick={() => post({ type: 'viewChanges', ...base })}>
+          {t('View changes')}
+        </button>
+        <button className="secondary" disabled={open.length === 0} onClick={() => post({ type: 'revert', ...base })}>
+          {open.length === 0 ? t('Reverted') : t('Revert')}
+        </button>
+      </span>
+    </>
+  );
+
   return (
-    <details className="checkpoint">
-      <summary>
-        <span className="codicon codicon-history" aria-hidden="true" />
-        <span className="checkpoint-title">
-          {files.length === 1 ? t('Kiro changed one file') : t('Kiro changed {0} files', files.length)}
-        </span>
-        <span className="stat">
-          <span className="added">+{added}</span> <span className="removed">−{removed}</span>
-        </span>
-        <span className="checkpoint-actions">
-          <button
-            className="secondary"
-            onClick={(event) => {
-              event.preventDefault();
-              post({ type: 'viewChanges', ...base });
-            }}
-          >
-            {t('View changes')}
-          </button>
-          <button
-            className="secondary"
-            disabled={open.length === 0}
-            onClick={(event) => {
-              event.preventDefault();
-              post({ type: 'revert', ...base });
-            }}
-          >
-            {open.length === 0 ? t('Reverted') : t('Revert')}
-          </button>
-        </span>
-      </summary>
+    <Disclosure className="checkpoint" head={head} tail={tail}>
       <ul className="checkpoint-files">
         {files.map((file) => (
           <li key={file.path} className={file.reverted ? 'reverted' : ''}>
@@ -82,6 +77,6 @@ export function CheckpointCard({ checkpoint, sessionId }: { checkpoint: Checkpoi
           </li>
         ))}
       </ul>
-    </details>
+    </Disclosure>
   );
 }

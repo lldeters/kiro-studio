@@ -10,6 +10,15 @@ import type {
   ToolView,
 } from '../../src/shared/chatProtocol';
 
+/** What a screen reader should be told about: a turn that ended, or a question that appeared. */
+export interface Announcement {
+  /** Changes with every announcement, so that the same words can be announced twice. */
+  seq: number;
+  kind: 'done' | 'question';
+  /** The question, for `question`. */
+  title?: string;
+}
+
 export interface ChatState {
   /** False until the host's `init` arrived. */
   ready: boolean;
@@ -24,6 +33,7 @@ export interface ChatState {
   sessions: Record<string, SessionView>;
   /** Attachments the host picked for the draft; the composer takes them and clears the list. */
   picked: AttachmentView[];
+  announcement: Announcement | undefined;
 }
 
 export const initialState: ChatState = {
@@ -37,7 +47,18 @@ export const initialState: ChatState = {
   autonomySetting: 'supervised',
   sessions: {},
   picked: [],
+  announcement: undefined,
 };
+
+/** What changed in the active session that the user cannot see while they listen: a new question, the end of a turn. */
+function announcementFor(before: SessionView, after: SessionView, seq: number): Announcement | undefined {
+  if (after.approvals.length > before.approvals.length) {
+    const asked = after.approvals.find((a) => !before.approvals.some((b) => b.id === a.id)) ?? after.approvals[0];
+    return { seq, kind: 'question', ...(asked === undefined ? {} : { title: asked.title }) };
+  }
+  if (before.phase !== 'idle' && after.phase === 'idle') return { seq, kind: 'done' };
+  return undefined;
+}
 
 function applyPatch(session: SessionView, patch: SessionPatch): SessionView {
   const items = patch.items.length > 0 ? [...session.items.slice(0, patch.itemsFrom), ...patch.items] : session.items;
@@ -77,7 +98,13 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
     case 'patch': {
       const current = state.sessions[message.patch.sessionId];
       if (!current) return state;
-      return { ...state, sessions: { ...state.sessions, [current.id]: applyPatch(current, message.patch) } };
+      const next = applyPatch(current, message.patch);
+      const announcement = announcementFor(current, next, (state.announcement?.seq ?? 0) + 1);
+      return {
+        ...state,
+        sessions: { ...state.sessions, [current.id]: next },
+        ...(announcement === undefined ? {} : { announcement }),
+      };
     }
     case 'contextPicked':
       return { ...state, picked: [...state.picked, ...message.attachments] };

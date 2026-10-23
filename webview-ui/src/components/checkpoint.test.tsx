@@ -44,11 +44,12 @@ describe('checkpoint card', () => {
       { type: 'viewChanges', sessionId: 's1', checkpointId: '3' },
       { type: 'revert', sessionId: 's1', checkpointId: '3' },
     ]);
-    expect((container.querySelector('details') as HTMLDetailsElement).open).toBe(false);
+    expect(container.querySelector('button.disclosure-toggle')?.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('views and reverts a single file', () => {
     render(<CheckpointCard checkpoint={checkpoint()} sessionId="s1" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
     fireEvent.click(screen.getByRole('button', { name: 'View changes: src/a.ts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Revert this file: src/new.ts' }));
     expect(outbox).toEqual([
@@ -59,12 +60,14 @@ describe('checkpoint card', () => {
 
   it('cannot show the diff of a binary file', () => {
     render(<CheckpointCard checkpoint={checkpoint()} sessionId="s1" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'View changes: logo.png' }).disabled).toBe(true);
   });
 
   it('shows what was reverted and does not offer it again', () => {
     const files = checkpoint().files.map((f) => ({ ...f, reverted: f.path !== 'logo.png' }));
     render(<CheckpointCard checkpoint={checkpoint({ files })} sessionId="s1" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Reverted: src/a.ts' }).disabled).toBe(true);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Revert this file: logo.png' }).disabled).toBe(false);
     expect(screen.getAllByRole('button', { name: 'Revert' })[0]).toBeTruthy(); // one file is still open

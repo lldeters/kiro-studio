@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Session } from '../../src/acp/sessions';
 import { parseSessionNotification } from '../../src/acp/types';
-import { optionLabel, statusModel, type StatusInput, type UiState } from '../../src/view/statusModel';
+import {
+  optionLabel,
+  plainText,
+  spokenStatus,
+  statusModel,
+  type StatusInput,
+  type UiState,
+} from '../../src/view/statusModel';
 import { statusTree } from '../../src/view/statusTree';
 import { SESSION_ID, sessionResult, u, update } from '../support/kiro';
 
@@ -101,6 +108,22 @@ describe('statusModel', () => {
   it('translates through the given function', () => {
     const shout = (message: string) => message.toUpperCase();
     expect(statusModel(input({ ui: 'cliMissing' }), shout).text).toContain('KIRO: CLI NOT FOUND');
+  });
+});
+
+describe('what a screen reader says for the status bar', () => {
+  it('drops the icons from the text', () => {
+    expect(plainText('$(sync~spin) Kiro')).toBe('Kiro');
+    expect(plainText('$(warning) Kiro: 2 questions')).toBe('Kiro: 2 questions');
+    expect(plainText('Kiro')).toBe('Kiro');
+  });
+
+  it('reads the text and then the tooltip as one sentence', () => {
+    expect(spokenStatus({ text: '$(sync~spin) Kiro', tooltip: 'Checking the Kiro CLI…' })).toBe(
+      'Kiro. Checking the Kiro CLI…',
+    );
+    expect(spokenStatus({ text: 'Kiro', tooltip: 'One\nTwo' })).toBe('Kiro. One. Two');
+    expect(spokenStatus({ text: '$(check) Kiro', tooltip: '' })).toBe('Kiro');
   });
 });
 

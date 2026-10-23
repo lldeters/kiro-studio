@@ -144,7 +144,11 @@ describe('tool card', () => {
         sessionId="s1"
       />,
     );
-    expect(container.querySelector('details')).not.toBeNull();
+    const toggle = container.querySelector('button.disclosure-toggle');
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('ok')).toBeNull();
+    fireEvent.click(toggle!);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByText('{"path":"a"}')).toBeTruthy();
     expect(screen.getByText('ok')).toBeTruthy();
     expect(container.querySelectorAll('.diff-line.add')).toHaveLength(1);
@@ -165,6 +169,7 @@ describe('tool card', () => {
         sessionId="s1"
       />,
     );
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
     const buttons = screen.getAllByRole('button', { name: 'Open diff' });
     fireEvent.click(buttons[1]!);
     expect(outbox).toEqual([{ type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 1 }]);
@@ -174,7 +179,7 @@ describe('tool card', () => {
 
   it('is a plain line when there is nothing to expand', () => {
     const { container } = render(<ToolCard tool={tool()} sessionId="s1" />);
-    expect(container.querySelector('details')).toBeNull();
+    expect(container.querySelector('button.disclosure-toggle')).toBeNull();
   });
 
   it('shows a new file as all added', () => {
@@ -186,6 +191,7 @@ describe('tool card', () => {
         sessionId="s1"
       />,
     );
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
     expect(container.querySelectorAll('.diff-line.add')).toHaveLength(2);
     expect(container.querySelectorAll('.diff-line.remove')).toHaveLength(0);
   });

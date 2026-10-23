@@ -1,6 +1,6 @@
 /** The status bar item. What it says is decided by `view/statusModel.ts`. */
 import * as vscode from 'vscode';
-import { statusModel } from '../view/statusModel';
+import { spokenStatus, statusModel } from '../view/statusModel';
 import type { AgentHost } from './agentHost';
 import type { SetupController } from './setup';
 
@@ -42,6 +42,7 @@ export class StatusBarController implements vscode.Disposable {
     );
     this.item.text = model.text;
     this.item.tooltip = model.tooltip;
+    this.item.accessibilityInformation = { label: spokenStatus(model), role: 'button' };
     this.item.command = model.command;
     this.item.backgroundColor =
       model.severity === 'error'

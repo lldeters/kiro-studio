@@ -102,6 +102,10 @@ button.secondary:hover:not(:disabled) {
   .spinner {
     animation-duration: 3s;
   }
+  /* The spinning Codicon of a task in progress stands still; its state is in the text. */
+  .codicon-modifier-spin {
+    animation: none;
+  }
 }
 
 /* Tabs */
@@ -110,12 +114,21 @@ button.secondary:hover:not(:disabled) {
   align-items: center;
   gap: 2px;
   padding: 4px 6px 0;
-  overflow-x: auto;
   flex: none;
   border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
 }
 .tabs:empty {
   display: none;
+}
+.tablist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
 }
 .tab {
   display: flex;
@@ -430,20 +443,39 @@ button.secondary:hover:not(:disabled) {
   color: var(--vscode-foreground);
   background: var(--vscode-editor-background);
 }
-.tool-summary {
+/* The header row of a card that opens (tool calls, checkpoints): the toggle, then what else belongs in the row. */
+.disclosure-head {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
   min-width: 0;
-  list-style: none;
-  cursor: default;
 }
-details.tool > summary {
-  cursor: pointer;
+.disclosure-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
 }
-details.tool > summary::-webkit-details-marker {
-  display: none;
+div.disclosure-toggle {
+  padding-left: 22px;
+}
+.chevron {
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+}
+.checkpoint .disclosure-head {
+  flex-wrap: wrap;
+  padding: 4px 8px;
+}
+.checkpoint .disclosure-toggle {
+  min-width: 8em;
 }
 .tool-title {
   flex: 1;
@@ -796,18 +828,6 @@ details.tool > summary::-webkit-details-marker {
   border-radius: 4px;
   background: var(--vscode-editor-background);
 }
-.checkpoint > summary {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-  list-style: none;
-}
-.checkpoint > summary::-webkit-details-marker {
-  display: none;
-}
 .checkpoint-title {
   flex: 1;
   min-width: 8em;
@@ -997,4 +1017,44 @@ body[data-view='spec'] {
   font-size: 0.85em;
   background: var(--vscode-badge-background);
   color: var(--vscode-badge-foreground);
+}
+
+/*
+ * High-contrast themes. VS Code defines --vscode-contrastBorder and --vscode-contrastActiveBorder only there, so
+ * these rules draw borders around what the other themes tell apart by colour, and outline what is hovered or
+ * selected. Outlines do not move anything.
+ */
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  :is(
+    .tool,
+    .code-block,
+    .message.user .text,
+    .chip,
+    .suggest,
+    .spec-task,
+    .spec-badge,
+    .table-wrap,
+    .notice,
+    .toolbar-select,
+    .context-bar
+  ) {
+  outline: 1px solid var(--vscode-contrastBorder);
+  outline-offset: -1px;
+}
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  :is(button, .tab, .spec-tab, .suggest-item, summary, .icon-button):hover:not(:disabled) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -1px;
+}
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light)
+  :is(.tab.active, .spec-tab.active, .suggest-item.selected) {
+  outline: 1px dashed var(--vscode-contrastActiveBorder);
+  outline-offset: -2px;
+}
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) :is(.markdown a, .link-button) {
+  text-decoration: underline;
+}
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) :focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 0;
 }

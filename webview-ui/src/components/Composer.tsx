@@ -196,8 +196,7 @@ export function Composer({ session }: { session: SessionView }) {
           ref={area}
           value={text}
           rows={1}
-          role="combobox"
-          aria-expanded={menuOpen}
+          aria-label={t('Ask Kiro…')}
           aria-controls={menuOpen ? menuId : undefined}
           aria-activedescendant={menuOpen ? `${menuId}-${selected}` : undefined}
           aria-autocomplete="list"

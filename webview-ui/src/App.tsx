@@ -1,3 +1,4 @@
+import { Announcer } from './components/Announcer';
 import { ApprovalDock } from './components/ApprovalDock';
 import { Banner } from './components/Banner';
 import { Composer } from './components/Composer';
@@ -19,6 +20,7 @@ export function App() {
 
   return (
     <div className="app">
+      <Announcer />
       <Tabs />
       <Banner />
       {session ? (

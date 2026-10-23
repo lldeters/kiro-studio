@@ -28,6 +28,16 @@ export interface StatusModel {
 }
 
 /** The display name of the current value of an option, for example the model. */
+/** The text of a status bar item without its `$(icon)` markers, for what a screen reader says. */
+export const plainText = (text: string): string => text.replace(/\$\([\w~-]+\)\s*/g, '').trim();
+
+/** What a screen reader says for the status bar item: its text, then the tooltip as one sentence. */
+export function spokenStatus(model: Pick<StatusModel, 'text' | 'tooltip'>): string {
+  const text = plainText(model.text);
+  const tooltip = model.tooltip.split(/\r?\n/).join('. ').trim();
+  return tooltip === '' ? text : `${text}. ${tooltip}`;
+}
+
 export function optionLabel(session: Session, id: string): string | undefined {
   const option = session.configOption(id);
   const value = option?.currentValue;
