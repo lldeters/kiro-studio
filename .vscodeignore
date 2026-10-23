@@ -4,6 +4,7 @@
 !dist/webview/**
 !l10n/**
 !resources/**
+resources/icon.svg
 !package.json
 !package.nls*.json
 !README.md

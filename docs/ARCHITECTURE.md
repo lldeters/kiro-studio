@@ -197,6 +197,33 @@ the position. Theme, fonts and spacing come only from `--vscode-*` variables and
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
 
+Themes: colours, fonts and spacing come only from `--vscode-*` variables, so every theme works. The high-contrast
+themes (the body class `vscode-high-contrast[-light]`) get outlines from `--vscode-contrastBorder` around what other
+themes tell apart by colour, dashed `contrastActiveBorder` outlines for what is hovered or selected, underlined links
+and a thicker focus ring; VS Code defines those variables only there. Shiki and Mermaid follow the light/dark kind of the
+theme.
+
+Accessibility: axe-core runs in the webview tests over every state of the chat and over the spec view (names and roles
+of controls, ARIA, labels, lists; colour contrast needs a layout engine and is checked in the preview screenshots).
+What it enforced: no control inside a control, so the sessions are a list of buttons (`aria-current`, a separate close
+button) and tool calls and checkpoints are a `Disclosure` whose toggle button holds only the head, with the file link and
+the buttons next to it; the input has a label. The transcript is not a live region (streaming would be read chunk by
+chunk); a small announcer tells a screen reader about a new question at once (`role="alert"`) and about the end of a
+turn politely (`role="status"`), both decided by the pure reducer. The status bar item has a spoken label without its
+icon markers. A spinning icon stops under `prefers-reduced-motion`.
+
+Performance: the list is virtualised (about 330 to 550 DOM nodes for any session length). Markdown is split into
+top-level blocks (`markdownBlocks.ts`: never inside a code fence, a loose list stays whole, text with link reference
+definitions is not split) and each block is memoised, so a streaming answer re-renders only the block that grows;
+highlighted code and drawn diagrams are cached by theme and source, so rows that scroll back into view appear
+highlighted at once. On the host side `PatchTracker` sends only the tail of the transcript and the tools whose revision
+changed. Measured in headless Chromium (software rendering, one machine, so read the numbers as orders of magnitude;
+`npm run preview -- --scenario long-streaming --measure`, length with `PREVIEW_TURNS`): a session of 1,000 turns
+(about 4,000 items, 2,000 tools) shows its first content after 1.2 s; 150 streamed pieces cost 0.6 s of scripting
+(1.7 s before the block-wise rendering), independent of the length of the session (the same for 100 and 300 turns).
+`test/unit/performance.test.ts` keeps the host side within budgets (the view of such a session in about 50 ms, a patch
+per streamed piece well under a millisecond).
+
 A script (`npm run preview`) renders the webview in Chromium with a mock VS Code API and a theme, using messages from
 the real store and presenter, for screenshots without starting VS Code.
 
@@ -281,7 +308,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
   German translation. `spawnTransport` is tested with a real process tree on POSIX.
 - **Webview (Vitest with jsdom, `webview-ui/src/**/*.test.tsx`):** the reducer, the app in every setup and connection
   state, Markdown, code blocks, tool cards, diffs, approvals, toolbar, composer (menus, keyboard, chips, drafts, drops),
-  checkpoint cards, the spec view (tabs with the keyboard, review, starting tasks).
+  checkpoint cards, the spec view (tabs with the keyboard, review, starting tasks), the announcements for screen readers,
+  the block-wise Markdown and the highlight cache, and axe-core over all of them.
 - **Fake CLI:** `test/integration/fixtures/fake-kiro.cjs` stands in for `kiro-cli` (scenarios `ready`, `signedout`,
   `old`): `--version`, `whoami`, `acp --help` and a minimal ACP conversation, with the agents `vibe`, `spec`,
   `quick-spec` and `bug-fix` as the `mode` option; a prompt `WRITE <file> <text>` makes it
@@ -293,6 +321,9 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
   sessions of the agent and the `.kiro` fixtures of the test workspace, opening an earlier session, the CodeLens over a `tasks.md`, starting a spec (agent and prompt), running a task, and that the
   spec view opens once and its page loads. The fake CLI is a shell
   script, so those tests are skipped on Windows. They need a VS Code download, which is why CI runs them.
+- **Package check:** `npm run package` ends with `scripts/check-vsix.ts`: the files that must be in the `.vsix`, the ones
+  that must not (sources, maps, tests, dependencies), its size and the images of the README (rules in
+  `scripts/vsix-rules.ts`, tested).
 - **Fixtures:** handwritten and Kiro-shaped (`test/support/kiro.ts`); third-party recordings are not committed.
 - **CI (`.github/workflows/ci.yml`):** typecheck, lint, format check, unit and webview tests and build on Windows,
   macOS and Linux; integration tests on VS Code 1.93.0 (the minimum) and stable; `npm run package` builds the `.vsix`
@@ -308,7 +339,8 @@ test/support/   fake agent, harness, Kiro-shaped fixtures, fake CLI helper
 test/integration/ tests that run inside VS Code (own tsconfig, CommonJS), fake CLI script, workspace folder
 l10n/           runtime message bundles (English list generated by `npm run l10n:export`, German by hand)
 resources/      icon and walkthrough pages
-scripts/        probe-acp.ts, validate-wire.ts, preview-webview.ts, l10n and licence tools (own tsconfig, ESM)
+scripts/        probe-acp.ts, validate-wire.ts, preview-webview.ts (screenshots, measuring), render-icon.ts, check-vsix.ts,
+                l10n and licence tools (own tsconfig, ESM)
 docs/           PLAN.md, ARCHITECTURE.md, protocol-notes.md
 probe-logs/     output of the probe (git-ignored; may contain account details)
 ```

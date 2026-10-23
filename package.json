@@ -5,6 +5,12 @@
   "version": "0.1.0",
   "publisher": "lldeters",
   "license": "Apache-2.0",
+  "icon": "resources/icon.png",
+  "preview": true,
+  "galleryBanner": {
+    "color": "#1f2340",
+    "theme": "dark"
+  },
   "private": true,
   "repository": {
     "type": "git",
@@ -851,7 +857,7 @@
     "test:integration": "npm run build && npm run build:integration && vscode-test",
     "l10n:export": "tsx scripts/l10n-export.ts",
     "notices": "tsx scripts/third-party-notices.ts",
-    "package": "npm run build:prod && npm run notices && vsce package --no-dependencies -o dist/kiro-studio.vsix",
+    "package": "npm run build:prod && npm run notices && vsce package --no-dependencies -o dist/kiro-studio.vsix && tsx scripts/check-vsix.ts",
     "vscode:prepublish": "npm run build:prod",
     "probe": "tsx scripts/probe-acp.ts",
     "validate-wire": "tsx scripts/validate-wire.ts",

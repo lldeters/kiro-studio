@@ -164,7 +164,7 @@ werden (E3); bis dahin gilt A19 (Abschnitt 12).
 
 ### Phase 5 – Feinschliff
 
-Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen Chats, Lokalisierung, README mit Screenshots, `.vsix`.
+Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen Chats, Lokalisierung, README mit Screenshots, `.vsix`. Gebaut, siehe Abschnitt 13.
 
 ## 6. Risiken
 
@@ -465,3 +465,55 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
 3. `tasks.md` öffnen: über den offenen Aufgaben steht „Aufgabe starten“. Eine starten; Kiro soll sie erledigen und in der Datei
    ankreuzen, der Fortschritt in der Ansicht folgt.
 4. Schick mir die `tasks.md` (und gern `requirements.md`/`design.md`) dieser Spec: Damit prüfe ich A19.
+
+## 13. Phase 5: Stand, Abweichungen und Annahmen
+
+### Was gebaut ist
+
+- **Themes:** Hochkontrast-Themes bekommen Rahmen und Umrisse aus `contrastBorder`/`contrastActiveBorder` dort, wo andere Themes
+  nur Farbe nutzen, unterstrichene Links und einen dickeren Fokusrahmen. Die Vorschau rendert `dark`, `light`, `hc`, `hc-light`.
+- **Barrierefreiheit:** axe-core prüft Chat (alle Zustände) und Spec-Ansicht im Test. Gefunden und behoben: Bedienelemente in
+  Bedienelementen (Schließen-Knöpfe in Tabs, Dateilink und Knöpfe in `<summary>`), eine Combobox-Rolle an einer Textarea, ein
+  Eingabefeld ohne Label. Die Sitzungen sind jetzt eine Liste aus Knöpfen mit `aria-current`; Werkzeugaufrufe und Checkpoints sind
+  eine `Disclosure`. Screenreader hören eine neue Frage sofort und das Ende eines Durchgangs höflich; die Statusleiste hat einen
+  gesprochenen Text; das drehende Symbol steht bei „Bewegung reduzieren“.
+- **Performance:** Antwort-Markdown wird blockweise gerendert (nur der wachsende Block wird neu berechnet); hervorgehobener Code
+  und gezeichnete Diagramme werden zwischengespeichert. Messwerte (headless Chromium, Software-Rendering, ein Rechner, also
+  Größenordnungen): Sitzung mit 1000 Durchgängen (rund 4000 Einträge, 2000 Werkzeuge): erster Inhalt nach 1,2 s, 150
+  gestreamte Stücke kosten 0,6 s Skriptzeit (vorher 1,7 s), unabhängig von der Länge der Sitzung. Host-Seite: Ansicht der
+  Sitzung rund 50 ms, ein Patch je Stück deutlich unter 1 ms; ein Test hält Budgets.
+- **Lokalisierung:** Deutsch war vollständig (Test); neu sind die deutschen Seiten der Einführung (`*.de.md`).
+- **Paket:** Icon (`resources/icon.png`, eigenes Motiv, erzeugt aus `resources/icon.svg`), Marketplace-Metadaten (Vorschau-Kennzeichen,
+  Banner), README mit Screenshots und Abschnitten zu Datenschutz und Grenzen, `CHANGELOG.md`, `scripts/check-vsix.ts` prüft
+  Inhalt, Größe (Grenze 5 MB, aktuell 2,2 MB) und README-Bilder und läuft am Ende von `npm run package` (also in der CI).
+
+### Abweichungen vom Phasenplan (und warum)
+
+| Geplant | Umgesetzt | Grund |
+| --- | --- | --- |
+| Farbkontrast prüfen | im Vorschau-Screenshot angesehen, nicht automatisch | axe braucht dafür eine Layout-Engine; jsdom hat keine. |
+| Sehr lange Sitzungen | gemessen, Streaming optimiert | Der erste Inhalt einer 1000-Durchgänge-Sitzung braucht 1,2 s, weil die ganze Sitzung auf einmal ankommt. Nachladen älterer Einträge wäre eine größere Änderung am Protokoll; erst sinnvoll, wenn echte Sitzungen so lang werden. |
+| Screenshots | aus der Vorschau (Beispieldaten), keine Aufnahme von VS Code | Ohne echtes VS Code mit Kiro nicht möglich; das README sagt es. Die Baumansichten (Panel) sind nicht abgebildet. |
+| Veröffentlichen | nicht gemacht | Nicht verlangt. `"private": true` bleibt gesetzt; für eine Veröffentlichung wäre es zu entfernen. |
+
+### Annahmen (nicht geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A23 | VS Code wählt für eine Einführungsseite `x.md` in einem deutschen Fenster `x.de.md`, wenn sie existiert (aus dem Verhalten der Einführungen von VS Code, nicht in einem echten Fenster gesehen). | Es erscheint die englische Seite. |
+| A24 | Die Hochkontrast-Themes setzen `--vscode-contrastBorder` und `--vscode-contrastActiveBorder` und die Body-Klassen `vscode-high-contrast` bzw. `vscode-high-contrast-light`. | Die Umrisse fehlen; Lesbarkeit und Fokusrahmen bleiben, weil sie aus anderen Variablen kommen. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- Das Paket ist als Vorschau gekennzeichnet (`"preview": true`).
+- Die Sitzungsleiste verwendet keine Tab-Semantik mehr (Liste aus Knöpfen), damit jede Sitzung einen eigenen Schließen-Knopf haben darf.
+- Werkzeugaufrufe und Checkpoint-Karten zeigen ihren Inhalt erst nach dem Aufklappen im DOM (weniger Arbeit beim Scrollen).
+
+### Abnahme bei dir
+
+1. Das Paket bauen (`npm run package`) und in VS Code installieren (`code --install-extension dist/kiro-studio.vsix`).
+2. Ein Hochkontrast-Theme wählen: Chat und Spec-Ansicht sollten Umrisse zeigen, der Fokusrahmen ist gut sichtbar.
+3. Mit einem Screenreader (NVDA, VoiceOver): in einem Durchgang bei einer Frage von Kiro sollte die Frage sofort vorgelesen werden,
+   am Ende „Kiro: Fertig“.
+4. VS Code auf Deutsch stellen: die Einführung sollte deutsch sein (A23).
+5. Eine lange Sitzung öffnen und eine Antwort streamen lassen: kein Ruckeln.

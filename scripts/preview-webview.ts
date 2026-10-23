@@ -83,7 +83,10 @@ const port = typeof address === 'object' && address ? address.port : 0;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH ?? findChromium() });
 try {
-  const page = await browser.newPage({ viewport: { width, height } });
+  const page = await browser.newPage({
+    viewport: { width, height },
+    deviceScaleFactor: Number(option('scale', '1')),
+  });
   const problems: string[] = [];
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
   page.on('console', (message) => {
