@@ -16,16 +16,14 @@ export class DebugChat implements vscode.Disposable {
 
   async newSession(): Promise<Session | undefined> {
     try {
-      const agent = this.host.ensureAgent();
       const session = await vscode.window.withProgress(
         {
           location: vscode.ProgressLocation.Notification,
           title: vscode.l10n.t('Starting a Kiro session… the first start can take a while.'),
         },
-        () => agent.newSession({ cwd: this.host.workspaceRoot() }),
+        () => this.host.newSession(),
       );
       this.attach(session);
-      this.host.setActive(session.id);
       this.out.show(true);
       return session;
     } catch (error) {

@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import prettier from 'eslint-config-prettier';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -36,6 +37,11 @@ export default tseslint.config(
         { paths: [{ name: 'vscode', message: 'Only src/host and src/extension.ts may import vscode.' }] },
       ],
     },
+  },
+  {
+    files: ['webview-ui/src/**/*.{ts,tsx}'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: reactHooks.configs.recommended.rules,
   },
   {
     files: ['src/host/**/*.ts', 'src/extension.ts', 'test/integration/**/*.ts'],

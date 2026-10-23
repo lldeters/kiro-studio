@@ -4,6 +4,7 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { UI_MESSAGES } from '../src/shared/uiMessages.js';
 
 function sourceFiles(dir: string, found: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
@@ -23,5 +24,6 @@ export function collectKeys(root = 'src'): string[] {
       keys.add((match[1] ?? '').replace(/\\'/g, "'"));
     }
   }
+  for (const message of UI_MESSAGES) keys.add(message);
   return [...keys].sort();
 }

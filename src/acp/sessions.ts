@@ -46,6 +46,8 @@ export type TranscriptItem = TranscriptMessage | TranscriptTool | TranscriptNoti
 
 export interface ToolCallState {
   toolCallId: string;
+  /** Increases with every change, so that a UI can send only the tools that changed. */
+  rev: number;
   title: string;
   kind?: string;
   status?: string;
@@ -322,6 +324,7 @@ export class Session {
     if (tool === undefined) {
       tool = {
         toolCallId: event.toolCallId,
+        rev: 0,
         title: event.title ?? 'Tool call',
         statusHistory: [],
         content: [],
@@ -358,6 +361,7 @@ export class Session {
         ...opt('modifiedContent', str(preview.modifiedContent)),
       };
     }
+    tool.rev++;
     this.changes.emit('tools');
   }
 

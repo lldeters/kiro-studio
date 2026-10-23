@@ -1,0 +1,286 @@
+/* Colours, fonts and spacing come from the VS Code theme variables only, so every theme works. */
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+body {
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  line-height: 1.5;
+}
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+.muted {
+  color: var(--vscode-descriptionForeground);
+}
+
+/* Buttons */
+button.primary,
+button.secondary {
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  padding: 4px 12px;
+}
+button.primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+button.primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+button.secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+button.secondary:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+.icon-button {
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  padding: 0 6px;
+  line-height: 20px;
+  height: 22px;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+.icon-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--vscode-progressBar-background, currentColor);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  flex: none;
+}
+.spinner.small {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 0;
+  overflow-x: auto;
+  flex: none;
+  border-bottom: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.tabs:empty {
+  display: none;
+}
+.tab {
+  display: flex;
+  align-items: center;
+  max-width: 180px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  color: var(--vscode-descriptionForeground);
+}
+.tab.active {
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  border-color: var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.tab.lost .tab-label {
+  text-decoration: line-through;
+}
+.tab-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 3px 4px 3px 8px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+}
+.tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attention {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vscode-notificationsWarningIcon-foreground, var(--vscode-editorWarning-foreground));
+  flex: none;
+}
+.new-tab {
+  margin-left: 2px;
+}
+
+/* Banner and empty state */
+.banner {
+  margin: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--vscode-editorInfo-foreground, var(--vscode-focusBorder));
+  background: var(--vscode-textBlockQuote-background);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: none;
+}
+.banner-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.empty {
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.empty p {
+  margin: 0;
+}
+.empty button {
+  margin-top: 12px;
+}
+
+/* Transcript */
+.transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.message .author {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 2px;
+}
+.message .text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.message.user .text {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+}
+.message.thought .text {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+.notice {
+  padding: 4px 8px;
+  border-left: 3px solid var(--vscode-editorInfo-foreground, var(--vscode-focusBorder));
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+.notice.warning {
+  border-color: var(--vscode-editorWarning-foreground);
+}
+.notice.error {
+  border-color: var(--vscode-errorForeground);
+  color: var(--vscode-errorForeground);
+}
+.tool {
+  padding: 2px 8px;
+  border-left: 3px solid var(--vscode-descriptionForeground);
+  color: var(--vscode-descriptionForeground);
+  overflow-wrap: anywhere;
+}
+.tool.running {
+  border-color: var(--vscode-progressBar-background);
+}
+.tool.waiting {
+  border-color: var(--vscode-editorWarning-foreground);
+}
+.tool.done {
+  border-color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+.tool.failed {
+  border-color: var(--vscode-errorForeground);
+}
+
+/* Composer */
+.composer {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  padding: 5px 8px;
+  max-height: 200px;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+}
+.composer textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+.composer textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}

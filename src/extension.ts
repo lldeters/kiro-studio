@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { AgentHost } from './host/agentHost';
+import { ChatController } from './host/chatController';
+import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
 import { createProtocolChannel } from './host/logger';
@@ -32,6 +34,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   });
   host = agentHost;
   const debug = new DebugChat(agentHost);
+  const chat = new ChatController(agentHost, setup, settings);
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
 
@@ -39,6 +42,11 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     protocol,
     setup,
     debug,
+    chat,
+    vscode.window.registerWebviewViewProvider(
+      ChatViewProvider.viewType,
+      new ChatViewProvider(context.extensionUri, chat),
+    ),
     statusBar,
     view,
     vscode.window.registerTreeDataProvider('kiroStudio.status', view),
@@ -58,7 +66,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     }),
   );
 
-  registerCommands({ context, host: agentHost, setup, settings, protocol, debug });
+  registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat });
 
   const firstCheck = setup.check();
   return {

@@ -25,6 +25,7 @@ export class AgentHost implements vscode.Disposable {
   private approvalUi: ApprovalUi | undefined;
   private active: string | undefined;
   private readonly subscriptions: (() => void)[] = [];
+  private notifyTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly deps: {
@@ -39,6 +40,22 @@ export class AgentHost implements vscode.Disposable {
     return this.current;
   }
 
+  /**
+   * Tells listeners that something changed. A streaming answer changes a session many times a second, and the
+   * listeners rebuild views, so notifications are merged into one every 40 ms.
+   */
+  notifyChanged(): void {
+    this.notify();
+  }
+
+  private notify(): void {
+    if (this.notifyTimer) return;
+    this.notifyTimer = setTimeout(() => {
+      this.notifyTimer = undefined;
+      this.changed.fire();
+    }, 40);
+  }
+
   /** Requests from Kiro that wait for the user. */
   get pendingApprovals(): number {
     return this.approvalUi?.pendingCount ?? 0;
@@ -49,13 +66,27 @@ export class AgentHost implements vscode.Disposable {
     this.approvalUi?.showNext();
   }
 
+  /** The session the chat shows: the one chosen last, or the first one if that is gone. */
   get activeSession(): Session | undefined {
-    return this.active === undefined ? undefined : this.current?.store.get(this.active);
+    const sessions = this.current?.store.all() ?? [];
+    return sessions.find((s) => s.id === this.active) ?? sessions[0];
+  }
+
+  /** Starts a session in the workspace folder (and the agent, if it is not running yet) and makes it the active one. */
+  async newSession(): Promise<Session> {
+    const session = await this.ensureAgent().newSession({ cwd: this.workspaceRoot() });
+    this.setActive(session.id);
+    return session;
+  }
+
+  async closeSession(sessionId: string): Promise<void> {
+    await this.current?.closeSession(sessionId);
+    this.notify();
   }
 
   setActive(sessionId: string | undefined): void {
     this.active = sessionId;
-    this.changed.fire();
+    this.notify();
   }
 
   /** The folder the agent process and new sessions start in. */
@@ -88,19 +119,19 @@ export class AgentHost implements vscode.Disposable {
     });
     this.current = agent;
     this.approvalUi = new ApprovalUi(agent);
-    const approvalChanges = this.approvalUi.onDidChange(() => this.changed.fire());
+    const approvalChanges = this.approvalUi.onDidChange(() => this.notify());
     this.subscriptions.push(
       () => {
         approvalChanges.dispose();
       },
-      agent.status.on(() => this.changed.fire()),
+      agent.status.on(() => this.notify()),
       agent.store.added.on((session) => {
-        this.subscriptions.push(session.changes.on(() => this.changed.fire()));
-        this.changed.fire();
+        this.subscriptions.push(session.changes.on(() => this.notify()));
+        this.notify();
       }),
-      agent.store.removed.on(() => this.changed.fire()),
+      agent.store.removed.on(() => this.notify()),
     );
-    this.changed.fire();
+    this.notify();
     return agent;
   }
 
@@ -111,6 +142,7 @@ export class AgentHost implements vscode.Disposable {
   }
 
   async dispose(): Promise<void> {
+    clearTimeout(this.notifyTimer);
     const agent = this.current;
     this.current = undefined;
     this.approvalUi?.dispose();

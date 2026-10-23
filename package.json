@@ -66,6 +66,12 @@
     "views": {
       "kiro-studio": [
         {
+          "type": "webview",
+          "id": "kiroStudio.chat",
+          "name": "%views.chat%",
+          "visibility": "visible"
+        },
+        {
           "id": "kiroStudio.status",
           "name": "%views.status%",
           "visibility": "visible"
@@ -105,6 +111,22 @@
       }
     ],
     "commands": [
+      {
+        "command": "kiroStudio.openChat",
+        "title": "%command.openChat%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.openChatInEditor",
+        "title": "%command.openChatInEditor%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.newSession",
+        "title": "%command.newSession%",
+        "category": "Kiro Studio",
+        "icon": "$(add)"
+      },
       {
         "command": "kiroStudio.showQuickMenu",
         "title": "%command.showQuickMenu%",
@@ -175,6 +197,16 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "kiroStudio.newSession",
+          "when": "view == kiroStudio.chat",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.openChatInEditor",
+          "when": "view == kiroStudio.chat",
+          "group": "navigation@2"
+        },
         {
           "command": "kiroStudio.checkSetup",
           "when": "view == kiroStudio.status",
@@ -291,10 +323,11 @@
     ]
   },
   "scripts": {
-    "build": "node esbuild.mjs",
-    "build:prod": "node esbuild.mjs --production",
+    "build": "node esbuild.mjs && npm run build:webview",
+    "build:webview": "vite build --config webview-ui/vite.config.mts --mode development",
+    "build:prod": "node esbuild.mjs --production && vite build --config webview-ui/vite.config.mts",
     "watch": "node esbuild.mjs --watch",
-    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json && tsc -p test/integration/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json && tsc -p webview-ui/tsconfig.json && tsc -p test/integration/tsconfig.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -307,27 +340,46 @@
     "package": "npm run build:prod && npm run notices && vsce package --no-dependencies -o dist/kiro-studio.vsix",
     "vscode:prepublish": "npm run build:prod",
     "probe": "tsx scripts/probe-acp.ts",
-    "validate-wire": "tsx scripts/validate-wire.ts"
+    "validate-wire": "tsx scripts/validate-wire.ts",
+    "preview": "tsx scripts/preview-webview.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "2.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/vscode": "1.93.0",
+    "@vitejs/plugin-react": "^6.1.2",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
+    "diff": "^9.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
+    "jsdom": "^29.1.1",
+    "mermaid": "^12.2.0",
+    "playwright-core": "^1.64.1",
     "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "react-virtuoso": "^4.18.19",
+    "remark-gfm": "^4.0.1",
+    "shiki": "^4.5.0",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.72.0",
-    "vitest": "^5.0.5"
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "zustand": "^5.0.16"
   }
 }
