@@ -159,8 +159,8 @@ und `_kiro/sessions/changed` `[V]` (Teilobjekte nach `sessionId` zusammenführen
 ### Phase 4 – Specs
 
 Assistent „Neue Spec“ (zuerst Modus setzen, dann strukturierter Prompt), Spec-Ansicht mit Tabs, Mermaid und
-Fortschritt, CodeLens und Task-Ausführung, Review-Modus. Das `tasks.md`-Format wird an einer **echten** Kiro-Spec
-ermittelt (offen, E3), nicht aus der Doku geraten.
+Fortschritt, CodeLens und Task-Ausführung, Review. Das `tasks.md`-Format sollte an einer **echten** Kiro-Spec ermittelt
+werden (E3); bis dahin gilt A19 (Abschnitt 12).
 
 ### Phase 5 – Feinschliff
 
@@ -201,8 +201,8 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
   dafür gar nicht erst nachfragt; Kiros Ask-Regeln werden im Autopilot dagegen mit „einmal erlauben“ beantwortet.
 - **E2 – Checkpoints:** Schatten-Git-Repo als verlässliche Basis für Revert und „View all changes“. Kiros eigene Checkpoints
   prüfe ich später und nutze sie höchstens als Zusatz.
-- **E3 – Beispiel-Spec:** zurückgestellt. Du kennst Specs noch nicht (Erklärung in der Antwort vom 2026-10-23); das ist erst
-  für Phase 4 nötig und kein Hindernis für Phase 1 bis 3.
+- **E3 – Beispiel-Spec:** zurückgestellt. Du kennst Specs noch nicht (Erklärung in der Antwort vom 2026-10-23). Phase 4 ist
+  trotzdem gebaut, mit dem Format aus Beschreibungen Dritter (Annahme A19, Abschnitt 12); eine echte Datei von Kiro prüft sie.
 - **E4 – Hooks: Opt-in.** Kiro Studio aktiviert Hooks nur, wenn du es einschaltest (Einstellung `kiroStudio.hooks.enabled`,
   Standard aus), mit Hinweis, dass dann auch deine globalen Hooks laufen. Details in Phase 3.
 - **E5 – Lizenz: Apache-2.0.** `LICENSE` und `package.json` sind angelegt.
@@ -216,7 +216,8 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 2. ~~Freigabe für Phase 1.~~ Erteilt (2026-10-23, „Du hast mein Go“).
 3. ~~Publisher-ID und Copyright-Name.~~ Entschieden: `lldeters` (Publisher in `package.json`, Copyright-Zeile in `NOTICE`). Das
    Repo ist bereits öffentlich; `probe-logs/` ist ausgeschlossen, damit keine Konto-Daten hochgeladen werden.
-4. **Beispiel-Spec** (E3): erst in Phase 4.
+4. **Beispiel-Spec** (E3): eine von Kiro geschriebene `tasks.md` (am besten mit `requirements.md` und `design.md`) würde A19
+   bestätigen oder korrigieren. Phase 4 läuft auch ohne.
 
 ## 8. Probe ausführen
 
@@ -388,7 +389,7 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
 | A13 | `session/list` ohne `cwd` liefert die Sitzungen aller Ordner. | Schlägt es fehl, wird mit dem Arbeitsbereichsordner erneut gefragt; „alle Ordner“ zeigt dann nur Sitzungen, die per Broadcast bekannt werden. |
 | A14 | `session/fork` nimmt `{ sessionId, cwd, mcpServers: [] }` (ACP-Entwurf) und antwortet wie `session/new`. | „Abzweigen“ zeigt eine Fehlermeldung. Es erscheint nur, wenn die CLI die Fähigkeit ankündigt. |
 | A15 | `_kiro/session/rename` nimmt `{ sessionId, title }`. | Die 2.33.1 kündigt die Methode gar nicht an; „Umbenennen“ erscheint dort nicht. |
-| A16 | Formate von `.kiro.hook`, Agent-JSON, `mcp.json` und der Steering-Frontmatter entsprechen dem, was die Kiro-IDE schreibt; `tasks.md` hat Checkbox-Zeilen (E3, noch keine echte Spec gesehen). | Dateien, die nicht passen, erscheinen trotzdem in der Liste, mit Fehlertext bzw. ohne Fortschritt. |
+| A16 | Formate von `.kiro.hook`, Agent-JSON, `mcp.json` und der Steering-Frontmatter entsprechen dem, was die Kiro-IDE schreibt; `tasks.md` hat Checkbox-Zeilen (seit Phase 4 siehe A19). | Dateien, die nicht passen, erscheinen trotzdem in der Liste, mit Fehlertext bzw. ohne Fortschritt. |
 | A17 | Einträge von `_kiro/mcp/status` haben Name und Status (unter üblichen Schlüsseln); beobachtet wurde nur die leere Liste. | Server ohne erkennbaren Status zeigen „nicht gestartet“; die Konfiguration bleibt sichtbar. |
 | A18 | Eingebaute Steering-Dokumente tragen im Broadcast eine `uri` mit `builtin:`; Dateien des Nutzers erkenne ich an den Dateien selbst. | Eingebaute Dokumente erscheinen nicht, oder Dateien doppelt; die Dateiansicht bleibt richtig. |
 
@@ -406,3 +407,61 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
 3. Eine Sitzung starten, dann in „Sitzungen“ eine frühere öffnen (das Gespräch erscheint im Chat).
 4. MCP: „Server hinzufügen“, dann einschalten und eine neue Sitzung starten; der Status sollte sich ändern.
 
+## 12. Phase 4: Stand, Abweichungen und Annahmen
+
+### Was gebaut ist
+
+- **Aufgaben aus `tasks.md`:** Der Parser macht aus der Datei einen Baum (Nummer, Titel, Unteraufgaben, `[ ]` / `[-]` / `[x]`,
+  optionale Aufgaben `- [ ]*`, Detailzeilen, `_Requirements: 1.1, 2.3_`). Der Fortschritt zählt die Aufgaben ohne
+  Unteraufgaben; eine optionale Aufgabe zählt nur, wenn sie erledigt ist, damit eine Spec ohne sie fertig sein kann.
+  (Phase 3 zählte jede Checkbox, auch Elternaufgaben; das zeigte bei einer Aufgabe mit zwei Unteraufgaben „2 von 3“.)
+- **Ansicht „Specs“:** unter dem Aufgabendokument stehen die Aufgaben mit Symbol je Zustand; „Aufgabe starten“ als Inline-Aktion,
+  „Aufgaben aktualisieren“ am Aufgabendokument, „Spec-Ansicht öffnen“ an der Spec, „Neue Spec“ in der Titelleiste. Eine
+  Fehlerbehebungs-Spec zeigt `bugfix.md`.
+- **Assistent „Neue Spec“:** Art (Funktion mit Anforderungen zuerst, Funktion mit Entwurf zuerst, Fehlerbehebung, schnelle Spec),
+  Beschreibung, Name (Vorschlag aus der Beschreibung, Kleinbuchstaben mit Bindestrichen, nicht vergeben). Dann eine eigene
+  Sitzung im Agenten des Ablaufs (`spec`, `quick-spec`, `bug-fix`) und ein strukturierter Prompt, der Kiro nach jedem
+  Dokument anhalten lässt.
+- **CodeLens in `tasks.md`:** „Aufgabe starten“ (bzw. „Aufgabe fortsetzen“) über jeder offenen Aufgabe, „Aufgaben aktualisieren“
+  oben (Einstellung `kiroStudio.specs.codeLens`, Standard an). Die Aufgabe wird beim Start in der Datei neu gesucht (Zeile, sonst
+  Nummer); eine geänderte Liste startet nie die falsche Aufgabe.
+- **Spec-Ansicht** (Editor-Tab): Dokumente als Tabs mit Markdown und Mermaid, Fortschritt, Aufgabenliste mit Start-Knöpfen,
+  „Datei öffnen“ und je Dokument eine Prüfleiste: **Freigeben und weitermachen** oder **Änderungen anfordern…** (Text an Kiro).
+  Sie lädt sich neu, wenn sich `.kiro` ändert. Tastatur: Pfeiltasten, Pos1 und Ende wechseln die Tabs.
+
+### Abweichungen vom Phasenplan (und warum)
+
+| Geplant | Umgesetzt | Grund |
+| --- | --- | --- |
+| `tasks.md`-Format an einer echten Kiro-Spec ermitteln (E3) | Format aus Beschreibungen Dritter, Parser tolerant | Es gab keine echte Datei, und die Kiro-Doku war von hier aus nicht erreichbar. Siehe A19. |
+| „Review-Modus“ | Prüfleiste: Freigabe oder Änderungswunsch als Prompt | Ein Review-Mechanismus von Kiro für Specs ist im Protokoll nicht bekannt `[P]`. Fragt Kiro selbst, erscheint die Frage wie immer im Chat. |
+| Task-Ausführung | Prompt an Kiro, kein eigener Task-Runner | Kiro schreibt den Zustand in `tasks.md`; die Extension liest ihn nur. |
+| Spec-Ansicht mit Tabs, Mermaid, Fortschritt | wie geplant; Diagramme in Entwurf und Anforderungen | – |
+| Spec-Assistent mit dem Modus `spec` | zusätzlich Entwurf-zuerst, Fehlerbehebung und schnelle Spec | Dieselbe Mechanik (Modus setzen, Prompt), drei weitere Abläufe der Kiro-IDE. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A19 | `tasks.md` ist eine nummerierte Checkbox-Liste (`- [ ] 1. Titel`, Unteraufgaben `1.1` eine Ebene tiefer, `[-]` in Arbeit, `- [ ]*` optional, eingerückte Detailzeilen, `_Requirements: 1.1_`). Quelle: Beschreibungen des Spec-Ablaufs von Dritten, keine Datei von Kiro. | Zeilen, die nicht als Checkbox erkannt werden, erscheinen nicht als Aufgaben (kein Start-Knopf, kein Fortschritt). Eine andere Statusmarke gilt als „offen“. |
+| A20 | Die Agents `spec`, `quick-spec` und `bug-fix` (auf deiner CLI als `mode` beobachtet `[V]`) tun, was der Name sagt; eine Fehlerbehebungs-Spec heißt `bugfix.md`. | Bietet die CLI den Agenten nicht an, steht ein Hinweis in der Sitzung und die Spec beginnt mit dem aktuellen Agenten. Ein anderer Dateiname fehlt in der Spec-Ansicht, bleibt aber in der Ordnerliste sichtbar. |
+| A21 | Kiro hält sich an die Bitten im Prompt (nach jedem Dokument anhalten, nur diese Aufgabe, danach ankreuzen). | Kiro macht mehr oder weniger; die Extension liest den Zustand immer aus der Datei, nie aus dem Prompt. |
+| A22 | Der Prompt „freigegeben, mach mit dem Entwurf weiter“ ist für Kiro ein gültiger Übergang zur nächsten Phase. | Kiro fragt nach oder bleibt stehen; die Antwort steht im Chat. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- „Neue Spec“ läuft immer in einer **neuen Sitzung**; „Aufgabe starten“ und die Prüfleiste nutzen die aktive Sitzung, bei laufendem Durchgang fragt die
+  Extension, ob eine neue Sitzung genommen werden soll.
+- Der Agent wird nur gewechselt, wenn er sich vom Ablauf unterscheidet und die CLI ihn anbietet.
+- Eine Aufgabe mit Unteraufgaben startet die Aufgabe samt Unteraufgaben nacheinander; eine ohne Unteraufgaben nur sich selbst.
+- Die CodeLens ist an. Für „Aufgabe starten“ gibt es keine Bestätigungsabfrage; Kiros Freigaben (Supervised/Autopilot) gelten wie immer.
+
+### Abnahme bei dir
+
+1. „Neue Spec“ in der Specs-Ansicht: Art wählen, Satz beschreiben, Name bestätigen. Der Chat öffnet sich in einer neuen Sitzung im
+   Agenten `spec`; Kiro soll `requirements.md` schreiben und anhalten.
+2. In der Specs-Ansicht „Spec-Ansicht öffnen“: Tabs, Anforderungen lesen, **Freigeben und weitermachen**; Kiro soll `design.md`
+   schreiben (Mermaid-Diagramme erscheinen gezeichnet), danach `tasks.md`.
+3. `tasks.md` öffnen: über den offenen Aufgaben steht „Aufgabe starten“. Eine starten; Kiro soll sie erledigen und in der Datei
+   ankreuzen, der Fortschritt in der Ansicht folgt.
+4. Schick mir die `tasks.md` (und gern `requirements.md`/`design.md`) dieser Spec: Damit prüfe ich A19.
