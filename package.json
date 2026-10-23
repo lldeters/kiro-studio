@@ -122,6 +122,11 @@
         "category": "Kiro Studio"
       },
       {
+        "command": "kiroStudio.exportSession",
+        "title": "%command.exportSession%",
+        "category": "Kiro Studio"
+      },
+      {
         "command": "kiroStudio.newSession",
         "title": "%command.newSession%",
         "category": "Kiro Studio",
@@ -246,6 +251,11 @@
           "default": true,
           "scope": "application",
           "markdownDescription": "%config.autoAllowInAutopilot%"
+        },
+        "kiroStudio.checkpoints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%config.checkpointsEnabled%"
         },
         "kiroStudio.hooks.enabled": {
           "type": "boolean",

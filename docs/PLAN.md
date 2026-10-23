@@ -3,8 +3,9 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0 und Phase 1 sind umgesetzt (Phase 1 siehe Abschnitt 9). Phase 1 ist gebaut, getestet und per CI geprüft,
-aber noch nicht gegen deine echte CLI durchgespielt. Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8 und 9).**
+**Status: Phase 0, 1 und 2 sind umgesetzt (Phase 1 siehe Abschnitt 9, Phase 2 Abschnitt 10). Beides ist gebaut, getestet und
+per CI geprüft (Linux, macOS, Windows; VS Code 1.93.0 und stable), aber noch nicht gegen deine echte CLI durchgespielt.
+Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8, 9 und 10).**
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -288,4 +289,64 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
 2. „Kiro Studio: Debug: New Session“, danach „Debug: Send Prompt“; die Antwort erscheint im Ausgabekanal „Kiro Studio: Chat (debug)“.
 3. Eine Freigabe beantworten, VS Code schließen und prüfen, dass kein `kiro-cli`-Prozess übrig bleibt.
 4. Optional die Probe-Läufe `--review reject`, `--autopilot on`, `--exit-wait 30 --no-prompt` aus Abschnitt 8.
+
+## 10. Phase 2: Stand, Abweichungen und Annahmen
+
+### Was gebaut ist
+
+- **Chat-Ansicht** (Webview, React/Vite) in der Seitenleiste und als Editor-Tab; Sitzungen als Tabs; Streaming mit
+  Markdown (GFM, kein rohes HTML), Code-Highlighting (Shiki, JS-Engine, lazy), Mermaid (lazy, erst wenn der Text ruht),
+  einklappbares „Thinking“, Tool-Karten (Icon je `kind`, Datei, `+x −y`, Status, Eingabe/Ausgabe, Diff), Plan,
+  virtualisierte Liste, die nur mitläuft, wenn man unten ist. Helles und dunkles Theme geprüft (Screenshots per
+  `npm run preview`).
+- **Freigaben im Chat** mit genau den angebotenen Optionen, Diff-Vorschau bei Schreibzugriffen, „Immer“-Optionen mit
+  Hinweis auf die dauerhafte Regel; der QuickPick bleibt zu, solange der Chat sichtbar ist.
+- **Toolbar:** Supervised/Autopilot, Agent, Modell, Effort, Kontext-Füllstand, „Kontext komprimieren“ (nur wenn
+  `_kiro/session/compact` angekündigt ist), Export als Markdown.
+- **Eingabe:** Enter/Shift+Enter/Esc, `/`-Befehle aus `available_commands_update`, `#file`, `#folder`, `#current`,
+  `#problems`, `#git diff`, `#steering`, `#spec`, Bilder per Einfügen oder Ablegen (nur wenn die CLI sie annimmt),
+  Dateien aus dem Explorer per Ablegen; Entwürfe pro Sitzung, auch nach dem Ausblenden der Ansicht.
+- **Diffs:** „Diff öffnen“ im nativen Diff-Editor über virtuelle Dokumente (nichts wird geschrieben).
+- **Checkpoints:** Schatten-Git-Repo (E2), Schnappschuss vor und nach jedem Durchlauf, Karte „Kiro hat N Dateien
+  geändert“ mit „Änderungen ansehen“ (Mehrfach-Diff) und „Zurücknehmen“ (alles oder je Datei, mit Rückfrage und
+  Konfliktschutz für Dateien, die du seitdem geändert hast). Dein eigenes Repository wird nie angefasst.
+- **Export** der Sitzung als Markdown-Dokument.
+
+### Abweichungen vom Phasenplan (und warum)
+
+| Geplant | Umgesetzt | Grund |
+| --- | --- | --- |
+| Schreibzugriff über `fs/write_text_file` zurückhalten, Hunks einzeln freigeben | Diff-Vorschau in der Freigabe-Frage; keine Hunk-Freigabe | Kiro fragt die Berechtigung **vor** dem Schreiben `[V]`, die Vorschau reicht also zum Entscheiden. Teile eines Schreibvorgangs wegzulassen würde den Inhalt ändern, den Kiro danach zurückliest; ob es das verträgt, ist ungeprüft. |
+| `#terminal`, `#url` | nicht umgesetzt | `#terminal` braucht die Ausgabe des Terminals (Shell-Integration) und ist ein eigener Aufwand; URLs kann man in den Text schreiben. |
+| Steer (`_session/steer`) | nicht umgesetzt | Wird von der CLI nicht angekündigt `[V]`. |
+| „Rewind to here“ (`session/fork`) | zurückgestellt | Parameter unbekannt, nur im `/unstable`-Teil des SDK. „Zurücknehmen“ je Durchlauf und Datei ist da. |
+| Export | eigenes Markdown aus dem Chat | `_kiro/session/export` ist zwar angekündigt, sein Format ist ungeprüft. |
+| Sitzungsliste, alte Sitzungen öffnen | Phase 3 | gehört zum Kiro-Panel. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A7 | `_kiro/session/compact` nimmt `{ sessionId }` an. | Die Schaltfläche zeigt eine Fehlermeldung im Chat; sie erscheint nur, wenn die CLI die Methode ankündigt. |
+| A8 | Kiro versteht `resource_link`-Blöcke (Dateien, Ordner) und `image`-Blöcke im Prompt (ACP-Standard). | Anhänge kommen nicht an. Die Anzeige im Chat stimmt dann trotzdem; die Antwort von Kiro würde es verraten. |
+| A9 | Ein Prompt `/name args` wird von Kiro als Befehl erkannt, die Namen in `available_commands_update` stehen ohne `/`. | Der Befehl läuft als normaler Text. |
+| A10 | Der VS-Code-Befehl `vscode.changes` öffnet den Mehrfach-Diff. | Es erscheint eine Dateiliste, aus der man eine Datei wählt. |
+| A11 | Git ist installiert. Unter Windows lange Pfade, Zeilenenden und Sonderzeichen in Dateinamen laufen wie unter Linux. | Fehlt Git, schalten sich Checkpoints einmalig mit Hinweis ab. Die Tests laufen mit echtem Git auch auf Windows und macOS (CI). |
+| A12 | Was „Reject changes“ am Turn-Ende in Kiro auslöst, ist unbekannt (A1); Checkpoints sind davon unabhängig, weil sie Dateibäume vergleichen. | Nach „Reject“ zeigt die Karte die Änderungen an, die Kiro vielleicht selbst zurückgenommen hat; „Zurücknehmen“ meldet dann nichts zu tun oder einen Konflikt. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- `kiroStudio.checkpoints.enabled`: **an**. Der Schatten-Speicher liegt im globalen Speicher der Extension, nicht im Projekt.
+- Ausgeschlossen aus Checkpoints: `.gitignore` des Projekts plus `node_modules`, `dist`, `out`, `build`, `target`,
+  `.venv`, `__pycache__`, `.vscode-test`.
+- Nur der erste Arbeitsbereichsordner wird verfolgt; ohne Arbeitsbereichsordner gibt es keine Checkpoints.
+
+### Abnahme bei dir (sobald du wieder am Rechner bist)
+
+1. Wie bei Phase 1, dann **Kiro Studio** in der Aktivitätsleiste öffnen: „Neue Sitzung“, einen kleinen Auftrag geben
+   („Lege eine Datei hello.txt mit einem Gruß an“).
+2. Im Supervised-Modus: Freigabe-Frage mit Diff-Vorschau beantworten; am Ende die Karte „Kiro hat eine Datei geändert“ →
+   „Änderungen ansehen“ → „Zurücknehmen“; die Datei verschwindet wieder.
+3. Autopilot umschalten, nochmal einen Auftrag geben: es wird nicht mehr gefragt, im Chat steht „Automatisch erlaubt“.
+4. Ansicht ausblenden und wieder einblenden (Entwurf bleibt), `#` und `/` in der Eingabe ausprobieren.
 

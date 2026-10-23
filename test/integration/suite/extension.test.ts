@@ -89,5 +89,29 @@ suite('Kiro Studio', () => {
       await vscode.commands.executeCommand('kiroStudio.restart');
       await waitFor(() => api.agentPhase === 'ready' && api.sessionCount === 1, 'the restarted agent to resume');
     });
+
+    test('records what a turn changed in a checkpoint and exports the session', async () => {
+      const api = await activate();
+      await setCliPath(createFakeCli('ready'));
+      await recheck();
+      await vscode.commands.executeCommand('kiroStudio.newSession');
+      await waitFor(() => api.sessionCount >= 1 && api.agentPhase === 'ready', 'a session');
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      const output = path.join(folder, 'kiro-test-output.txt');
+      try {
+        const before = api.checkpointCount;
+        await api.sendPrompt('WRITE kiro-test-output.txt hello from the fake agent');
+        await waitFor(() => api.checkpointCount > before, 'the checkpoint of the turn', 40_000);
+        assert.ok(fs.existsSync(output), 'the fake agent wrote the file through the extension');
+
+        await vscode.commands.executeCommand('kiroStudio.exportSession');
+        const editor = vscode.window.activeTextEditor;
+        assert.strictEqual(editor?.document.languageId, 'markdown');
+        assert.match(editor.document.getText(), /WRITE kiro-test-output\.txt/);
+        assert.match(editor.document.getText(), /kiro-test-output\.txt/);
+      } finally {
+        fs.rmSync(output, { force: true });
+      }
+    });
   });
 });

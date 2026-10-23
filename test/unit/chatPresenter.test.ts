@@ -196,3 +196,50 @@ describe('PatchTracker', () => {
     expect(result && 'items' in result && result.items).toEqual([]);
   });
 });
+
+describe('checkpoints in the view', () => {
+  const files = [{ path: 'a.ts', status: 'modified' as const, added: 2, removed: 1, binary: false, reverted: false }];
+
+  it('puts a marker in the transcript and the details in the meta', () => {
+    const s = make();
+    apply(s, u.agent('Done'));
+    s.addCheckpoint({ id: '1', files });
+    const view = sessionView(s, 'posix');
+    expect(view.items.map((i) => i.kind)).toEqual(['assistant', 'checkpoint']);
+    expect(view.items[1]).toMatchObject({ checkpointId: '1', text: '' });
+    expect(view.checkpoints).toEqual([{ id: '1', files }]);
+  });
+
+  it('has no checkpoints entry when there are none', () => {
+    expect(sessionView(make(), 'posix').checkpoints).toBeUndefined();
+  });
+
+  it('sends the changed meta, not the transcript, when files were reverted', () => {
+    const s = make();
+    s.addCheckpoint({ id: '1', files });
+    const tracker = new PatchTracker('posix');
+    tracker.full(s);
+    s.markReverted('1', ['a.ts']);
+    const patch = tracker.diff(s);
+    expect(isPatch(patch) && patch.items).toEqual([]);
+    expect(isPatch(patch) && patch.meta?.checkpoints?.[0]?.files[0]?.reverted).toBe(true);
+  });
+
+  it('sends the marker as a new item', () => {
+    const s = make();
+    apply(s, u.agent('Done'));
+    const tracker = new PatchTracker('posix');
+    tracker.full(s);
+    s.addCheckpoint({ id: '1', files });
+    const patch = tracker.diff(s);
+    expect(isPatch(patch) && patch.items.map((i) => i.kind)).toEqual(['assistant', 'checkpoint']);
+    expect(isPatch(patch) && patch.meta?.checkpoints).toHaveLength(1);
+  });
+
+  it('forgets checkpoints when a session is loaded again', () => {
+    const s = make();
+    s.addCheckpoint({ id: '1', files });
+    s.resetForReplay();
+    expect(s.checkpoints.size).toBe(0);
+  });
+});

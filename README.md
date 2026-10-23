@@ -8,18 +8,22 @@ Agent Client Protocol (ACP).
 
 ## Status
 
-**Phase 1 (foundation) is done. There is no chat yet**, so this is not useful for daily work. What exists:
+**Phases 0 to 2 are done: setup, connection and the chat.** It has not been tried against a real Kiro CLI by anyone
+but the author's probe runs yet, so expect rough edges. What exists:
 
 - Finds the Kiro CLI, checks that it is new enough (V3 engine) and that you are signed in, and shows the result in
-  the status bar, in the Kiro Studio view and in a getting-started walkthrough.
-- Starts `kiro-cli acp` on demand, keeps the connection alive (restart with back-off, sessions are resumed) and
-  ends the whole process tree on exit.
-- Answers Kiro's file requests through the editor (unsaved changes win) and asks you for every permission request.
-  In Autopilot, Kiro Studio allows every permission request once for you (`kiroStudio.autoAllowInAutopilot`, on by
-  default, never a permanent "always" rule); Supervised always asks. See [docs/PLAN.md](docs/PLAN.md), decision E1.
-- Debug commands to start a session and send a prompt; the answer appears in the "Kiro Studio: Chat (debug)" output.
+  the status bar, the Kiro Studio view and a getting-started walkthrough.
+- A **chat view** (sidebar or editor tab) with sessions as tabs: streaming Markdown, highlighted code, Mermaid
+  diagrams, tool cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
+  `git diff`, steering, specs), pasted or dropped images, agent/model/effort and Supervised/Autopilot in a toolbar.
+- Kiro's permission questions are answered in the chat, with the change shown. In Autopilot, Kiro Studio allows every
+  request once for you (`kiroStudio.autoAllowInAutopilot`, on by default, never a permanent "always" rule); Supervised
+  always asks. See [docs/PLAN.md](docs/PLAN.md), decision E1.
+- **Checkpoints:** every turn that changes files leaves a card with "View changes" and "Revert", backed by a separate
+  Git repository in the extension's storage (yours is never touched; needs Git). Sessions export to Markdown.
+- Keeps the connection alive (restart with back-off, sessions resume) and ends the whole process tree on exit.
 
-Next: the chat view (phase 2), the Kiro panel (3), specs (4), polish (5).
+Next: the Kiro panel (3), specs (4), polish (5).
 
 - [docs/PLAN.md](docs/PLAN.md): architecture decisions, phases, risks, open questions (German)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the pieces fit together

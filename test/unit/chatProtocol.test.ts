@@ -24,6 +24,11 @@ describe('messages from the webview', () => {
       { type: 'compact', sessionId: 's1' },
       { type: 'pickContext', kind: 'steering' },
       { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 0 },
+      { type: 'viewChanges', sessionId: 's1', checkpointId: '2' },
+      { type: 'viewChanges', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
+      { type: 'revert', sessionId: 's1', checkpointId: '2' },
+      { type: 'revert', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
+      { type: 'exportSession', sessionId: 's1' },
       { type: 'command', command: 'kiroStudio.restart' },
     ];
     for (const message of messages) expect(parseWebviewMessage(message)).toEqual(message);
@@ -57,6 +62,9 @@ describe('messages from the webview', () => {
     { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: -1 },
     { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 1.5 },
     { type: 'openDiff', sessionId: 's1', index: 0 },
+    { type: 'revert', sessionId: 's1' },
+    { type: 'viewChanges', checkpointId: '2' },
+    { type: 'exportSession' },
     { type: 'command', command: 'workbench.action.terminal.new' },
     { type: 'command', command: 'kiroStudio.debug.sendPrompt' },
     { type: 'copy', text: 'x'.repeat(1_000_001) },

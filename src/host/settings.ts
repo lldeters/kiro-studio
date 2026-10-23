@@ -22,6 +22,10 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('autoAllowInAutopilot', true);
   }
 
+  checkpointsEnabled(): boolean {
+    return this.config.get<boolean>('checkpoints.enabled', true);
+  }
+
   hooksEnabled(): boolean {
     return this.config.get<boolean>('hooks.enabled', false);
   }

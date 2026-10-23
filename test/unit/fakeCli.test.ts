@@ -44,4 +44,20 @@ describe.skipIf(process.platform === 'win32')('fake CLI of the integration tests
       await agent.dispose();
     }
   });
+
+  it('writes a file through the client when the prompt says WRITE', async () => {
+    const cli = createFakeCli('ready', SCRIPT);
+    const h = createHarness({
+      transport: () => () => spawnTransport({ command: cli, args: ['acp'], cwd: process.cwd() }),
+      shutdownGraceMs: 2000,
+    });
+    try {
+      await h.agent.start();
+      const session = await h.agent.newSession({ cwd: '/work' });
+      await h.agent.prompt(session.id, 'WRITE out/notes.txt hello there');
+      expect(h.writes).toEqual([{ path: path.join('/work', 'out/notes.txt'), content: 'hello there\n' }]);
+    } finally {
+      await h.agent.dispose();
+    }
+  });
 });

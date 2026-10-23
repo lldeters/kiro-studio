@@ -52,6 +52,14 @@ export const UI_MESSAGES = [
   'Kiro saves this as a rule; it also applies to later sessions.',
   'Kiro finished and asks you to review its changes.',
   'Open diff',
+  // Checkpoints
+  'Kiro changed one file',
+  'Kiro changed {0} files',
+  'View changes',
+  'Revert',
+  'Revert this file',
+  'Reverted',
+  'Export the session as Markdown',
   // Toolbar
   'Agent',
   'Model',

@@ -13,6 +13,8 @@ export interface KiroStudioApi {
   readonly agentPhase: string;
   readonly sessionCount: number;
   readonly chatReady: boolean;
+  readonly checkpointCount: number;
+  sendPrompt(text: string): Promise<void>;
   readonly firstCheck: Promise<void>;
 }
 

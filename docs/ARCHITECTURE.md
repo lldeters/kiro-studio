@@ -7,12 +7,12 @@ This file describes how the pieces fit together. Phases, risks and open question
 [PLAN.md](PLAN.md); wire-level facts live in [protocol-notes.md](protocol-notes.md). Keep this file in
 step with the code after every phase.
 
-**State after Phase 1:** the foundation exists and is described as built: CLI discovery and setup states, the
-complete ACP layer (connection, restart, resume, permissions, file system), the VS Code host glue (status bar,
-Kiro panel, quick menu, approval prompts, debug chat) and the test setup. The chat view, the Kiro panel contents,
-specs and checkpoints are still target design and are marked *(planned)*. Facts proven by the probe on a real Kiro
-CLI 2.33.1 (Windows 11), by recordings or by reading the SDK are marked *(proven)*; behaviour that is implemented
-from documentation only is listed in PLAN.md under "Assumptions".
+**State after Phase 2:** the foundation (CLI discovery, the complete ACP layer, status UI) and the chat exist: a
+webview with Markdown, highlighted code, diagrams, tool cards, inline permission questions, a toolbar, slash commands
+and context attachments, diffs, checkpoints with revert, and an export to Markdown. The Kiro panel contents, specs and
+polish are still target design and are marked *(planned)*. Facts proven by the probe on a real Kiro CLI 2.33.1
+(Windows 11), by recordings or by reading the SDK are marked *(proven)*; behaviour that is implemented from
+documentation only is listed in PLAN.md under "Assumptions".
 
 ## Principles
 
@@ -36,35 +36,45 @@ VS Code window (extension host, extensionKind: workspace)
 ├─ src/extension.ts ........ activation, wiring, Workspace Trust gate, small API for the integration tests
 │
 ├─ src/host/ ............... the only code (besides extension.ts) allowed to import `vscode`
-│   ├─ agentHost.ts ....... owns the KiroAgent of the window, created on first use; approval UI; active session
-│   ├─ setup.ts ........... SetupController: runs the CLI check, sets the `kiroStudio.state` context key
-│   ├─ settings.ts ........ typed access to `kiroStudio.*` (security-relevant ones are application/machine scoped)
-│   ├─ approvalUi.ts ...... QuickPick for permission requests; dismissing never answers
-│   ├─ fsPort.ts .......... file access for Kiro: open editor text wins, saves through WorkspaceEdit
-│   ├─ statusBar.ts, statusView.ts, quickMenu.ts, commands.ts, debugChat.ts, logger.ts
+│   ├─ agentHost.ts ....... owns the KiroAgent of the window (created on first use), the approval picker, the active
+│   │                       session, the checkpoint services; merges change notifications to one per 40 ms
+│   ├─ chatController.ts .. talks to the chat webviews: sends changes (30 ms), validates and carries out requests
+│   ├─ chatView.ts ........ the sidebar view and the editor-tab variant; the page is built by src/view/chatHtml.ts
+│   ├─ promptContext.ts ... pickers (files, folders, steering, specs) and readers (git diff, problems) for attachments
+│   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors
+│   ├─ setup.ts, settings.ts, approvalUi.ts, fsPort.ts, statusBar.ts, statusView.ts, quickMenu.ts, commands.ts,
+│   │   debugChat.ts, logger.ts
 │
-├─ src/view/ ............... pure view models (status bar text, status tree, transcript printer); unit tested
+├─ src/shared/ ............. the chat protocol (`chatProtocol.ts`, validation of webview messages) and the list of
+│                            webview messages (`uiMessages.ts`); no `vscode`, no DOM, imported by host and webview
 │
-├─ src/kiro/cli.ts ......... locate the CLI, `--version`, `acp --help`, `whoami`, login invocation → SetupState
+├─ src/view/ ............... pure view models, tested without VS Code
+│   ├─ chatPresenter.ts ... session store -> what the webview renders; `PatchTracker` computes what changed
+│   ├─ promptContext.ts ... attachments -> ACP content blocks (links only inside the workspace)
+│   ├─ exportMarkdown.ts, chatHtml.ts, statusModel.ts, statusTree.ts, transcriptPrinter.ts
+│
+├─ src/checkpoints/ ........ no `vscode`: git.ts (runs `git`), shadowRepo.ts (the shadow repository),
+│                            service.ts (records turns, sides of a diff, revert)
+│
+├─ src/kiro/cli.ts ......... locate the CLI, `--version`, `acp --help`, `whoami`, login invocation -> SetupState
 │
 ├─ src/acp/ ................ no `vscode` import; ONE kiro-cli process per window, many sessions
 │   ├─ transport.ts ....... Transport interface, spawn with process group / `taskkill /T`, tree kill
 │   ├─ connection.ts ...... KiroConnection (one process lifetime): line tap, diversion, handlers, timeouts, teardown
 │   ├─ agent.ts ........... KiroAgent (window lifetime): backoff restart, resume via session/load, cancel gating,
-│   │                       config write ordering, defaults per new session
+│   │                       config write ordering, defaults per new session, turn hooks (checkpoints)
 │   ├─ dispatcher.ts ...... tolerant routing of session/update and `_kiro/*` notifications, parks early ones
-│   ├─ types.ts, capabilities.ts ... lenient parsing of Kiro payloads and of the initialize result
-│   ├─ sessions.ts ........ Session (transcript, tools, approvals, turn state), SessionStore
+│   ├─ types.ts, capabilities.ts, prompt.ts ... lenient parsing of Kiro payloads; prompt content blocks
+│   ├─ sessions.ts ........ Session (transcript, tools, approvals, checkpoints, turn state), SessionStore
 │   └─ handlers/ ........... permissions.ts (PermissionBroker, rule E1), fs.ts (path-guarded read/write, WriteGate)
 │
 ├─ src/util/ ............... json helpers, emitter, async helpers, path normalisation, redaction, protocol log
 │
 ├─ (planned) workspace/ .... file watchers + parsers: specs, steering, hooks, mcp, agents (jsonc-parser edits)
-├─ (planned) checkpoints/ .. shadow git repo in extension storage, diffs, revert
-├─ (planned) webviews/ ..... chat view, spec view (host side, typed message bus), shared/ message types
-└─ (planned) editor/ ....... CodeLens for tasks.md, virtual document provider for diffs
+└─ (planned) editor/ ....... CodeLens for tasks.md
 
-(planned) webview-ui/ ...... React app (separate bundle), store, virtualised message list
+webview-ui/ ................ React app (own tsconfig, built by Vite to dist/webview): state.ts (pure reducer),
+                             store.ts (Zustand, drafts), components/, highlight.ts (Shiki, lazy), styles.css
 ```
 
 The boundary between `src/acp` and `src/host` is enforced by an ESLint rule (`no-restricted-imports` for `vscode`),
@@ -91,6 +101,14 @@ the agent is never started (`capabilities.untrustedWorkspaces: limited`, no virt
 - Only `http(s)` URLs from `_kiro/openExternalUrl` are opened.
 - The approval prompt never answers by itself: closing it leaves the request pending, `Kiro Studio: Answer Pending
   Kiro Request` and the status bar item open it again.
+- The chat webview is untrusted: every message is validated (`parseWebviewMessage`: kinds, sizes, image types), only
+  whitelisted commands run, a file path is resolved against the session folder and opened only inside the workspace
+  and only if it exists, only `http`, `https` and `mailto` links open, and a diff is looked up in the session by tool
+  call and position, never taken from the message. The page has a strict content security policy: scripts only with a
+  nonce or from the extension's `dist/webview`, no network, no remote images; Markdown cannot contain HTML.
+- Attachments: files and folders are linked (not read) only inside the workspace; the shadow repository for
+  checkpoints is separate from the user's repository, which is never read or written (`#git diff` only runs a
+  read-only `git diff`); the home folder is never snapshotted.
 
 ## The ACP layer
 
@@ -149,15 +167,27 @@ A crashed process is restarted with exponential backoff. After `initialize`, ses
 re-opened with `session/load` (client-side MCP servers sent again). A turn that was running is marked as
 interrupted; it is not replayed automatically.
 
-## Webview protocol *(planned)*
+## The chat webview
 
-Typed discriminated unions in `src/shared/`, both directions. The extension host batches streaming chunks per
-animation frame; the webview store (Zustand) applies them in order. Rendering uses `react-markdown` with
-`remark-gfm`, Shiki (JavaScript regex engine, so the CSP needs no WASM exception), lazily loaded Mermaid and a
-virtualised list. Theme, fonts and spacing come only from `--vscode-*` variables and Codicons.
+The host builds plain views (`SessionView`: items, tools, approvals, plan, config selects, commands, checkpoints,
+context) from the session store and sends them as typed messages (`src/shared/chatProtocol.ts`). The webview that is
+showing gets the active session in full once, then **patches**: the tail of the transcript from the last item the
+webview has (only the last message can grow, tools are separate), the tools whose revision changed, and the small
+`meta` when it changed. `PatchTracker` computes this per webview; changes are merged to about one send per 30 ms.
+Only the active session is streamed; switching tabs sends the new one in full. Drafts (text and attachments) are kept
+per session in the webview and survive it being hidden through VS Code's webview state.
 
-Security: strict CSP with nonce, narrow `localResourceRoots`, sanitised Markdown, links opened only through
-`vscode.env.openExternal`, no remote content in webviews.
+Rendering: `react-markdown` with `remark-gfm` (no raw HTML), Shiki with the JavaScript regex engine (no WebAssembly;
+languages and themes load lazily as chunks), lazily loaded Mermaid in `strict` mode that draws only when the streaming
+text has been still, `react-virtuoso` for the list. The list follows new text only while the reader is at the bottom;
+this is decided by the reader's own scrolling, so diagrams or highlighted code that grow after being drawn do not lose
+the position. Theme, fonts and spacing come only from `--vscode-*` variables and Codicons.
+
+Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
+chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
+
+A script (`npm run preview`) renders the webview in Chromium with a mock VS Code API and a theme, using messages from
+the real store and presenter, for screenshots without starting VS Code.
 
 ## Files shared with the Kiro IDE *(planned)*
 
@@ -169,44 +199,58 @@ installed CLI provides. Kiro 2.33.1 pushes `_kiro/mcp/status` (full snapshot), `
 (documents with content), `_kiro/tools/didChange` (tool tags) and `_kiro/sessions/changed` (partial objects, merged by
 `sessionId`) *(proven)*. Hook state arrives only after the client opted in to hooks.
 
-## Checkpoints and revert *(planned)*
+## Checkpoints and revert
 
-Kiro writes its own file tools' output through the client's `fs/write_text_file` *(proven)*, so the client sees every
-such write before it happens, can hold it until the user decided, and can snapshot the old content first. Shell-written
-files bypass `fs/*` and are only caught by the snapshot. A shadow git repository in the extension's storage tracks the
-workspace independently of the user's own repository, which is never touched. A snapshot is taken before a turn and after it; "View all changes" and
-"Revert" work from those two trees, regardless of whether Kiro or the client wrote the file. Kiro's own
-checkpoints (`kiro-snapshot-v2://`) are evaluated as an optional enhancement (PLAN.md decision E2).
+A shadow Git repository in the extension's global storage (`checkpoints/<hash of the workspace path>`, bare, with the
+workspace as work tree) records the workspace without touching the user's repository. `KiroAgent` calls turn hooks:
+`before` just before the prompt is sent, `after` once it has settled and before the session goes idle, so the marker
+comes before the next message. Each is a snapshot (`git add --all`, `write-tree`, `commit-tree`); `.gitignore` and a
+fixed exclude list (`node_modules`, `dist`, `out`, `build`, `target`, `.venv`) keep generated files out. A turn that
+changed files adds a checkpoint to the session: a marker in the transcript and the file list (status, +x −y) in the
+meta. "View changes" opens one file as a diff or all files in VS Code's multi-file diff editor (a list is the
+fallback); "Revert" puts files back to the `before` state, but only files that still have the `after` content: a file
+the user changed since is reported as a conflict and touched only after a second, explicit confirmation. Checkpoints
+need Git; without it, or after an error, they switch themselves off once with a message. Only the first workspace
+folder is tracked. Writes by Kiro's file tools and by its shell are both caught, because the snapshots compare trees
+and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapshot-v2://`) remain an optional extra
+(PLAN.md decision E2). Unverified: what Kiro does when the user rejects the end-of-turn review (PLAN.md assumption A1).
 
 ## Testing
 
 - **Unit (Vitest, `npm test`):** the protocol layer against a scripted fake agent over in-memory streams (streaming,
   replay, cancel, approvals, late config advertisements, process crash, restart and resume, early notifications,
-  write ordering), the dispatcher, parsers, CLI discovery with an injected environment, redaction, path handling,
-  view models and the transcript printer, and a coverage test that every runtime message and manifest string has a
+  write ordering, turn hooks), the dispatcher, parsers, CLI discovery with an injected environment, redaction, path
+  handling, the presenter and patch tracker, attachment resolution, the shadow repository and checkpoint service
+  **against real `git`** in temporary folders (including that the user's repository is untouched), the Markdown
+  export, message validation, and a coverage test that every runtime message, webview message and manifest string has a
   German translation. `spawnTransport` is tested with a real process tree on POSIX.
-- **Fake CLI:** `test/integration/fixtures/fake-kiro.cjs` is a small stand-in for `kiro-cli` (scenarios `ready`,
-  `signedout`, `old`) that answers `--version`, `whoami`, `acp --help` and a minimal ACP conversation. A unit test
-  runs it as a real process through the production code, the integration tests use it inside VS Code.
+- **Webview (Vitest with jsdom, `webview-ui/src/**/*.test.tsx`):** the reducer, the app in every setup and connection
+  state, Markdown, code blocks, tool cards, diffs, approvals, toolbar, composer (menus, keyboard, chips, drafts, drops),
+  checkpoint cards.
+- **Fake CLI:** `test/integration/fixtures/fake-kiro.cjs` stands in for `kiro-cli` (scenarios `ready`, `signedout`,
+  `old`): `--version`, `whoami`, `acp --help` and a minimal ACP conversation; a prompt `WRITE <file> <text>` makes it
+  write a file through the client like Kiro does. A unit test runs it as a real process; the integration tests use it
+  inside VS Code.
 - **Integration (`@vscode/test-cli`, `npm run test:integration`):** activation, every manifest command registered,
-  setup states, agent start, session creation and restart in a real VS Code. The fake CLI is a shell script, so the
-  tests that need it are skipped on Windows. They need a VS Code download, which is why CI runs them.
+  that the chat page loads (script, style, content security policy), setup states, agent start, session, restart, and a
+  turn that writes a file: checkpoint recorded (real Git, real storage) and session exported. The fake CLI is a shell
+  script, so those tests are skipped on Windows. They need a VS Code download, which is why CI runs them.
 - **Fixtures:** handwritten and Kiro-shaped (`test/support/kiro.ts`); third-party recordings are not committed.
-- **CI (`.github/workflows/ci.yml`):** typecheck, lint, format check, unit tests and build on Windows, macOS and
-  Linux; integration tests on VS Code 1.93.0 (the minimum) and stable; `npm run package` builds the `.vsix` and
-  uploads it as an artifact.
+- **CI (`.github/workflows/ci.yml`):** typecheck, lint, format check, unit and webview tests and build on Windows,
+  macOS and Linux; integration tests on VS Code 1.93.0 (the minimum) and stable; `npm run package` builds the `.vsix`
+  (host bundle, webview bundle, licences of all bundled packages) and uploads it as an artifact.
 
 ## Repository layout
 
 ```
 src/            extension host code (layout above)
+webview-ui/     the chat app (React, Vite)
 test/unit/      Vitest tests
 test/support/   fake agent, harness, Kiro-shaped fixtures, fake CLI helper
 test/integration/ tests that run inside VS Code (own tsconfig, CommonJS), fake CLI script, workspace folder
 l10n/           runtime message bundles (English list generated by `npm run l10n:export`, German by hand)
 resources/      icon and walkthrough pages
-scripts/        probe-acp.ts, validate-wire.ts, l10n tools (own tsconfig, ESM)
+scripts/        probe-acp.ts, validate-wire.ts, preview-webview.ts, l10n and licence tools (own tsconfig, ESM)
 docs/           PLAN.md, ARCHITECTURE.md, protocol-notes.md
 probe-logs/     output of the probe (git-ignored; may contain account details)
-(planned) webview-ui/   React app
 ```

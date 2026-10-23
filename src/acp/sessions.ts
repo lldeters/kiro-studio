@@ -44,7 +44,31 @@ export interface TranscriptNotice {
   level: 'info' | 'warning' | 'error';
   text: string;
 }
-export type TranscriptItem = TranscriptMessage | TranscriptTool | TranscriptNotice;
+/** Marks where a turn ended with changes to files; the details are in {@link Session.checkpoints}. */
+export interface TranscriptCheckpoint {
+  kind: 'checkpoint';
+  id: number;
+  checkpointId: string;
+}
+export type TranscriptItem = TranscriptMessage | TranscriptTool | TranscriptNotice | TranscriptCheckpoint;
+
+export interface CheckpointFile {
+  /** Relative to the workspace, with `/` as separator. */
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  added: number;
+  removed: number;
+  binary: boolean;
+  /** The file was put back to its state before the turn. */
+  reverted: boolean;
+}
+
+/** What one turn changed, recorded by the checkpoint service. */
+export interface CheckpointInfo {
+  id: string;
+  files: CheckpointFile[];
+  createdAt: number;
+}
 
 export interface ToolCallState {
   toolCallId: string;
@@ -123,6 +147,7 @@ export type SessionChange =
   | 'title'
   | 'status'
   | 'plan'
+  | 'checkpoints'
   | 'turn'
   | 'modes';
 
@@ -155,6 +180,7 @@ export class Session {
   readonly transcript: TranscriptItem[] = [];
   readonly tools = new Map<string, ToolCallState>();
   readonly approvals: PendingApproval[] = [];
+  readonly checkpoints = new Map<string, CheckpointInfo>();
   readonly autoApprovals: AutoApproval[] = [];
   /** Number of replayed events applied (non-zero after `session/load`). */
   replayedEvents = 0;
@@ -506,6 +532,7 @@ export class Session {
   resetForReplay(): void {
     this.transcript.length = 0;
     this.tools.clear();
+    this.checkpoints.clear();
     this.approvals.length = 0;
     this.autoApprovals.length = 0;
     this.plan = undefined;
@@ -522,6 +549,22 @@ export class Session {
     if (this.status === status) return;
     this.status = status;
     this.changes.emit('status');
+  }
+
+  /** Records what a turn changed. Shown in the transcript at the end of the turn. */
+  addCheckpoint(info: Omit<CheckpointInfo, 'createdAt'>): void {
+    this.checkpoints.set(info.id, { ...info, createdAt: this.now() });
+    this.transcript.push({ kind: 'checkpoint', id: this.nextItemId++, checkpointId: info.id });
+    this.changes.emit('transcript');
+    this.changes.emit('checkpoints');
+  }
+
+  markReverted(checkpointId: string, paths: readonly string[]): void {
+    const info = this.checkpoints.get(checkpointId);
+    if (!info) return;
+    const reverted = new Set(paths);
+    for (const file of info.files) if (reverted.has(file.path)) file.reverted = true;
+    this.changes.emit('checkpoints');
   }
 
   addNotice(level: TranscriptNotice['level'], text: string): void {

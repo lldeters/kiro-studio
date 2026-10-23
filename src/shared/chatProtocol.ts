@@ -30,11 +30,13 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'
 
 export interface ItemView {
   id: number;
-  kind: 'user' | 'assistant' | 'thought' | 'tool' | 'notice';
+  kind: 'user' | 'assistant' | 'thought' | 'tool' | 'notice' | 'checkpoint';
   /** Message text, or the notice text. Empty for tools. */
   text: string;
   /** Tool items: the key into `SessionView.tools`. */
   toolCallId?: string;
+  /** Checkpoint items: the key into `SessionMeta.checkpoints`. */
+  checkpointId?: string;
   level?: 'info' | 'warning' | 'error';
   /** Set on everything a sub-agent does. */
   subtaskId?: string;
@@ -77,6 +79,22 @@ export interface ApprovalView {
   options: { kind: ApprovalKind; name: string }[];
 }
 
+export interface CheckpointFileView {
+  /** Relative to the workspace, with `/` as separator. */
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  added: number;
+  removed: number;
+  binary: boolean;
+  reverted: boolean;
+}
+
+/** What one turn changed in the workspace. */
+export interface CheckpointView {
+  id: string;
+  files: CheckpointFileView[];
+}
+
 export interface ConfigSelectView {
   id: string;
   name: string;
@@ -107,6 +125,7 @@ export interface SessionMeta {
   plan?: PlanEntryView[];
   config: ConfigSelectView[];
   commands: CommandView[];
+  checkpoints?: CheckpointView[];
   context?: { percentage?: number; summarizationThreshold?: number };
   lastTurn?: { credits?: number; elapsedMs?: number; stopReason?: string };
   cwd?: string;
@@ -201,6 +220,10 @@ export type WebviewMessage =
   | { type: 'openDiff'; sessionId: string; toolCallId: string; index: number }
   | { type: 'copy'; text: string }
   | { type: 'compact'; sessionId: string }
+  /** Without `path`, all files of the checkpoint. */
+  | { type: 'viewChanges'; sessionId: string; checkpointId: string; path?: string }
+  | { type: 'revert'; sessionId: string; checkpointId: string; path?: string }
+  | { type: 'exportSession'; sessionId: string }
   | { type: 'command'; command: WebviewCommand };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -302,6 +325,20 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
       if (sessionId === undefined || toolCallId === undefined) return undefined;
       if (typeof raw.index !== 'number' || !Number.isInteger(raw.index) || raw.index < 0) return undefined;
       return { type: 'openDiff', sessionId, toolCallId, index: raw.index };
+    }
+    case 'viewChanges':
+    case 'revert': {
+      const sessionId = str('sessionId');
+      const checkpointId = str('checkpointId');
+      if (sessionId === undefined || checkpointId === undefined) return undefined;
+      const path = str('path');
+      return path === undefined
+        ? { type: raw.type, sessionId, checkpointId }
+        : { type: raw.type, sessionId, checkpointId, path };
+    }
+    case 'exportSession': {
+      const sessionId = str('sessionId');
+      return sessionId === undefined ? undefined : { type: 'exportSession', sessionId };
     }
     case 'compact': {
       const sessionId = str('sessionId');

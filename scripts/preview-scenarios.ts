@@ -137,6 +137,14 @@ function conversation(): HostMessage[] {
   feed(session, u.contextUsage(84));
   session.addNotice('info', 'Automatically allowed once (Autopilot): Read File src/parser.ts');
   session.addNotice('error', 'Could not reach the model. Retrying…');
+  session.addCheckpoint({
+    id: '1',
+    files: [
+      { path: 'src/parser.ts', status: 'modified', added: 3, removed: 1, binary: false, reverted: false },
+      { path: 'test/parser.test.ts', status: 'added', added: 24, removed: 0, binary: false, reverted: false },
+      { path: 'old/notes.md', status: 'deleted', added: 0, removed: 8, binary: false, reverted: true },
+    ],
+  });
   const other = new Session('sess_preview_2');
   other.title = 'Add docs';
   const tracker = new PatchTracker('posix');

@@ -20,8 +20,10 @@ export function collectKeys(root = 'src'): string[] {
   const keys = new Set<string>();
   for (const file of sourceFiles(root)) {
     const text = readFileSync(file, 'utf8');
-    for (const match of text.matchAll(/\b(?:l10n\.)?t\(\s*'((?:[^'\\]|\\.)*)'/g)) {
-      keys.add((match[1] ?? '').replace(/\\'/g, "'"));
+    // Prettier writes a message that contains an apostrophe in double quotes, so both quote styles are read.
+    for (const match of text.matchAll(/\b(?:l10n\.)?t\(\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/g)) {
+      const raw = match[1] ?? match[2] ?? '';
+      keys.add(raw.replace(/\\(['"])/g, '$1'));
     }
   }
   for (const message of UI_MESSAGES) keys.add(message);

@@ -1,4 +1,4 @@
-import { KiroAgent, type AgentSettings } from '../../src/acp/agent';
+import { KiroAgent, type AgentDeps, type AgentSettings } from '../../src/acp/agent';
 import type { FileSystemPort, WriteGate } from '../../src/acp/handlers/fs';
 import type { OptionKind } from '../../src/acp/handlers/permissions';
 import { ProtocolLog, type LogLevel } from '../../src/util/log';
@@ -19,6 +19,7 @@ export interface HarnessOptions {
   /** Replaces the transport, for example to make starting fail. Receives the fake. */
   transport?: (fake: FakeAgent) => TransportFactory;
   writeGate?: WriteGate;
+  turnHooks?: AgentDeps['turnHooks'];
 }
 
 export interface MutableSettings {
@@ -77,6 +78,7 @@ export function createHarness(options: HarnessOptions = {}) {
     clientInfo: { name: 'kiro-studio-test', version: '0.0.0' },
     platform: 'posix',
     ...(options.writeGate === undefined ? {} : { writeGate: options.writeGate }),
+    ...(options.turnHooks === undefined ? {} : { turnHooks: options.turnHooks }),
     backoffMs: options.backoffMs ?? [5, 5, 5],
     stableAfterMs: 1000,
     cancelHoldMs: options.cancelHoldMs ?? 300,

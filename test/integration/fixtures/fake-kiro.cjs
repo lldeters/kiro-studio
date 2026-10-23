@@ -5,6 +5,8 @@
 // `acp` speaks just enough ACP for a session to start and a prompt to be answered.
 'use strict';
 
+const path = require('node:path');
+
 const scenario = process.env.FAKE_KIRO_SCENARIO || 'ready';
 const args = process.argv.slice(2);
 
@@ -50,8 +52,24 @@ function serve() {
     },
   ];
 
+  let cwd = process.cwd();
+  let nextId = 1000;
+  const waiting = new Map();
+  /** Asks the client (the extension) for something and waits for its answer. */
+  const ask = (method, params) =>
+    new Promise((resolve) => {
+      const id = nextId++;
+      waiting.set(id, resolve);
+      send({ id, method, params });
+    });
+
   const handle = (message) => {
     const { id, method, params } = message;
+    if (method === undefined && waiting.has(id)) {
+      waiting.get(id)(message);
+      waiting.delete(id);
+      return undefined;
+    }
     switch (method) {
       case 'initialize':
         return send({
@@ -63,11 +81,22 @@ function serve() {
           },
         });
       case 'session/new':
+        if (params && typeof params.cwd === 'string') cwd = params.cwd;
         return send({ id, result: { sessionId: 'fake-session-1', configOptions } });
       case 'session/load':
         return send({ id, result: { configOptions } });
       case 'session/prompt': {
         const sessionId = params.sessionId;
+        const text = (params.prompt || []).map((block) => block.text || '').join('');
+        // "WRITE <file> <content>" makes the agent write a file through the client, as Kiro does.
+        const write = /^WRITE (\S+) (.*)$/.exec(text);
+        if (write) {
+          const target = path.join(cwd, write[1]);
+          ask('fs/write_text_file', { sessionId, path: target, content: write[2] + '\n' }).then(() =>
+            send({ id, result: { stopReason: 'end_turn' } }),
+          );
+          return undefined;
+        }
         send({
           method: 'session/update',
           params: {

@@ -138,6 +138,8 @@ export function itemView(item: TranscriptItem): ItemView {
       };
     case 'notice':
       return { id: item.id, kind: 'notice', text: item.text, level: item.level, replay: false };
+    case 'checkpoint':
+      return { id: item.id, kind: 'checkpoint', text: '', checkpointId: item.checkpointId, replay: false };
     default:
       return {
         id: item.id,
@@ -227,6 +229,14 @@ export function metaView(session: Session): SessionMeta {
           },
         }),
     ...(session.cwd === undefined ? {} : { cwd: session.cwd }),
+    ...(session.checkpoints.size === 0
+      ? {}
+      : {
+          checkpoints: [...session.checkpoints.values()].map((c) => ({
+            id: c.id,
+            files: c.files.map((f) => ({ ...f })),
+          })),
+        }),
   };
 }
 
@@ -319,7 +329,7 @@ export class PatchTracker {
 }
 
 const sizeOf = (item: ItemView | TranscriptItem | undefined): number =>
-  item === undefined ? -1 : item.kind === 'tool' ? 0 : item.text.length;
+  item === undefined ? -1 : item.kind === 'tool' || item.kind === 'checkpoint' ? 0 : item.text.length;
 
 const signature = (tool: ToolCallState, waiting: Set<string>): string =>
   `${tool.rev}:${waiting.has(tool.toolCallId) ? 1 : 0}`;

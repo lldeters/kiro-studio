@@ -3,6 +3,7 @@
  * (merged to about 30 ms), and carries out what the webview asks for. The webview is not trusted: every message is
  * validated, and a file path is opened only when it lies inside the workspace or the session's folder.
  */
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeError } from '../acp/errors';
 import { currentPlatform, isInsideAny, normalizeAgentPath } from '../util/paths';
@@ -18,7 +19,8 @@ import {
   type WebviewMessage,
 } from '../shared/chatProtocol';
 import { UI_MESSAGES } from '../shared/uiMessages';
-import { PatchTracker, tabView, toolView } from '../view/chatPresenter';
+import { PatchTracker, sessionView, tabView, toolView } from '../view/chatPresenter';
+import { exportMarkdown } from '../view/exportMarkdown';
 import { resolveAttachments, type SkipReason } from '../view/promptContext';
 import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
@@ -224,6 +226,15 @@ export class ChatController implements vscode.Disposable {
         case 'compact':
           await this.compact(message.sessionId);
           return;
+        case 'viewChanges':
+          await this.viewChanges(message.sessionId, message.checkpointId, message.path);
+          return;
+        case 'revert':
+          await this.revert(message.sessionId, message.checkpointId, message.path);
+          return;
+        case 'exportSession':
+          await this.exportSession(message.sessionId);
+          return;
         case 'openDiff':
           await this.openDiff(message.sessionId, message.toolCallId, message.index);
           return;
@@ -237,6 +248,112 @@ export class ChatController implements vscode.Disposable {
     } catch (error) {
       void vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
     }
+  }
+
+  /** Shows what a turn changed: one file as a diff, several in the multi-file diff editor (or a list). */
+  private async viewChanges(sessionId: string, checkpointId: string, file?: string): Promise<void> {
+    const session = this.host.agent?.store.get(sessionId);
+    const service = session && this.host.checkpointsFor(session);
+    const files = service?.open(sessionId, checkpointId)?.filter((f) => file === undefined || f.path === file);
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!service || !files || files.length === 0 || root === undefined) return;
+
+    const texts = [];
+    for (const changed of files) {
+      const sides = await service.sides(sessionId, checkpointId, changed.path);
+      if (!sides || changed.binary) continue;
+      texts.push({
+        path: path.join(root, ...changed.path.split('/')),
+        oldText: sides.before?.toString('utf8') ?? null,
+        newText: sides.after?.toString('utf8') ?? '',
+      });
+    }
+    if (texts.length === 0) return;
+    const only = texts.length === 1 ? texts[0] : undefined;
+    if (only) {
+      await this.diffs.open(only.path, only.oldText, only.newText);
+    } else if (!(await this.diffs.openMany(vscode.l10n.t('Changes by Kiro'), texts))) {
+      const picked = await vscode.window.showQuickPick(
+        texts.map((t) => ({ label: vscode.workspace.asRelativePath(t.path, false), item: t })),
+        { placeHolder: vscode.l10n.t('Choose a file to see its changes') },
+      );
+      if (picked) await this.diffs.open(picked.item.path, picked.item.oldText, picked.item.newText);
+    }
+  }
+
+  /**
+   * Puts a turn's changes back: all of them, or one file. Asks first, and asks again for files that changed after the
+   * turn, because reverting those would overwrite what the user did since.
+   */
+  private async revert(sessionId: string, checkpointId: string, file?: string): Promise<void> {
+    const session = this.host.agent?.store.get(sessionId);
+    const service = session && this.host.checkpointsFor(session);
+    const info = session?.checkpoints.get(checkpointId);
+    if (!session || !service || !info) return;
+    if (session.busy) {
+      void vscode.window.showInformationMessage(vscode.l10n.t('Wait until Kiro has finished its turn.'));
+      return;
+    }
+    const todo = info.files.filter((f) => !f.reverted && (file === undefined || f.path === file));
+    if (todo.length === 0) return;
+
+    const confirm = vscode.l10n.t('Revert');
+    const question =
+      todo.length === 1 && todo[0]
+        ? vscode.l10n.t('Revert {0} to its state before this turn?', todo[0].path)
+        : vscode.l10n.t('Revert {0} files to their state before this turn?', todo.length);
+    if ((await vscode.window.showWarningMessage(question, { modal: true }, confirm)) !== confirm) return;
+
+    const options = file === undefined ? {} : { path: file };
+    let result = await service.revert(session, checkpointId, options);
+    if (result && result.conflicts.length > 0) {
+      const anyway = vscode.l10n.t('Revert anyway');
+      const answer = await vscode.window.showWarningMessage(
+        vscode.l10n.t("{0} changed after Kiro's turn and would lose your changes:", result.conflicts.length),
+        { modal: true, detail: result.conflicts.join('\n') },
+        anyway,
+      );
+      if (answer === anyway) {
+        const forced = await service.revert(session, checkpointId, { ...options, force: true });
+        if (forced)
+          result = {
+            restored: [...result.restored, ...forced.restored],
+            conflicts: [],
+            failed: [...result.failed, ...forced.failed],
+          };
+      }
+    }
+    if (!result) return;
+    if (result.restored.length > 0) {
+      session.addNotice(
+        'info',
+        vscode.l10n.t('Reverted {0} files to their state before the turn.', result.restored.length),
+      );
+    }
+    if (result.failed.length > 0) {
+      session.addNotice('error', vscode.l10n.t('Could not revert: {0}', result.failed.join(', ')));
+    }
+  }
+
+  /** The command behind "Export Session as Markdown": the session on screen. */
+  async exportActive(): Promise<void> {
+    const session = this.host.activeSession;
+    if (session) await this.exportSession(session.id);
+  }
+
+  /** Opens the session as a Markdown document the user can save. */
+  private async exportSession(sessionId: string): Promise<void> {
+    const session = this.host.agent?.store.get(sessionId);
+    if (!session) return;
+    const t = vscode.l10n.t;
+    const content = exportMarkdown(sessionView(session), {
+      you: t('You'),
+      kiro: t('Kiro'),
+      thinking: t('Thinking'),
+      filesChanged: (count) => (count === 1 ? t('Kiro changed one file') : t('Kiro changed {0} files', count)),
+    });
+    const document = await vscode.workspace.openTextDocument({ language: 'markdown', content });
+    await vscode.window.showTextDocument(document, { preview: false });
   }
 
   /** Opens the diff of a tool call in the editor. The content comes from the session, not from the webview. */

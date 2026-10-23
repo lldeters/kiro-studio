@@ -4,8 +4,13 @@
  */
 import * as os from 'node:os';
 import * as vscode from 'vscode';
+import { createHash } from 'node:crypto';
+import * as path from 'node:path';
 import { KiroAgent } from '../acp/agent';
+import { CheckpointService } from '../checkpoints/service';
+import { ShadowRepo } from '../checkpoints/shadowRepo';
 import type { Session } from '../acp/sessions';
+import { currentPlatform, isInside } from '../util/paths';
 import { spawnTransport } from '../acp/transport';
 import { ApprovalUi } from './approvalUi';
 import { VsCodeFileSystemPort } from './fsPort';
@@ -33,6 +38,10 @@ export class AgentHost implements vscode.Disposable {
       setup: SetupController;
       protocol: ProtocolChannel;
       version: string;
+      /** The extension's storage folder; the checkpoint repositories live below it. */
+      storagePath: string;
+      /** Tells the user once that checkpoints are off, and why. */
+      onCheckpointsUnavailable: (reason: string) => void;
     },
   ) {}
 
@@ -94,6 +103,30 @@ export class AgentHost implements vscode.Disposable {
     this.notify();
   }
 
+  private readonly checkpointServices = new Map<string, CheckpointService>();
+
+  /**
+   * The checkpoint service of the workspace folder a session works in, or undefined when checkpoints are off, there is
+   * no workspace folder (the home folder is never snapshotted) or the session works outside of it.
+   */
+  checkpointsFor(session: Session): CheckpointService | undefined {
+    if (!this.deps.settings.checkpointsEnabled()) return undefined;
+    const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (folder === undefined || (session.cwd !== undefined && !isInside(folder, session.cwd, currentPlatform())))
+      return undefined;
+    let service = this.checkpointServices.get(folder);
+    if (!service) {
+      const id = createHash('sha1').update(folder).digest('hex').slice(0, 16);
+      service = new CheckpointService(
+        new ShadowRepo(path.join(this.deps.storagePath, 'checkpoints', id), folder),
+        this.deps.protocol.log,
+        this.deps.onCheckpointsUnavailable,
+      );
+      this.checkpointServices.set(folder, service);
+    }
+    return service;
+  }
+
   /** The folder the agent process and new sessions start in. */
   workspaceRoot(): string {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? os.homedir();
@@ -121,6 +154,10 @@ export class AgentHost implements vscode.Disposable {
         await vscode.env.openExternal(vscode.Uri.parse(url));
       },
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },
+      turnHooks: {
+        before: async (session) => void (await this.checkpointsFor(session)?.before(session)),
+        after: async (session) => void (await this.checkpointsFor(session)?.after(session)),
+      },
     });
     this.current = agent;
     this.approvalUi = new ApprovalUi(agent, () => this.suppressApprovalPrompt());

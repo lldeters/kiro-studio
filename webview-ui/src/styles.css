@@ -788,3 +788,67 @@ details.tool > summary::-webkit-details-marker {
   max-height: 220px;
   overflow: auto;
 }
+
+/* Checkpoints */
+.checkpoint {
+  border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+  border-left: 3px solid var(--vscode-editorInfo-foreground, var(--vscode-focusBorder));
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+}
+.checkpoint > summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.checkpoint > summary::-webkit-details-marker {
+  display: none;
+}
+.checkpoint-title {
+  flex: 1;
+  min-width: 8em;
+}
+.checkpoint-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+.checkpoint-actions button {
+  padding: 1px 8px;
+}
+.checkpoint-files {
+  list-style: none;
+  margin: 0;
+  padding: 2px 8px 6px;
+  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.checkpoint-files li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.checkpoint-files li.reverted {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+.checkpoint-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.92em;
+}
+.file-added {
+  color: var(--vscode-gitDecoration-addedResourceForeground, var(--vscode-testing-iconPassed));
+}
+.file-modified {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, var(--vscode-editorWarning-foreground));
+}
+.file-deleted {
+  color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
+}

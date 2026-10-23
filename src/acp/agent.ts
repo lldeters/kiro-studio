@@ -4,6 +4,7 @@
  *
  * A {@link KiroConnection} lives as long as one process; this object lives as long as the window.
  */
+import { withTimeout } from '../util/async';
 import { Emitter } from '../util/emitter';
 import { arr, errorMessage, opt, rec, str } from '../util/json';
 import type { ProtocolLog } from '../util/log';
@@ -52,6 +53,11 @@ export interface AgentDeps {
   clientInfo: { name: string; title?: string; version: string };
   platform?: PlatformKind;
   writeGate?: WriteGate;
+  /**
+   * Called around every turn: `before` just before the prompt is sent, `after` once it has settled (and before the
+   * session goes idle). Used to record what a turn changes in the workspace.
+   */
+  turnHooks?: { before: (session: Session) => Promise<void>; after: (session: Session) => Promise<void> };
   /** Delays between reconnect attempts. After the last one the agent gives up until restarted by hand. */
   backoffMs?: number[];
   /** A connection that stayed up this long resets the attempt counter. */
@@ -365,17 +371,35 @@ export class KiroAgent {
     if (session.busy) throw new Error('A turn is already running in this session');
     const { text, blocks = [], labels = [] } = typeof input === 'string' ? { text: input } : input;
     session.beginTurn(text, labels);
+    await this.hook('before', session);
+    // A stop pressed while the turn was being prepared: the prompt is not sent at all.
+    if (session.phase === 'cancelling') {
+      session.endTurn({ stopReason: 'cancelled' });
+      return { stopReason: 'cancelled' };
+    }
+    let outcome: TurnOutcome;
     try {
       const { stopReason } = await this.ready.prompt(sessionId, [{ type: 'text', text }, ...blocks]);
-      session.endTurn({ stopReason });
-      return { stopReason };
+      outcome = { stopReason };
     } catch (error) {
       // When the process died, the loss handler already told the session; do not report it a second time.
       const lost = isConnectionClosed(error) || session.status === 'lost';
-      const outcome: TurnOutcome = { error: describeError(error) };
-      if (lost) session.endTurn({});
-      else session.endTurn(outcome);
-      return lost ? {} : outcome;
+      outcome = lost ? {} : { error: describeError(error) };
+    }
+    // The turn counts as running until its changes are recorded, so that the checkpoint comes before the next message.
+    await this.hook('after', session);
+    session.endTurn(outcome);
+    return outcome;
+  }
+
+  /** Runs a turn hook without letting it break the turn: a failure or a hang is logged and the turn goes on. */
+  private async hook(which: 'before' | 'after', session: Session): Promise<void> {
+    const hook = this.deps.turnHooks?.[which];
+    if (!hook) return;
+    try {
+      await withTimeout(hook(session), 120_000, `turn hook ${which}`);
+    } catch (error) {
+      this.deps.log.info(`turn hook ${which} failed: ${describeError(error)}`);
     }
   }
 

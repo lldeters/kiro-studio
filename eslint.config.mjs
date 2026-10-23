@@ -51,6 +51,7 @@ export default tseslint.config(
     files: ['**/*.mjs', '**/*.cjs', '**/*.mts', '**/*.config.ts'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: { ...tseslint.configs.disableTypeChecked.languageOptions, globals: globals.node },
+    rules: { ...tseslint.configs.disableTypeChecked.rules, '@typescript-eslint/no-require-imports': 'off' },
   },
   prettier,
 );

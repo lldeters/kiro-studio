@@ -1,7 +1,8 @@
 import { memo, useRef } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import type { ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
+import type { CheckpointView, ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
+import { CheckpointCard } from './CheckpointCard';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
 
@@ -11,6 +12,7 @@ const testProps =
 
 export function Transcript({ session }: { session: SessionView }) {
   const tools = new Map(session.tools.map((tool) => [tool.toolCallId, tool]));
+  const checkpoints = new Map((session.checkpoints ?? []).map((checkpoint) => [checkpoint.id, checkpoint]));
   const busy = session.phase !== 'idle';
   const lastId = session.items[session.items.length - 1]?.id;
   const list = useRef<VirtuosoHandle>(null);
@@ -44,6 +46,7 @@ export function Transcript({ session }: { session: SessionView }) {
               tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)}
               streaming={busy && item.id === lastId}
               sessionId={session.id}
+              checkpoint={item.checkpointId === undefined ? undefined : checkpoints.get(item.checkpointId)}
             />
           </div>
         )}
@@ -58,11 +61,13 @@ const Item = memo(function Item({
   tool,
   streaming,
   sessionId,
+  checkpoint,
 }: {
   item: ItemView;
   tool: ToolView | undefined;
   streaming: boolean;
   sessionId: string;
+  checkpoint: CheckpointView | undefined;
 }) {
   const t = useT();
   switch (item.kind) {
@@ -102,5 +107,7 @@ const Item = memo(function Item({
       return <div className={`notice ${item.level ?? 'info'}`}>{item.text}</div>;
     case 'tool':
       return tool ? <ToolCard tool={tool} sessionId={sessionId} /> : null;
+    case 'checkpoint':
+      return checkpoint ? <CheckpointCard checkpoint={checkpoint} sessionId={sessionId} /> : null;
   }
 });

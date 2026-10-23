@@ -19,6 +19,10 @@ export interface KiroStudioApi {
   readonly sessionCount: number;
   /** True while a chat webview is showing and has told the host that its page is loaded. */
   readonly chatReady: boolean;
+  /** How many turns of the active session left a checkpoint (changed files). */
+  readonly checkpointCount: number;
+  /** Sends a prompt in the active session, like the chat does, and resolves when the turn is over. */
+  sendPrompt(text: string): Promise<void>;
   /** Resolves when the first check of the Kiro CLI is done. */
   readonly firstCheck: Promise<void>;
 }
@@ -34,6 +38,11 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     setup,
     protocol,
     version: String((context.extension.packageJSON as { version?: string }).version ?? '0.0.0'),
+    storagePath: context.globalStorageUri.fsPath,
+    onCheckpointsUnavailable: (reason) =>
+      void vscode.window.showInformationMessage(
+        vscode.l10n.t('Checkpoints are off: {0}. Without them you cannot revert what Kiro changed.', reason),
+      ),
   });
   host = agentHost;
   const debug = new DebugChat(agentHost);
@@ -81,6 +90,13 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     },
     get agentPhase() {
       return agentHost.agent?.state.phase ?? 'stopped';
+    },
+    get checkpointCount() {
+      return agentHost.activeSession?.checkpoints.size ?? 0;
+    },
+    async sendPrompt(text: string) {
+      const session = agentHost.activeSession;
+      if (session) await agentHost.agent?.prompt(session.id, text);
     },
     get chatReady() {
       return chat.visible;

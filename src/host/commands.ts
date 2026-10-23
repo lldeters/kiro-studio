@@ -42,6 +42,7 @@ export function registerCommands(deps: CommandDeps): void {
   command('kiroStudio.showQuickMenu', () => showQuickMenu(host, setup, settings));
   command('kiroStudio.openChat', () => vscode.commands.executeCommand('kiroStudio.chat.focus'));
   command('kiroStudio.openChatInEditor', () => openChatInEditor(context.extensionUri, chat));
+  command('kiroStudio.exportSession', () => chat.exportActive());
   command('kiroStudio.newSession', async () => {
     await vscode.commands.executeCommand('kiroStudio.chat.focus');
     await chat.newSession();

@@ -83,6 +83,14 @@ export function Toolbar({ session }: { session: SessionView }) {
           {Math.round(percentage)}%
         </span>
       )}
+      <button
+        className="icon-button"
+        title={t('Export the session as Markdown')}
+        aria-label={t('Export the session as Markdown')}
+        onClick={() => post({ type: 'exportSession', sessionId: session.id })}
+      >
+        <span className="codicon codicon-export" aria-hidden="true" />
+      </button>
       {canCompact && (
         <button
           className="icon-button"
