@@ -7,17 +7,23 @@ import { post } from './vscode';
 import '@vscode/codicons/dist/codicon.css';
 import './styles.css';
 
-window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
-  if (event.data && typeof event.data === 'object' && 'type' in event.data) useChat.getState().receive(event.data);
-});
-
 const root = document.getElementById('root');
-if (root)
-  createRoot(root).render(
-    <StrictMode>
-      <App />
-    </StrictMode>,
-  );
 
-// Tell the host the page is ready for its first state.
-post({ type: 'ready' });
+if (root && document.body.dataset['view'] === 'spec') {
+  // The spec view shares this bundle; its code loads only when that page is opened.
+  void import('./spec/specMain').then((spec) => spec.start(root));
+} else {
+  window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
+    if (event.data && typeof event.data === 'object' && 'type' in event.data) useChat.getState().receive(event.data);
+  });
+
+  if (root)
+    createRoot(root).render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+  // Tell the host the page is ready for its first state.
+  post({ type: 'ready' });
+}

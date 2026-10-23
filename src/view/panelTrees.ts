@@ -8,6 +8,7 @@ import type { McpConfig, McpRuntime, McpServerConfig } from '../workspace/mcp';
 import { baseName } from '../workspace/reader';
 import { filterSessions, relativeTime, type SessionEntry } from '../workspace/sessionList';
 import type { SpecInfo } from '../workspace/specs';
+import type { TaskItem } from '../workspace/tasks';
 import type { SteeringFile } from '../workspace/steering';
 import { identityTranslate, type Translate } from './statusModel';
 
@@ -108,12 +109,49 @@ export function sessionsTree(input: SessionsInput, t: Translate = identityTransl
 // Specs
 // ---------------------------------------------------------------------------------------------------------------
 
+function taskNodes(spec: SpecInfo, path: string, tasks: readonly TaskItem[], t: Translate): PanelNode[] {
+  return tasks.map((task): PanelNode => {
+    const icon =
+      task.status === 'done' ? 'pass-filled' : task.status === 'inProgress' ? 'sync~spin' : 'circle-large-outline';
+    const description = [
+      task.optional ? t('optional') : undefined,
+      task.status === 'inProgress' ? t('working') : undefined,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+    return {
+      id: `spec-task/${path}/${task.line}`,
+      label: task.number === undefined ? task.title : `${task.number} ${task.title}`,
+      ...(description === '' ? {} : { description }),
+      tooltip: [
+        task.title,
+        ...task.details,
+        task.requirements.length > 0 ? t('Requirements: {0}', task.requirements.join(', ')) : undefined,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      icon,
+      ...(task.status === 'done' ? { iconColor: GOOD } : {}),
+      contextValue: task.status === 'done' ? 'specTask' : 'specTask canStart',
+      data: {
+        path,
+        line: String(task.line),
+        spec: spec.name,
+        ...(task.number === undefined ? {} : { number: task.number }),
+      },
+      command: { id: 'kiroStudio.openFile', args: [path, task.line + 1], title: t('Open') },
+      ...(task.children.length > 0 ? { children: taskNodes(spec, path, task.children, t) } : {}),
+    };
+  });
+}
+
 export function specsTree(specs: readonly SpecInfo[], t: Translate = identityTranslate): PanelNode[] {
   return specs.map((spec): PanelNode => {
     const progress = spec.progress;
     const done = progress !== undefined && progress.total > 0 && progress.done === progress.total;
     const documents: [string | undefined, string, string][] = [
       [spec.requirements, t('Requirements'), 'checklist'],
+      [spec.bugfix, t('Bugfix'), 'bug'],
       [spec.design, t('Design'), 'symbol-structure'],
       [spec.tasks, t('Tasks'), 'tasklist'],
     ];
@@ -127,6 +165,7 @@ export function specsTree(specs: readonly SpecInfo[], t: Translate = identityTra
       icon: done ? 'pass-filled' : 'notebook',
       ...(done ? { iconColor: GOOD } : {}),
       contextValue: 'spec',
+      data: { dir: spec.dir, name: spec.name },
       children: documents.flatMap(([path, label, icon]): PanelNode[] =>
         path === undefined
           ? []
@@ -139,9 +178,12 @@ export function specsTree(specs: readonly SpecInfo[], t: Translate = identityTra
                   : {}),
                 tooltip: path,
                 icon,
-                contextValue: 'specFile',
-                data: { path },
+                contextValue: path === spec.tasks ? 'specFile specTasksFile' : 'specFile',
+                data: { path, dir: spec.dir, name: spec.name },
                 command: { id: 'kiroStudio.openFile', args: [path], title: t('Open') },
+                ...(path === spec.tasks && spec.taskItems !== undefined && spec.taskItems.length > 0
+                  ? { children: taskNodes(spec, path, spec.taskItems, t) }
+                  : {}),
               },
             ],
       ),

@@ -30,6 +30,10 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('hooks.enabled', false);
   }
 
+  specCodeLens(): boolean {
+    return this.config.get<boolean>('specs.codeLens', true);
+  }
+
   defaultMode(): string {
     return this.config.get<string>('defaultMode', '').trim();
   }
@@ -51,6 +55,13 @@ export class Settings implements AgentSettings {
   onDidChangeHooks(listener: () => void): vscode.Disposable {
     return vscode.workspace.onDidChangeConfiguration((event) => {
       if (Settings.changed(event, 'hooks.enabled')) listener();
+    });
+  }
+
+  /** Fires when the CodeLens setting for `tasks.md` changes. */
+  onDidChangeSpecCodeLens(listener: () => void): vscode.Disposable {
+    return vscode.workspace.onDidChangeConfiguration((event) => {
+      if (Settings.changed(event, 'specs.codeLens')) listener();
     });
   }
 

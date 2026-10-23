@@ -29,7 +29,9 @@ if (args.includes('--list')) {
 const scenarioName = option('scenario', 'conversation');
 const themeName = option('theme', 'dark');
 const out = option('out', 'preview.png');
-const width = Number(option('width', '420'));
+// The spec view is an editor tab, so it is wide; the chat is a narrow sidebar.
+const isSpec = scenarioName === 'spec';
+const width = Number(option('width', isSpec ? '900' : '420'));
 const height = Number(option('height', '760'));
 const scenario = SCENARIOS[scenarioName];
 const theme = THEMES[themeName];
@@ -51,6 +53,7 @@ const server = createServer((request, response) => {
         styleUri: `${origin}/main.css`,
         lang: 'en',
         title: 'Kiro Studio',
+        view: isSpec ? 'spec' : 'chat',
       });
       // A theme, and a stand-in for acquireVsCodeApi that keeps what the page posts.
       const injected = `<style>:root{${Object.entries(theme)
@@ -87,11 +90,19 @@ try {
     }
   });
   await page.goto(`http://127.0.0.1:${port}/`);
+  // The host sends its state only after the page said it is ready; the spec page loads its code lazily.
+  await page.waitForFunction(() => (window as unknown as { __posted: unknown[] }).__posted.length > 0);
   for (const step of scenario) {
     if (typeof step === 'number') await page.waitForTimeout(step);
     else await page.evaluate((m) => window.postMessage(m, '*'), step as never);
   }
   await page.waitForTimeout(Number(option('wait', '600')));
+  // Show another tab or press a button before the screenshot, for example --click Tasks.
+  const clicked = option('click', '');
+  if (clicked) {
+    await page.getByText(clicked, { exact: true }).first().click();
+    await page.waitForTimeout(600);
+  }
   const typed = option('type', '');
   if (typed) {
     await page.locator('textarea').click();

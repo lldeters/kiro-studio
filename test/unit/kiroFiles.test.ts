@@ -105,12 +105,12 @@ describe('steering', () => {
 });
 
 describe('specs', () => {
-  it('counts checkboxes, nested and with any bullet, and ignores code fences', () => {
+  it('counts the tasks that have no sub-tasks, with any bullet, and ignores code fences', () => {
     expect(
       parseTaskProgress(
         '# Tasks\n- [x] 1. Done\n  - [x] 1.1 Done too\n  - [ ] 1.2 Open\n* [X] 2. Capital X\n+ [-] 3. In progress\n```\n- [ ] not a task\n```\n- not a checkbox\n',
       ),
-    ).toEqual({ done: 3, total: 5 });
+    ).toEqual({ done: 2, total: 4 });
     expect(parseTaskProgress('nothing')).toEqual({ done: 0, total: 0 });
   });
 
@@ -129,6 +129,10 @@ describe('specs', () => {
         requirements: '/ws/.kiro/specs/login/requirements.md',
         design: '/ws/.kiro/specs/login/design.md',
         tasks: '/ws/.kiro/specs/login/tasks.md',
+        taskItems: [
+          expect.objectContaining({ line: 0, title: 'a', status: 'done' }),
+          expect.objectContaining({ line: 1, title: 'b', status: 'todo' }),
+        ],
         progress: { done: 1, total: 2 },
       },
       { name: 'search', dir: '/ws/.kiro/specs/search', requirements: '/ws/.kiro/specs/search/requirements.md' },

@@ -28,4 +28,9 @@ describe('chat page', () => {
     expect(html).toContain('<html lang="de">');
     expect(html).toContain(`href="${input.styleUri}"`);
   });
+
+  it('tells the script which page to draw', () => {
+    expect(chatHtml(input)).toContain('<body data-view="chat">');
+    expect(chatHtml({ ...input, view: 'spec' })).toContain('<body data-view="spec">');
+  });
 });

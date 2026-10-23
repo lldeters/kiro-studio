@@ -2,7 +2,9 @@
 import { Session } from '../src/acp/sessions';
 import { parseSessionNotification } from '../src/acp/types';
 import type { HostMessage, SetupView } from '../src/shared/chatProtocol';
+import type { SpecHostMessage } from '../src/shared/specProtocol';
 import { PatchTracker, tabView } from '../src/view/chatPresenter';
+import { specView } from '../src/view/specPresenter';
 import { configOptions, u, update } from '../test/support/kiro';
 
 function feed(session: Session, ...updates: Record<string, unknown>[]): void {
@@ -185,7 +187,7 @@ function idle(): HostMessage[] {
 const setupOnly = (setup: SetupView): HostMessage[] => [init([], { setup })];
 
 /** Messages, and pauses in milliseconds between them. */
-export type Step = HostMessage | number;
+export type Step = HostMessage | SpecHostMessage | number;
 
 /** A long answer that arrives in pieces while the reader is at the bottom, like a real turn. */
 function streaming(): Step[] {
@@ -212,7 +214,80 @@ function streaming(): Step[] {
   return steps;
 }
 
+const REQUIREMENTS = `# Requirements Document
+
+## Introduction
+
+Users can reset a forgotten password by e-mail.
+
+## Requirements
+
+### Requirement 1
+
+**User Story:** As a user, I want to reset my password, so that I can get back into my account.
+
+#### Acceptance Criteria
+
+1. WHEN the user asks for a reset THEN the system SHALL send a link that is valid for one hour
+2. WHEN the link is used twice THEN the system SHALL refuse the second use
+3. IF the e-mail address is unknown THEN the system SHALL answer exactly as for a known one`;
+
+const DESIGN = `# Design Document
+
+## Overview
+
+A reset token is stored hashed; the link carries the token. See \`src/auth/reset.ts\`.
+
+## Architecture
+
+\`\`\`mermaid
+sequenceDiagram
+  participant U as User
+  participant A as Auth service
+  participant M as Mailer
+  U->>A: Request reset
+  A->>M: Send link
+  M-->>U: E-mail with token
+  U->>A: Open link, new password
+\`\`\`
+
+## Data Models
+
+| Field | Type |
+| --- | --- |
+| tokenHash | string |
+| expiresAt | datetime |`;
+
+const SPEC_TASKS = `# Implementation Plan
+
+- [x] 1. Add the token store
+  - Create the table for hashed tokens
+  - _Requirements: 1.1_
+
+- [ ] 2. Send the reset link
+  - [x] 2.1 Build the mail template
+    - _Requirements: 1.1_
+  - [-] 2.2 Create the endpoint that sends the link
+    - Rate-limit by address
+    - _Requirements: 1.1, 1.3_
+  - [ ]* 2.3 Write tests for the endpoint
+    - _Requirements: 1.2_
+
+- [ ] 3. Check the link and set the new password
+  - _Requirements: 1.2_
+`;
+
+function specScenario(): Step[] {
+  const documents = [
+    { kind: 'requirements' as const, path: '/ws/.kiro/specs/password-reset/requirements.md', text: REQUIREMENTS },
+    { kind: 'design' as const, path: '/ws/.kiro/specs/password-reset/design.md', text: DESIGN },
+    { kind: 'tasks' as const, path: '/ws/.kiro/specs/password-reset/tasks.md', text: SPEC_TASKS },
+  ];
+  return [{ type: 'init', strings: {}, spec: specView({ name: 'password-reset', documents }, true) }];
+}
+
 export const SCENARIOS: Record<string, Step[]> = {
+  spec: specScenario(),
   conversation: conversation(),
   streaming: streaming(),
   idle: idle(),

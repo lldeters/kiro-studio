@@ -87,6 +87,28 @@ export const UI_MESSAGES = [
   'Enter sends, Shift+Enter adds a line, Esc stops.',
   'Stopping…',
   'Waiting for your answer',
+  // Spec view
+  'Requirements',
+  'Bugfix',
+  'Design',
+  'Tasks',
+  '{0} of {1} tasks',
+  'Open file',
+  'This document is very long. Open the file to read all of it.',
+  'This spec was deleted.',
+  'Review',
+  'Approve and continue',
+  'Request changes…',
+  'What should change?',
+  'Send changes',
+  'Cancel',
+  'Update tasks',
+  'There are no tasks in this file yet.',
+  'To do',
+  'optional',
+  'Requirements: {0}',
+  'Start',
+  'Continue',
 ] as const;
 
 export type UiMessage = (typeof UI_MESSAGES)[number];

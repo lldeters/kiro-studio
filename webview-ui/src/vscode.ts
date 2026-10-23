@@ -1,4 +1,5 @@
 import type { WebviewMessage } from '../../src/shared/chatProtocol';
+import type { SpecWebviewMessage } from '../../src/shared/specProtocol';
 
 interface VsCodeApi {
   postMessage(message: unknown): void;
@@ -16,10 +17,10 @@ function vscodeApi(): VsCodeApi | undefined {
 }
 
 /** Messages "sent" outside VS Code (tests, a browser preview) are collected here. */
-export const outbox: WebviewMessage[] = [];
+export const outbox: (WebviewMessage | SpecWebviewMessage)[] = [];
 
 /** Sends a message to the extension host. */
-export function post(message: WebviewMessage): void {
+export function post(message: WebviewMessage | SpecWebviewMessage): void {
   const target = vscodeApi();
   if (target) target.postMessage(message);
   else outbox.push(message);

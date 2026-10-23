@@ -151,6 +151,64 @@ suite('Kiro Studio', () => {
     });
   });
 
+  suite('Specs', () => {
+    const folder = (): string => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+    const specDir = (): string => path.join(folder(), '.kiro', 'specs', 'demo');
+
+    test('offers "Start task" over open tasks and "Update tasks" at the top of a tasks.md', async () => {
+      await activate();
+      const uri = vscode.Uri.file(path.join(specDir(), 'tasks.md'));
+      await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(uri));
+      const titles = async (): Promise<string[]> =>
+        (await vscode.commands.executeCommand<vscode.CodeLens[]>('vscode.executeCodeLensProvider', uri)).map(
+          (lens) => lens.command?.title ?? '',
+        );
+      await waitForAsync(async () => (await titles()).length > 0, 'the CodeLens of the task list');
+      // Task 1 is done and has no lens; task 2 is open.
+      assert.deepStrictEqual(await titles(), ['$(sparkle) Update tasks', '$(play) Start task']);
+    });
+
+    suite('with a fake CLI', function () {
+      suiteSetup(function () {
+        if (!canRunFakeCli) this.skip();
+      });
+
+      test('starts a spec in the agent of the workflow and asks for its first document', async () => {
+        const api = await activate();
+        await setCliPath(createFakeCli('ready'));
+        await recheck();
+        await api.startSpec('requirements-first', 'password-reset', 'Users can reset their password by e-mail.');
+        await waitFor(() => api.agentPhase === 'ready' && api.sessionCount >= 1, 'a session');
+        await waitFor(() => api.lastUserMessage !== undefined, 'the prompt of the spec');
+        assert.match(api.lastUserMessage ?? '', /named "password-reset" in \.kiro\/specs\/password-reset\//);
+        assert.match(api.lastUserMessage ?? '', /requirements\.md/);
+        assert.strictEqual(api.activeMode, 'spec');
+      });
+
+      test('runs a task of the list by its line', async () => {
+        const api = await activate();
+        await setCliPath(createFakeCli('ready'));
+        await recheck();
+        await vscode.commands.executeCommand('kiroStudio.newSession');
+        await waitFor(() => api.sessionCount >= 1 && api.agentPhase === 'ready', 'a session');
+        // Line 3 (zero-based) of the demo list is "- [ ] 2. Add a test".
+        await vscode.commands.executeCommand('kiroStudio.specs.runTask', path.join(specDir(), 'tasks.md'), 3, '2');
+        await waitFor(
+          () => /Execute task 2 "Add a test" of the spec "demo"/.test(api.lastUserMessage ?? ''),
+          'the task prompt',
+        );
+      });
+    });
+
+    test('opens the view of a spec once and loads its page', async () => {
+      const api = await activate();
+      await vscode.commands.executeCommand('kiroStudio.specs.openView', specDir());
+      await vscode.commands.executeCommand('kiroStudio.specs.openView', specDir());
+      assert.strictEqual(api.openSpecViews, 1, 'a second open brings the first view to the front');
+      await waitFor(() => api.readySpecViews === 1, 'the page of the spec view to load');
+    });
+  });
+
   suite('Kiro panel files', () => {
     test('shows what is in the .kiro folder of the workspace', async () => {
       const api = await activate();

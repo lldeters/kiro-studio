@@ -39,7 +39,23 @@ if (args[0] === '--version') {
 function serve() {
   let buffer = '';
   const send = (message) => out(JSON.stringify({ jsonrpc: '2.0', ...message }));
+  const modes = {
+    currentModeId: 'vibe',
+    availableModes: [
+      { id: 'vibe', name: 'Default' },
+      { id: 'spec', name: 'Spec' },
+      { id: 'quick-spec', name: 'Quick spec' },
+      { id: 'bug-fix', name: 'Bug fix' },
+    ],
+  };
   const configOptions = [
+    {
+      id: 'mode',
+      name: 'Agent',
+      type: 'select',
+      currentValue: 'vibe',
+      options: modes.availableModes.map((mode) => ({ value: mode.id, name: mode.name })),
+    },
     {
       id: 'autopilot',
       name: 'Autopilot',
@@ -86,7 +102,7 @@ function serve() {
         });
       case 'session/new':
         if (params && typeof params.cwd === 'string') cwd = params.cwd;
-        return send({ id, result: { sessionId: 'fake-session-1', configOptions } });
+        return send({ id, result: { sessionId: 'fake-session-1', modes, configOptions } });
       case 'session/list':
         return send({
           id,
@@ -135,8 +151,12 @@ function serve() {
         });
         return send({ id, result: { stopReason: 'end_turn' } });
       }
-      case 'session/set_config_option':
+      case 'session/set_config_option': {
+        const option = configOptions.find((o) => o.id === params.configId);
+        if (option) option.currentValue = params.value;
+        if (params.configId === 'mode') modes.currentModeId = params.value;
         return send({ id, result: { configOptions } });
+      }
       case 'session/cancel':
         return undefined;
       default:

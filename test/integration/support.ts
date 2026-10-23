@@ -16,6 +16,15 @@ export interface KiroStudioApi {
   readonly checkpointCount: number;
   panelLabels(view: string): Promise<string[]>;
   sendPrompt(text: string): Promise<void>;
+  startSpec(
+    workflow: 'requirements-first' | 'design-first' | 'bugfix' | 'quick',
+    name: string,
+    description: string,
+  ): Promise<void>;
+  readonly lastUserMessage: string | undefined;
+  readonly activeMode: string | undefined;
+  readonly openSpecViews: number;
+  readonly readySpecViews: number;
   readonly firstCheck: Promise<void>;
 }
 

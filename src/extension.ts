@@ -6,8 +6,10 @@ import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
 import { DiffProvider } from './host/diffProvider';
 import { KiroPanel, PANEL_VIEWS, type PanelViewId } from './host/panel/panel';
+import { SpecsFeature } from './host/specs/specsFeature';
 import { createProtocolChannel } from './host/logger';
 import { SetupController, type UiState } from './host/setup';
+import type { SpecWorkflow } from './workspace/specPrompts';
 import { Settings } from './host/settings';
 import { StatusBarController } from './host/statusBar';
 import { StatusView } from './host/statusView';
@@ -26,6 +28,15 @@ export interface KiroStudioApi {
   readonly checkpointCount: number;
   /** Sends a prompt in the active session, like the chat does, and resolves when the turn is over. */
   sendPrompt(text: string): Promise<void>;
+  /** Starts a spec like the assistant "New spec" does, after its questions. */
+  startSpec(workflow: SpecWorkflow, name: string, description: string): Promise<void>;
+  /** The text of the last message the user sent in the active session. */
+  readonly lastUserMessage: string | undefined;
+  /** The agent (mode) of the active session. */
+  readonly activeMode: string | undefined;
+  /** How many spec views are open, and how many of those have loaded their page. */
+  readonly openSpecViews: number;
+  readonly readySpecViews: number;
   /** Resolves when the first check of the Kiro CLI is done. */
   readonly firstCheck: Promise<void>;
 }
@@ -52,6 +63,12 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   const diffs = new DiffProvider();
   const chat = new ChatController(agentHost, setup, settings, diffs);
   const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
+  const specs = new SpecsFeature({
+    host: agentHost,
+    settings,
+    extensionUri: context.extensionUri,
+    onDidChangeFiles: panel.onDidChangeFiles,
+  });
   agentHost.suppressApprovalPrompt = () => chat.visible;
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
@@ -63,6 +80,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     chat,
     diffs,
     panel,
+    specs,
     vscode.window.registerWebviewViewProvider(
       ChatViewProvider.viewType,
       new ChatViewProvider(context.extensionUri, chat),
@@ -104,6 +122,26 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     async sendPrompt(text: string) {
       const session = agentHost.activeSession;
       if (session) await agentHost.agent?.prompt(session.id, text);
+    },
+    startSpec: (workflow, name, description) => specs.actions.startSpec(workflow, name, description),
+    get lastUserMessage() {
+      const items = agentHost.activeSession?.transcript ?? [];
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        if (item?.kind === 'user') return item.text;
+      }
+      return undefined;
+    },
+    get activeMode() {
+      const session = agentHost.activeSession;
+      const mode = session?.configValue('mode');
+      return typeof mode === 'string' ? mode : session?.modes.currentModeId;
+    },
+    get openSpecViews() {
+      return specs.views.openCount;
+    },
+    get readySpecViews() {
+      return specs.views.readyCount;
     },
     get chatReady() {
       return chat.visible;

@@ -9,6 +9,7 @@ import {
   type PanelNode,
 } from '../../src/view/panelTrees';
 import type { McpConfig } from '../../src/workspace/mcp';
+import { parseTasks } from '../../src/workspace/tasks';
 
 const labels = (nodes: PanelNode[] | undefined): string[] => (nodes ?? []).map((n) => n.label);
 const now = Date.parse('2026-10-23T12:00:00Z');
@@ -100,6 +101,28 @@ describe('specs tree', () => {
     expect(nodes[1]?.description).toBeUndefined();
     expect(labels(nodes[1]?.children)).toEqual(['Requirements']);
     expect(nodes[2]).toMatchObject({ icon: 'pass-filled', iconColor: 'testing.iconPassed' });
+  });
+
+  it('lists the tasks below the task document, with their state and what can be started', () => {
+    const taskItems = parseTasks('- [x] 1. Set up\n- [ ] 2. Build\n  - [-] 2.1 Core\n  - [ ]* 2.2 Tests\n');
+    const [spec] = specsTree([
+      { name: 'login', dir: '/ws/.kiro/specs/login', tasks: '/t', taskItems, progress: { done: 1, total: 3 } },
+    ]);
+    const tasks = spec?.children?.[0];
+    expect(tasks?.contextValue).toBe('specFile specTasksFile');
+    expect(labels(tasks?.children)).toEqual(['1 Set up', '2 Build']);
+    const [first, second] = tasks?.children ?? [];
+    expect(first).toMatchObject({ icon: 'pass-filled', contextValue: 'specTask' });
+    expect(second).toMatchObject({ icon: 'circle-large-outline', contextValue: 'specTask canStart' });
+    expect(second?.data).toEqual({ path: '/t', line: '1', spec: 'login', number: '2' });
+    expect(second?.command).toMatchObject({ id: 'kiroStudio.openFile', args: ['/t', 2] });
+    expect(second?.children?.[0]).toMatchObject({ icon: 'sync~spin', description: 'working' });
+    expect(second?.children?.[1]).toMatchObject({ description: 'optional' });
+  });
+
+  it('shows the analysis of a bugfix spec', () => {
+    const [spec] = specsTree([{ name: 'crash', dir: '/d', bugfix: '/d/bugfix.md', design: '/d/design.md' }]);
+    expect(labels(spec?.children)).toEqual(['Bugfix', 'Design']);
   });
 });
 

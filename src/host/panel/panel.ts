@@ -110,6 +110,11 @@ export class KiroPanel implements vscode.Disposable {
     this.updateSessionsDescription();
   }
 
+  /** Fires when something under `.kiro` in the workspace changed (merged, 300 ms). */
+  get onDidChangeFiles(): vscode.Event<void> {
+    return this.watcher.onDidChange;
+  }
+
   refresh(...ids: PanelViewId[]): void {
     for (const id of ids.length > 0 ? ids : PANEL_VIEWS) this.trees[id].refresh();
   }
@@ -317,7 +322,9 @@ export class KiroPanel implements vscode.Disposable {
       );
     };
 
-    command('openFile', (file) => (typeof file === 'string' ? this.openFile(file) : undefined));
+    command('openFile', (file, line) =>
+      typeof file === 'string' ? this.openFile(file, typeof line === 'number' ? line : undefined) : undefined,
+    );
     command('panel.refresh', () => {
       this.refresh();
       return this.refreshSessions();
@@ -388,9 +395,10 @@ export class KiroPanel implements vscode.Disposable {
   // Actions
   // -------------------------------------------------------------------------------------------------------------
 
-  private async openFile(file: string): Promise<void> {
+  private async openFile(file: string, line?: number): Promise<void> {
     try {
-      await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
+      const at = line === undefined ? undefined : new vscode.Range(Math.max(0, line - 1), 0, Math.max(0, line - 1), 0);
+      await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true, ...(at ? { selection: at } : {}) });
     } catch {
       void vscode.window.showWarningMessage(t('{0} does not exist (any more).', path.basename(file)));
     }

@@ -9,6 +9,8 @@ export interface ChatHtmlInput {
   /** Language tag of the window, for the `lang` attribute. */
   lang: string;
   title: string;
+  /** Which page the script draws; the chat by default. */
+  view?: 'chat' | 'spec';
 }
 
 const escapeHtml = (text: string): string =>
@@ -30,7 +32,7 @@ export function contentSecurityPolicy(cspSource: string, nonce: string): string 
 }
 
 export function chatHtml(input: ChatHtmlInput): string {
-  const { cspSource, nonce, scriptUri, styleUri, lang, title } = input;
+  const { cspSource, nonce, scriptUri, styleUri, lang, title, view = 'chat' } = input;
   return `<!doctype html>
 <html lang="${escapeHtml(lang)}">
   <head>
@@ -40,7 +42,7 @@ export function chatHtml(input: ChatHtmlInput): string {
     <link rel="stylesheet" href="${escapeHtml(styleUri)}" />
     <title>${escapeHtml(title)}</title>
   </head>
-  <body>
+  <body data-view="${view}">
     <div id="root"></div>
     <script type="module" nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script>
   </body>
