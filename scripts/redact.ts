@@ -1,0 +1,55 @@
+/**
+ * Best-effort redaction for protocol logs: secrets by key name, e-mail addresses, JWTs, bearer tokens,
+ * AWS access key ids, and the user's home directory in every spelling Kiro puts on the wire.
+ * Not a guarantee: logs must still be read before they are shared.
+ */
+
+const SECRET_KEY = /token|secret|password|passwd|authorization|api[-_]?key|cookie|credential/i;
+const escapeRegExp = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Kiro reports paths with a lower-case drive letter (`c:\Users\name`), as `file:///c%3A/Users/name`, and inside
+ * `kiro-snapshot-v2://` URIs percent-encoded twice, so the home directory is matched in all of those spellings,
+ * case-insensitively.
+ */
+export function homePattern(home: string): RegExp | undefined {
+  const variants = new Set<string>();
+  const add = (v: string) => { if (v.length > 3) variants.add(v); };
+  const slashes = home.replace(/\\/g, '/');
+  add(home);
+  add(slashes);
+  add(slashes.replace(/^([A-Za-z]):/, '$1%3A'));
+  add(encodeURIComponent(home));
+  add(encodeURIComponent(encodeURIComponent(home)));
+  if (variants.size === 0) return undefined;
+  return new RegExp([...variants].sort((a, b) => b.length - a.length).map(escapeRegExp).join('|'), 'gi');
+}
+
+export interface Redactor {
+  redactText(text: string): string;
+  redactDeep(value: unknown, key?: string): unknown;
+}
+
+export function createRedactor(home: string): Redactor {
+  const homeRe = homePattern(home);
+
+  const redactText = (text: string): string => {
+    const withoutHome = homeRe ? text.replace(homeRe, '~') : text;
+    return withoutHome
+      .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '<email>')
+      .replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/g, '<jwt>')
+      .replace(/Bearer\s+[\w.~+/=-]+/gi, 'Bearer <redacted>')
+      .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '<aws-key-id>');
+  };
+
+  const redactDeep = (value: unknown, key = ''): unknown => {
+    if (typeof value === 'string') return SECRET_KEY.test(key) ? '[redacted]' : redactText(value);
+    if (Array.isArray(value)) return value.map((x) => redactDeep(x, key));
+    if (typeof value === 'object' && value !== null) {
+      return Object.fromEntries(Object.entries(value).map(([k, x]) => [k, redactDeep(x, k)]));
+    }
+    return value;
+  };
+
+  return { redactText, redactDeep };
+}

@@ -23,6 +23,7 @@ import { PassThrough, Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
 import { fileURLToPath } from 'node:url';
 import * as acp from '@agentclientprotocol/sdk/unstable';
+import { createRedactor } from './redact.js';
 
 // ---------------------------------------------------------------------------------------
 // Small helpers
@@ -63,11 +64,13 @@ interface Options {
   mode?: string;
   protocolVersion: number;
   approve: 'safe' | 'none';
+  review: 'accept' | 'reject';
   fs: boolean;
   terminal: boolean;
   hooks: boolean;
   extensions: boolean;
   timeoutSec: number;
+  exitWaitSec: number;
   keepDir: boolean;
   out?: string;
   redact: boolean;
@@ -87,11 +90,13 @@ const HELP = `Usage: npm run probe -- [options]
   --mode <id>             set the "mode" session option, i.e. the agent (only if advertised)
   --protocol-version <n>  protocolVersion sent in initialize (default: ${acp.PROTOCOL_VERSION}, the SDK's stable version)
   --approve safe|none     safe = allow once when all paths are inside the temp dir (default); none = reject all
+  --review accept|reject  answer Kiro's end-of-turn "Review changes" request (default: accept); reject shows whether Kiro reverts
   --no-fs                 do not advertise fs/read_text_file and fs/write_text_file
   --terminal              advertise and implement terminal/* (runs agent-requested commands in the temp dir)
   --hooks                 opt in to Kiro hooks (clientCapabilities._meta.kiro.hooks); may run your global hooks
   --no-extensions         skip the read-only _kiro/* calls
   --timeout <seconds>     overall limit for the prompt turn (default: 180)
+  --exit-wait <seconds>   how long to wait for the CLI to exit after stdin is closed before killing it (default: 5)
   --kiro-debug            start kiro-cli with KIRO_LOG_LEVEL=debug
   --include-kiro-log      append the last 200 lines of Kiro's own chat log to the output (may contain private data)
   --keep-dir              do not delete the temp working directory
@@ -108,11 +113,13 @@ function parseArgs(argv: string[]): Options {
     autopilot: 'off',
     protocolVersion: acp.PROTOCOL_VERSION,
     approve: 'safe',
+    review: 'accept',
     fs: true,
     terminal: false,
     hooks: false,
     extensions: true,
     timeoutSec: 180,
+    exitWaitSec: 5,
     keepDir: false,
     redact: true,
     kiroDebug: false,
@@ -146,11 +153,13 @@ function parseArgs(argv: string[]): Options {
       case '--mode': o.mode = value(); break;
       case '--protocol-version': o.protocolVersion = Number.parseInt(value(), 10); break;
       case '--approve': o.approve = oneOf(value(), ['safe', 'none'] as const); break;
+      case '--review': o.review = oneOf(value(), ['accept', 'reject'] as const); break;
       case '--no-fs': o.fs = false; break;
       case '--terminal': o.terminal = true; break;
       case '--hooks': o.hooks = true; break;
       case '--no-extensions': o.extensions = false; break;
       case '--timeout': o.timeoutSec = Number.parseInt(value(), 10); break;
+      case '--exit-wait': o.exitWaitSec = Number.parseInt(value(), 10); break;
       case '--kiro-debug': o.kiroDebug = true; break;
       case '--include-kiro-log': o.includeKiroLog = true; break;
       case '--keep-dir': o.keepDir = true; break;
@@ -160,8 +169,8 @@ function parseArgs(argv: string[]): Options {
       default: throw new Error(`Unknown option: ${flag}\n\n${HELP}`);
     }
   }
-  if (!Number.isInteger(o.protocolVersion) || o.timeoutSec <= 0 || Number.isNaN(o.timeoutSec)) {
-    throw new Error('--protocol-version and --timeout must be positive integers');
+  if (!Number.isInteger(o.protocolVersion) || o.timeoutSec <= 0 || Number.isNaN(o.timeoutSec) || !(o.exitWaitSec > 0)) {
+    throw new Error('--protocol-version, --timeout and --exit-wait must be positive integers');
   }
   return o;
 }
@@ -170,25 +179,7 @@ function parseArgs(argv: string[]): Options {
 // Redaction (best effort)
 // ---------------------------------------------------------------------------------------
 
-const SECRET_KEY = /token|secret|password|passwd|authorization|api[-_]?key|cookie|credential/i;
-const HOME = os.homedir();
-
-function redactText(s: string): string {
-  let out = s;
-  if (HOME.length > 3) out = out.split(HOME).join('~');
-  return out
-    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '<email>')
-    .replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/g, '<jwt>')
-    .replace(/Bearer\s+[\w.~+/=-]+/gi, 'Bearer <redacted>')
-    .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '<aws-key-id>');
-}
-
-function redactDeep(v: unknown, key = ''): unknown {
-  if (typeof v === 'string') return SECRET_KEY.test(key) ? '[redacted]' : redactText(v);
-  if (Array.isArray(v)) return v.map((x) => redactDeep(x, key));
-  if (isRecord(v)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, redactDeep(x, k)]));
-  return v;
-}
+const { redactText, redactDeep } = createRedactor(os.homedir());
 
 // ---------------------------------------------------------------------------------------
 // Recorder: raw wire log, stderr log, observed message inventory
@@ -357,11 +348,22 @@ async function locateCli(explicit: string | undefined): Promise<{ path?: string;
     if (found) return found;
   }
   // Locations that editors do not inherit from the shell PATH. Candidates only; see docs/PLAN.md.
-  for (const candidate of [path.join(os.homedir(), '.local', 'bin', 'kiro-cli'), '/usr/local/bin/kiro-cli', '/opt/homebrew/bin/kiro-cli']) {
+  const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), 'AppData', 'Local');
+  for (const candidate of [
+    path.join(os.homedir(), '.local', 'bin', process.platform === 'win32' ? 'kiro-cli.exe' : 'kiro-cli'),
+    ...(process.platform === 'win32' ? [path.join(localAppData, 'Kiro-Cli', 'kiro-cli.exe')] : ['/usr/local/bin/kiro-cli', '/opt/homebrew/bin/kiro-cli']),
+  ]) {
     const found = check(candidate, 'candidate');
     if (found) return found;
   }
   return { tried };
+}
+
+/** kiro-cli starts a Node-based agent server as a child; on Windows `kill()` alone would leave that child running. */
+async function killTree(proc: ChildProcess): Promise<void> {
+  if (proc.pid === undefined) return;
+  if (process.platform === 'win32') await run('taskkill', ['/pid', String(proc.pid), '/T', '/F'], 10_000);
+  else proc.kill();
 }
 
 function kiroLogCandidates(): string[] {
@@ -391,7 +393,7 @@ interface Decision {
   summary: Json;
 }
 
-function decidePermission(params: Json, workDir: string, mode: Options['approve']): Decision {
+function decidePermission(params: Json, workDir: string, mode: Options['approve'], review: Options['review']): Decision {
   const options = arr(params.options).map(rec);
   const meta = rec(rec(params._meta).kiro);
   const consent = rec(meta.consent);
@@ -408,7 +410,7 @@ function decidePermission(params: Json, workDir: string, mode: Options['approve'
   const knownSafeKind = type === 'turn_approval' || capability === 'fs_write' || capability === 'fs_read';
   const allow = mode === 'safe' && knownSafeKind && paths.length > 0 && paths.every((p) => isInside(workDir, p));
 
-  const wanted = allow ? 'allow_once' : 'reject_once';
+  const wanted = allow && !(type === 'turn_approval' && review === 'reject') ? 'allow_once' : 'reject_once';
   const option = options.find((o) => o.kind === wanted);
   const optionId = str(option?.optionId);
   return {
@@ -479,7 +481,7 @@ async function main(): Promise<number> {
     fs.writeFileSync(path.join(outDir, 'summary.json'), JSON.stringify(recorder.safe(summary), null, 2) + '\n');
   };
   process.once('SIGINT', () => {
-    child?.kill();
+    if (child) void killTree(child);
     finding('interrupted by SIGINT');
     finish();
     process.exit(130);
@@ -490,7 +492,7 @@ async function main(): Promise<number> {
 
     // 1. Locate and interrogate the CLI ------------------------------------------------
     const located = await locateCli(opts.cli);
-    summary.cliLookup = recorder.safe({ via: located.via, tried: located.tried });
+    summary.cliLookup = recorder.safe({ via: located.via, found: located.path, triedCount: located.tried.length, lastTried: located.tried.slice(-4) });
     if (!located.path) {
       finding('kiro-cli not found. Pass --cli <path> or set KIRO_CLI_PATH. Install: https://kiro.dev/docs/cli/');
       finish();
@@ -609,14 +611,18 @@ async function main(): Promise<number> {
 
     const app = acp.client({ name: 'kiro-studio-probe' })
       .onRequest(acp.methods.client.session.requestPermission, (ctx) => {
-        const decision = decidePermission(rec(ctx.params), workDir, opts.approve);
+        const decision = decidePermission(rec(ctx.params), workDir, opts.approve, opts.review);
         permissions.push(decision.summary);
         recorder.note('permission decision', decision.summary);
         return { outcome: decision.outcome };
       })
       .onRequest(acp.methods.client.fs.readTextFile, async (ctx) => {
         const file = guard(ctx.params.path);
-        const text = await fs.promises.readFile(file, 'utf8');
+        const text = await fs.promises.readFile(file, 'utf8').catch((e: unknown) => {
+          // ACP reserves -32002 for a missing resource; Kiro reads a file before creating it.
+          if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw acp.RequestError.resourceNotFound(file);
+          throw e;
+        });
         const lines = text.split('\n');
         const from = Math.max((ctx.params.line ?? 1) - 1, 0);
         const content = ctx.params.line || ctx.params.limit ? lines.slice(from, ctx.params.limit ? from + ctx.params.limit : undefined).join('\n') : text;
@@ -685,7 +691,11 @@ async function main(): Promise<number> {
         clientCapabilities,
         clientInfo: { name: 'kiro-studio-probe', title: 'Kiro Studio probe', version: '0.0.0' },
       };
-      const init = await withTimeout(cx.request(acp.methods.agent.initialize, initParams), 30_000, 'initialize');
+      const timings: Record<string, number> = {};
+      summary.timingsMs = timings;
+      const initStarted = Date.now();
+      const init = await withTimeout(cx.request(acp.methods.agent.initialize, initParams), 60_000, 'initialize');
+      timings.initialize = Date.now() - initStarted;
       summary.initialize = { sentCapabilities: clientCapabilities, result: recorder.safe(init) };
       const caps = rec(init.agentCapabilities);
       const kiroCaps = rec(rec(caps._meta).kiro);
@@ -696,7 +706,9 @@ async function main(): Promise<number> {
       if (extensionMethods.length === 0) finding('no _meta.kiro.extensionMethods advertised; this may not be the V3 engine (check "kiro-cli --version" and the acp --help output).');
 
       log('  -> session/new');
-      const created = await withTimeout(cx.request(acp.methods.agent.session.new, { cwd: workDir, mcpServers: [] }), 60_000, 'session/new');
+      const newStarted = Date.now();
+      const created = await withTimeout(cx.request(acp.methods.agent.session.new, { cwd: workDir, mcpServers: [] }), 120_000, 'session/new');
+      timings.sessionNew = Date.now() - newStarted;
       sessionId = created.sessionId;
       if (Array.isArray(created.configOptions)) configOptions = created.configOptions;
       summary.sessionNew = recorder.safe(created);
@@ -794,9 +806,15 @@ async function main(): Promise<number> {
 
     // 6. Shut down ------------------------------------------------------------------------
     proc.stdin.end();
-    await Promise.race([exitPromise, sleep(5000)]);
-    if (!exited) { finding('process did not exit within 5 s after stdin closed; killing it'); proc.kill(); await Promise.race([exitPromise, sleep(2000)]); }
-    summary.process = { exit: exited ?? null };
+    const stdinClosedAt = recorder.elapsed();
+    await Promise.race([exitPromise, sleep(opts.exitWaitSec * 1000)]);
+    const exitedOnStdinClose = exited !== undefined;
+    if (!exited) {
+      finding(`process did not exit within ${opts.exitWaitSec} s after stdin closed; killing the process tree`);
+      await killTree(proc);
+      await Promise.race([exitPromise, sleep(3000)]);
+    }
+    summary.process = { exitedOnStdinClose, stdinClosedAtMs: stdinClosedAt, exit: exited ?? null };
 
     // 7. What actually happened on disk and through the client capabilities -----------------
     summary.workDirContents = recorder.safe(fs.readdirSync(workDir).map((name) => {
@@ -825,7 +843,7 @@ async function main(): Promise<number> {
     exitCode = 1;
     finding(`probe failed: ${errorMessage(e)}`);
     summary.fatal = describeError(e);
-    child?.kill();
+    if (child) await killTree(child);
   } finally {
     if (summary.process === undefined) {
       await sleep(300); // give a crashed child a moment to report its exit status
