@@ -8,5 +8,5 @@ export default defineConfig({
   version,
   workspaceFolder: './test/integration/workspace',
   mocha: { ui: 'tdd', timeout: 60_000 },
-  launchArgs: ['--disable-extensions'],
+  launchArgs: ['--disable-extensions', '--disable-workspace-trust'],
 });

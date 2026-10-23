@@ -3,8 +3,8 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0 abgeschlossen, erster Probe-Lauf ausgewertet, deine Entscheidungen vom 2026-10-23 sind eingearbeitet
-(Abschnitt 7). Es fehlen noch die Freigabe für Phase 1 und ein paar kurze Probe-Läufe (Abschnitt 8).**
+**Status: Phase 0 und Phase 1 sind umgesetzt (Phase 1 siehe Abschnitt 9). Phase 1 ist gebaut, getestet und per CI geprüft,
+aber noch nicht gegen deine echte CLI durchgespielt. Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8 und 9).**
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -121,6 +121,8 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
 - **Abnahme:** Tests grün; mit deiner CLI: verbinden, Session anlegen, Prompt senden, Freigabe beantworten,
   Prozess abschießen und wiederaufnehmen. Windows-, macOS- und Linux-Pfade in der CI-Matrix.
 - **Voraussetzung:** Probe-Läufe aus Abschnitt 8 (mindestens `--review reject`, `--autopilot on`, `--exit-wait 30`). Lauf 1 liegt vor.
+  Du warst unterwegs und konntest keine weiteren Läufe machen; Phase 1 wurde deshalb mit dokumentierten Annahmen gebaut
+  (Abschnitt 9) und durch den Fake-Agenten abgesichert.
 
 ### Phase 2 – Chat
 
@@ -210,7 +212,7 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
    `--exit-wait 30 --no-prompt`; Befehle in Abschnitt 8. Ein Lauf mit Prompt kostete bei dir rund 0,1 Credit, `--no-prompt`
    nichts. Schick mir wieder `summary.json` und `wire.ndjson` (vorher durchsehen). Alternativ schaltest du `kiro.dev` und
    `agentclientprotocol.com` in den Umgebungseinstellungen frei, dann lese ich die Doku selbst.
-2. **Freigabe für Phase 1.**
+2. ~~Freigabe für Phase 1.~~ Erteilt (2026-10-23, „Du hast mein Go“).
 3. **Publisher-ID und Name für die Copyright-Zeile.** `package.json` braucht einen `publisher`; für die Apache-Lizenz lege ich
    eine `NOTICE`-Datei mit dem Copyright-Inhaber an, sobald ich den Namen kenne. Soll das Repo öffentlich sein?
 4. **Beispiel-Spec** (E3): erst in Phase 4.
@@ -240,3 +242,50 @@ npm run probe -- --terminal --prompt "Run the command: node --version"
 Die Probe arbeitet in einem frischen Temp-Ordner und erlaubt Freigaben nur einmalig und nur, wenn alle genannten Pfade
 darin liegen (`--approve none` lehnt alles ab). Ergebnis: `summary.json` (Zusammenfassung), `wire.ndjson` (jede Zeile auf
 der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist von Git ausgeschlossen. `npm run validate-wire -- probe-logs/<Lauf>/wire.ndjson` prüft die Nachrichten gegen die Schemas des SDK.
+
+## 9. Phase 1: Stand, Annahmen und gewählte Voreinstellungen
+
+### Was gebaut ist
+
+- Gerüst: Build (esbuild, ein CJS-Bundle mit eingebettetem SDK), strikte TypeScript-Konfiguration, ESLint (mit Regel „nur
+  `src/host` und `src/extension.ts` dürfen `vscode` importieren“), Prettier, Vitest, `@vscode/test-cli`, `vsce`,
+  GitHub-Actions-Matrix, Texte auf Englisch und Deutsch (Manifest und Laufzeit, mit Abdeckungstest).
+- `kiro/cli.ts`: Suche (Einstellung → `KIRO_CLI_PATH` → PATH → Login-Shell → bekannte Orte), `--version`, `acp --help`
+  (V3 vorhanden?), `whoami`, Login im VS-Code-Terminal. Zustände *fehlt / zu alt / nicht angemeldet / Fehler / bereit*.
+  `doctor` wird noch nicht aufgerufen (kein Bedarf bisher).
+- ACP-Schicht: Verbindung mit Rohlog, Umleitung, Dispatcher mit Puffer für zu frühe Notifications, Session-Store mit
+  Turn-Automat, Freigaben (Regel E1), `fs` mit Pfadwächter, Neustart mit Backoff, Wiederaufnahme per `session/load`,
+  Abbrechen erst nach `turn_start`, Beenden des Prozessbaums.
+- VS-Code-Anbindung: Statusleiste mit Quick-Menü, Kiro-Ansicht (Status, Verbindung, Sessions), Willkommensansichten und
+  Walkthrough, Workspace-Trust-Sperre, Freigabe-Dialog (QuickPick), Debug-Befehle (neue Session, Prompt senden, abbrechen),
+  Befehle zum Prüfen, Neustarten, Anmelden, CLI-Pfad setzen, Autonomie umschalten, Logs zeigen.
+- Tests: Unit-Tests gegen den Fake-Agenten und gegen eine echte Fake-CLI, Integrationstests in VS Code (laufen in der CI).
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A1 | „Reject changes“ am Turn-Ende ist eine normale Antwort mit der Option `reject_once`; Kiro stellt danach nicht selbständig Dateien wieder her. | Die Extension zeigt weiter genau die angebotenen Optionen. Eine mögliche Wiederherstellung durch Kiro fiele uns erst im Lauf `--review reject` auf. Revert über das Schatten-Repo kommt in Phase 2. |
+| A2 | Im Autopilot sind nur Rückfragen mit `askType: "implicit"` automatisch zu erlauben. | Andere Werte werden dir gezeigt, nicht automatisch erlaubt (sicherer Standard). Du kannst die Auslegung E1 erweitern lassen. |
+| A3 | Die CLI beendet sich nach geschlossenem stdin nicht zuverlässig. | Nach 5 s Gnadenfrist wird der Prozessbaum beendet. Beendet sie sich doch, passiert nichts weiter. |
+| A4 | Abgemeldet bedeutet: `whoami` endet mit Fehler oder liefert kein JSON in der ersten Zeile. | Im schlimmsten Fall steht „bereit“ oder „nicht angemeldet“ im falschen Zustand; die Statusanzeige und „Einrichtung prüfen“ zeigen den Fehler dann beim ersten Verbinden. |
+| A5 | `terminal` bleibt abgeschaltet; Hooks laufen nur mit Opt-in. Der Hook-Verkehr nach dem Opt-in ist nicht beobachtet. | Hook-Nachrichten werden ignoriert, solange kein Code sie auswertet (Phase 3). |
+| A6 | Der Host-Code (Statusleiste, Befehle, Dialoge) ist nur typgeprüft und durch die Integrationstests in der CI abgedeckt, nicht von mir in einem echten VS Code gesehen. | Darstellungsfehler sind möglich, siehe unten „Abnahme bei dir“. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- `kiroStudio.autonomy`: **supervised** (nicht Autopilot). Neue Sessions fragen also nach.
+- `kiroStudio.autoAllowInAutopilot`: **an**, wirkt aber nur im Autopilot und nur für `allow_once` (Entscheidung E1). Die Einstellung gilt
+  nur auf Anwendungsebene, ein Repository kann sie nicht per `.vscode/settings.json` einschalten.
+- `kiroStudio.hooks.enabled`: **aus** (Entscheidung E4), ebenfalls nur auf Anwendungsebene.
+- `kiroStudio.cliPath`: nur auf Maschinenebene, aus demselben Grund.
+- `kiroStudio.logging.level`: `messages` (Protokoll zeigt Nachrichten in Kurzform, `verbose` zeigt alles; Tokens, E-Mail und Home-Pfad sind immer geschwärzt).
+- Der Agent startet erst bei der ersten Verwendung, nicht beim Start von VS Code.
+
+### Abnahme bei dir (sobald du wieder am Rechner bist)
+
+1. `git pull`, `npm ci`, `npm run build`, F5 („Run Extension“). In der Statusleiste sollte *Kiro* mit Häkchen stehen.
+2. „Kiro Studio: Debug: New Session“, danach „Debug: Send Prompt“; die Antwort erscheint im Ausgabekanal „Kiro Studio: Chat (debug)“.
+3. Eine Freigabe beantworten, VS Code schließen und prüfen, dass kein `kiro-cli`-Prozess übrig bleibt.
+4. Optional die Probe-Läufe `--review reject`, `--autopilot on`, `--exit-wait 30 --no-prompt` aus Abschnitt 8.
+

@@ -29,7 +29,7 @@ export class DebugChat implements vscode.Disposable {
       this.out.show(true);
       return session;
     } catch (error) {
-      await this.fail(error);
+      this.fail(error);
       return undefined;
     }
   }
@@ -59,7 +59,7 @@ export class DebugChat implements vscode.Disposable {
         },
       );
     } catch (error) {
-      await this.fail(error);
+      this.fail(error);
     }
   }
 
@@ -69,7 +69,7 @@ export class DebugChat implements vscode.Disposable {
     try {
       await this.host.agent.cancel(session.id);
     } catch (error) {
-      await this.fail(error);
+      this.fail(error);
     }
   }
 
@@ -81,8 +81,8 @@ export class DebugChat implements vscode.Disposable {
     session.changes.on(() => printer.sync(session));
   }
 
-  private async fail(error: unknown): Promise<void> {
-    await vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
+  private fail(error: unknown): void {
+    void vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
   }
 
   dispose(): void {

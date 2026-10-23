@@ -17,5 +17,6 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "test", "vitest.config.mts", "esbuild.mjs"]
+  "include": ["src", "test", "vitest.config.mts", "esbuild.mjs"],
+  "exclude": ["test/integration"]
 }

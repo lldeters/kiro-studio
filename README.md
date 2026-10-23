@@ -8,13 +8,35 @@ Agent Client Protocol (ACP).
 
 ## Status
 
-**Phase 0 (exploration and planning). There is no extension to install yet.** The repository currently holds
-the research and the tooling needed to learn how the Kiro CLI really behaves:
+**Phase 1 (foundation) is done. There is no chat yet**, so this is not useful for daily work. What exists:
 
-- [docs/PLAN.md](docs/PLAN.md): architecture decisions, phases, risks, open questions
+- Finds the Kiro CLI, checks that it is new enough (V3 engine) and that you are signed in, and shows the result in
+  the status bar, in the Kiro Studio view and in a getting-started walkthrough.
+- Starts `kiro-cli acp` on demand, keeps the connection alive (restart with back-off, sessions are resumed) and
+  ends the whole process tree on exit.
+- Answers Kiro's file requests through the editor (unsaved changes win) and asks you for every permission request.
+  Autopilot can answer routine write requests for you (`kiroStudio.autoAllowInAutopilot`); see
+  [docs/PLAN.md](docs/PLAN.md), decision E1.
+- Debug commands to start a session and send a prompt; the answer appears in the "Kiro Studio: Chat (debug)" output.
+
+Next: the chat view (phase 2), the Kiro panel (3), specs (4), polish (5).
+
+- [docs/PLAN.md](docs/PLAN.md): architecture decisions, phases, risks, open questions (German)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the pieces fit together
 - [docs/protocol-notes.md](docs/protocol-notes.md): what `kiro-cli acp` does on the wire, with the evidence for each statement
 - [`scripts/probe-acp.ts`](scripts/probe-acp.ts): starts the ACP server in a throw-away folder and records every message
+
+## Development
+
+Requires Node 22 (the packaging tool needs it) and, to try the extension, a signed-in Kiro CLI.
+
+```bash
+npm ci
+npm run build              # bundle to dist/extension.js; press F5 ("Run Extension") to try it
+npm run typecheck && npm run lint && npm test
+npm run test:integration   # downloads VS Code; the CI runs it on Linux, macOS and Windows
+npm run package            # dist/kiro-studio.vsix
+```
 
 ## Running the probe
 
@@ -35,7 +57,7 @@ checks which recorded messages the ACP SDK's own schemas would reject.
 
 Apache License 2.0, see [LICENSE](LICENSE).
 
-## Requirements and limits (planned)
+## Requirements and limits
 
 - Kiro CLI with the V3 engine (`kiro-cli update` if yours is older). The headless mode that needs `KIRO_API_KEY`
   is deliberately not used.

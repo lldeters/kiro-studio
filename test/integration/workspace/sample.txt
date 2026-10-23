@@ -1,0 +1,1 @@
+A placeholder file so that the test workspace folder exists in a fresh checkout.

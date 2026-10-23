@@ -12,6 +12,8 @@ import { StatusView } from './host/statusView';
 export interface KiroStudioApi {
   readonly uiState: UiState;
   readonly agentPhase: string;
+  /** Sessions the agent currently knows (including lost ones that are being resumed). */
+  readonly sessionCount: number;
   /** Resolves when the first check of the Kiro CLI is done. */
   readonly firstCheck: Promise<void>;
 }
@@ -65,6 +67,9 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     },
     get agentPhase() {
       return agentHost.agent?.state.phase ?? 'stopped';
+    },
+    get sessionCount() {
+      return agentHost.agent?.store.all().length ?? 0;
     },
     firstCheck,
   };

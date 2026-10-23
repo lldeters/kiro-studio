@@ -30,7 +30,7 @@ export function registerCommands(deps: CommandDeps): void {
         try {
           await body();
         } catch (error) {
-          await vscode.window.showErrorMessage(t('Kiro Studio: {0}', describeError(error)));
+          void vscode.window.showErrorMessage(t('Kiro Studio: {0}', describeError(error)));
         }
       }),
     );
@@ -72,10 +72,10 @@ export function registerCommands(deps: CommandDeps): void {
     await setup.check();
   });
 
-  command('kiroStudio.login', async () => {
+  command('kiroStudio.login', () => {
     const cli = setup.cliPath;
     if (cli === undefined) {
-      await vscode.window.showWarningMessage(t('Set up the Kiro CLI first.'));
+      void vscode.window.showWarningMessage(t('Set up the Kiro CLI first.'));
       return;
     }
     const terminal = vscode.window.createTerminal({ name: t('Kiro: sign in'), ...loginInvocation(cli) });
@@ -127,6 +127,6 @@ async function openFile(file: string): Promise<void> {
   try {
     await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
   } catch {
-    await vscode.window.showInformationMessage(vscode.l10n.t('There is no log at {0} yet.', file));
+    void vscode.window.showInformationMessage(vscode.l10n.t('There is no log at {0} yet.', file));
   }
 }

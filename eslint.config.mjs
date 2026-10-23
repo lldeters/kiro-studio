@@ -42,9 +42,9 @@ export default tseslint.config(
     rules: { 'no-restricted-imports': 'off' },
   },
   {
-    files: ['**/*.mjs', '**/*.mts', '**/*.config.ts'],
+    files: ['**/*.mjs', '**/*.cjs', '**/*.mts', '**/*.config.ts'],
     ...tseslint.configs.disableTypeChecked,
-    languageOptions: { globals: globals.node },
+    languageOptions: { ...tseslint.configs.disableTypeChecked.languageOptions, globals: globals.node },
   },
   prettier,
 );

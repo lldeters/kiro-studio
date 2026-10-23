@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "types": ["node", "mocha"],
+    "noEmit": false,
+    "outDir": "../../out",
+    "rootDir": "../..",
+    "isolatedModules": false,
+    "sourceMap": true
+  },
+  "include": ["./**/*.ts"],
+  "exclude": []
+}
