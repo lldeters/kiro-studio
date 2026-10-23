@@ -43,6 +43,7 @@ export function Transcript({ session }: { session: SessionView }) {
               item={item}
               tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)}
               streaming={busy && item.id === lastId}
+              sessionId={session.id}
             />
           </div>
         )}
@@ -56,10 +57,12 @@ const Item = memo(function Item({
   item,
   tool,
   streaming,
+  sessionId,
 }: {
   item: ItemView;
   tool: ToolView | undefined;
   streaming: boolean;
+  sessionId: string;
 }) {
   const t = useT();
   switch (item.kind) {
@@ -98,6 +101,6 @@ const Item = memo(function Item({
     case 'notice':
       return <div className={`notice ${item.level ?? 'info'}`}>{item.text}</div>;
     case 'tool':
-      return tool ? <ToolCard tool={tool} /> : null;
+      return tool ? <ToolCard tool={tool} sessionId={sessionId} /> : null;
   }
 });

@@ -197,6 +197,8 @@ export type WebviewMessage =
   | { type: 'openFile'; path: string; line?: number }
   /** Only `http`, `https` and `mailto` links are opened. */
   | { type: 'openLink'; url: string }
+  /** `index` counts the diffs of the tool call (see `ToolView.content`). */
+  | { type: 'openDiff'; sessionId: string; toolCallId: string; index: number }
   | { type: 'copy'; text: string }
   | { type: 'compact'; sessionId: string }
   | { type: 'command'; command: WebviewCommand };
@@ -293,6 +295,13 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'openLink': {
       const url = str('url');
       return url === undefined ? undefined : { type: 'openLink', url };
+    }
+    case 'openDiff': {
+      const sessionId = str('sessionId');
+      const toolCallId = str('toolCallId');
+      if (sessionId === undefined || toolCallId === undefined) return undefined;
+      if (typeof raw.index !== 'number' || !Number.isInteger(raw.index) || raw.index < 0) return undefined;
+      return { type: 'openDiff', sessionId, toolCallId, index: raw.index };
     }
     case 'compact': {
       const sessionId = str('sessionId');

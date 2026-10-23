@@ -65,6 +65,33 @@ describe('approval dock', () => {
     expect(outbox).toEqual([{ type: 'answer', sessionId: 's1', approvalId: 7, kind }]);
   });
 
+  it('shows the change a write is about and opens it as a diff', () => {
+    const tool = {
+      toolCallId: 'tc1',
+      rev: 1,
+      title: 'Write File',
+      state: 'waiting' as const,
+      locations: [],
+      content: [
+        { type: 'diff' as const, path: '/ws/src/parser.ts', oldText: 'a\n', newText: 'b\n', added: 1, removed: 1 },
+      ],
+    };
+    const { container } = render(
+      <ApprovalDock session={session({ approvals: [{ ...toolApproval, toolCallId: 'tc1' }], tools: [tool] })} />,
+    );
+    expect(container.querySelectorAll('.approval-diff .diff-line.add')).toHaveLength(1);
+    expect(container.querySelectorAll('.approval-diff .diff-line.remove')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Open diff' }));
+    expect(outbox).toEqual([{ type: 'openDiff', sessionId: 's1', toolCallId: 'tc1', index: 0 }]);
+  });
+
+  it('shows no preview when the tool has no change to show', () => {
+    const { container } = render(
+      <ApprovalDock session={session({ approvals: [{ ...toolApproval, toolCallId: 'tc1' }] })} />,
+    );
+    expect(container.querySelector('.approval-diff')).toBeNull();
+  });
+
   it('warns that a persistent choice becomes a rule', () => {
     render(<ApprovalDock session={session({ approvals: [toolApproval] })} />);
     expect(screen.getByRole('button', { name: 'Always allow' }).title).toBe(

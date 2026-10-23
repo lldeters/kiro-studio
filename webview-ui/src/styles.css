@@ -740,3 +740,51 @@ details.tool > summary::-webkit-details-marker {
   white-space: nowrap;
   opacity: 0.8;
 }
+
+/* Diff headers and the change preview in a question */
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+}
+.diff-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+.approval-diff {
+  margin-top: 6px;
+  border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+  border-radius: 3px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+/* Diff headers and the change preview in a question */
+.diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px;
+  font-size: 0.9em;
+}
+.diff-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+.approval-diff {
+  margin-top: 6px;
+  border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+  border-radius: 3px;
+  max-height: 220px;
+  overflow: auto;
+}

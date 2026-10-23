@@ -18,10 +18,11 @@ import {
   type WebviewMessage,
 } from '../shared/chatProtocol';
 import { UI_MESSAGES } from '../shared/uiMessages';
-import { PatchTracker, tabView } from '../view/chatPresenter';
+import { PatchTracker, tabView, toolView } from '../view/chatPresenter';
 import { resolveAttachments, type SkipReason } from '../view/promptContext';
 import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
+import type { DiffProvider } from './diffProvider';
 import type { SetupController } from './setup';
 import type { Settings } from './settings';
 
@@ -53,6 +54,7 @@ export class ChatController implements vscode.Disposable {
     private readonly host: AgentHost,
     private readonly setup: SetupController,
     private readonly settings: Settings,
+    private readonly diffs: DiffProvider,
   ) {
     this.subscriptions.push(
       host.onDidChange(() => this.schedule()),
@@ -222,6 +224,9 @@ export class ChatController implements vscode.Disposable {
         case 'compact':
           await this.compact(message.sessionId);
           return;
+        case 'openDiff':
+          await this.openDiff(message.sessionId, message.toolCallId, message.index);
+          return;
         case 'copy':
           await vscode.env.clipboard.writeText(message.text);
           return;
@@ -232,6 +237,14 @@ export class ChatController implements vscode.Disposable {
     } catch (error) {
       void vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
     }
+  }
+
+  /** Opens the diff of a tool call in the editor. The content comes from the session, not from the webview. */
+  private async openDiff(sessionId: string, toolCallId: string, index: number): Promise<void> {
+    const tool = this.host.agent?.store.get(sessionId)?.tools.get(toolCallId);
+    if (!tool) return;
+    const diff = toolView(tool, false).content.filter((c) => c.type === 'diff')[index];
+    if (diff?.type === 'diff') await this.diffs.open(diff.path, diff.oldText, diff.newText);
   }
 
   /** Asks Kiro to summarise the conversation to free context. Only offered when the CLI advertises the method. */

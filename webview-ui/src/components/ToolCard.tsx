@@ -34,7 +34,7 @@ function StateIcon({ state }: { state: ToolView['state'] }) {
 }
 
 /** One tool call: a line with icon, title, file and change counts; expands to input, output and diffs. */
-export function ToolCard({ tool }: { tool: ToolView }) {
+export function ToolCard({ tool, sessionId }: { tool: ToolView; sessionId: string }) {
   const t = useT();
   const target = tool.locations[0];
   const hasBody = tool.input !== undefined || tool.output !== undefined || tool.content.length > 0;
@@ -76,8 +76,30 @@ export function ToolCard({ tool }: { tool: ToolView }) {
       <summary className="tool-summary">{summary}</summary>
       <div className="tool-body">
         {tool.content.map((content, index) => {
-          if (content.type === 'diff')
-            return <DiffView key={index} oldText={content.oldText} newText={content.newText} />;
+          if (content.type === 'diff') {
+            const diffIndex = tool.content.slice(0, index).filter((c) => c.type === 'diff').length;
+            return (
+              <div key={index}>
+                <div className="diff-header">
+                  <span className="diff-file" title={content.path}>
+                    {baseName(content.path)}
+                  </span>
+                  <span className="stat">
+                    <span className="added">+{content.added}</span> <span className="removed">−{content.removed}</span>
+                  </span>
+                  <button
+                    className="icon-button"
+                    title={t('Open diff')}
+                    aria-label={t('Open diff')}
+                    onClick={() => post({ type: 'openDiff', sessionId, toolCallId: tool.toolCallId, index: diffIndex })}
+                  >
+                    <span className="codicon codicon-diff" aria-hidden="true" />
+                  </button>
+                </div>
+                <DiffView oldText={content.oldText} newText={content.newText} />
+              </div>
+            );
+          }
           if (content.type === 'text') return <pre key={index}>{content.text}</pre>;
           return null;
         })}

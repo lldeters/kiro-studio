@@ -115,7 +115,7 @@ const tool = (extra: Partial<ToolView> = {}): ToolView => ({
 
 describe('tool card', () => {
   it('shows title, file name, counts and state, and opens the file', () => {
-    render(<ToolCard tool={tool({ added: 2, removed: 1 })} />);
+    render(<ToolCard tool={tool({ added: 2, removed: 1 })} sessionId="s1" />);
     expect(screen.getByText('Write File')).toBeTruthy();
     expect(screen.getByText('+2')).toBeTruthy();
     expect(screen.getByText('−1')).toBeTruthy();
@@ -129,7 +129,7 @@ describe('tool card', () => {
     ['waiting', 'Waiting for your answer'],
     ['failed', 'Failed'],
   ] as const)('marks a %s tool', (state, label) => {
-    render(<ToolCard tool={tool({ state })} />);
+    render(<ToolCard tool={tool({ state })} sessionId="s1" />);
     expect(screen.getByRole('img', { name: label })).toBeTruthy();
   });
 
@@ -141,6 +141,7 @@ describe('tool card', () => {
           output: 'ok',
           content: [{ type: 'diff', path: '/ws/a.ts', oldText: 'a\nb\n', newText: 'a\nc\n', added: 1, removed: 1 }],
         })}
+        sessionId="s1"
       />,
     );
     expect(container.querySelector('details')).not.toBeNull();
@@ -151,8 +152,28 @@ describe('tool card', () => {
     expect(container.querySelector('.diff-line.remove .diff-text')?.textContent).toBe('b');
   });
 
+  it('opens the diff of a file in the editor, naming the diff by its position among the diffs', () => {
+    render(
+      <ToolCard
+        tool={tool({
+          content: [
+            { type: 'text', text: 'wrote two files' },
+            { type: 'diff', path: '/ws/a.ts', oldText: 'a\n', newText: 'b\n', added: 1, removed: 1 },
+            { type: 'diff', path: '/ws/b.ts', oldText: null, newText: 'c\n', added: 1, removed: 0 },
+          ],
+        })}
+        sessionId="s1"
+      />,
+    );
+    const buttons = screen.getAllByRole('button', { name: 'Open diff' });
+    fireEvent.click(buttons[1]!);
+    expect(outbox).toEqual([{ type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 1 }]);
+    expect(screen.getByText('a.ts')).toBeTruthy();
+    expect(screen.getByText('b.ts')).toBeTruthy();
+  });
+
   it('is a plain line when there is nothing to expand', () => {
-    const { container } = render(<ToolCard tool={tool()} />);
+    const { container } = render(<ToolCard tool={tool()} sessionId="s1" />);
     expect(container.querySelector('details')).toBeNull();
   });
 
@@ -162,6 +183,7 @@ describe('tool card', () => {
         tool={tool({
           content: [{ type: 'diff', path: '/ws/n.txt', oldText: null, newText: 'x\ny\n', added: 2, removed: 0 }],
         })}
+        sessionId="s1"
       />,
     );
     expect(container.querySelectorAll('.diff-line.add')).toHaveLength(2);

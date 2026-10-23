@@ -1,5 +1,6 @@
 import type { ApprovalKind, ApprovalView, SessionView } from '../../../src/shared/chatProtocol';
 import { useT, type T } from '../i18n';
+import { DiffView } from './DiffView';
 import { post } from '../vscode';
 
 const ORDER: ApprovalKind[] = ['allow_once', 'allow_always', 'reject_once', 'reject_always'];
@@ -43,6 +44,7 @@ export function ApprovalDock({ session }: { session: SessionView }) {
               {approval.resource}
             </div>
           )}
+          {approval.type === 'tool_approval' && <ChangePreview session={session} approval={approval} />}
           {approval.files.length > 0 && (
             <ul className="approval-files">
               {approval.files.map((file) => (
@@ -77,6 +79,35 @@ export function ApprovalDock({ session }: { session: SessionView }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** The change a write permission is about, so that the user decides with the diff in front of them. */
+function ChangePreview({ session, approval }: { session: SessionView; approval: ApprovalView }) {
+  const t = useT();
+  const tool = session.tools.find((candidate) => candidate.toolCallId === approval.toolCallId);
+  const diff = tool?.content.find((content) => content.type === 'diff');
+  if (tool === undefined || diff?.type !== 'diff') return null;
+  return (
+    <div className="approval-diff">
+      <div className="diff-header">
+        <span className="diff-file" title={diff.path}>
+          {baseName(diff.path)}
+        </span>
+        <span className="stat">
+          <span className="added">+{diff.added}</span> <span className="removed">−{diff.removed}</span>
+        </span>
+        <button
+          className="icon-button"
+          title={t('Open diff')}
+          aria-label={t('Open diff')}
+          onClick={() => post({ type: 'openDiff', sessionId: session.id, toolCallId: tool.toolCallId, index: 0 })}
+        >
+          <span className="codicon codicon-diff" aria-hidden="true" />
+        </button>
+      </div>
+      <DiffView oldText={diff.oldText} newText={diff.newText} maxLines={24} />
     </div>
   );
 }

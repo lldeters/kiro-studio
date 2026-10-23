@@ -4,6 +4,7 @@ import { ChatController } from './host/chatController';
 import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
+import { DiffProvider } from './host/diffProvider';
 import { createProtocolChannel } from './host/logger';
 import { SetupController, type UiState } from './host/setup';
 import { Settings } from './host/settings';
@@ -36,7 +37,8 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   });
   host = agentHost;
   const debug = new DebugChat(agentHost);
-  const chat = new ChatController(agentHost, setup, settings);
+  const diffs = new DiffProvider();
+  const chat = new ChatController(agentHost, setup, settings, diffs);
   agentHost.suppressApprovalPrompt = () => chat.visible;
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
@@ -46,6 +48,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     setup,
     debug,
     chat,
+    diffs,
     vscode.window.registerWebviewViewProvider(
       ChatViewProvider.viewType,
       new ChatViewProvider(context.extensionUri, chat),

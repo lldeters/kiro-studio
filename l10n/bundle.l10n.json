@@ -94,6 +94,7 @@
   "Not sent: {0} does not exist.": "Not sent: {0} does not exist.",
   "Not sent: {0} is outside the workspace.": "Not sent: {0} is outside the workspace.",
   "Not started": "Not started",
+  "Open diff": "Open diff",
   "Open the install guide": "Open the install guide",
   "Output": "Output",
   "Plan": "Plan",
@@ -154,6 +155,8 @@
   "active": "active",
   "now: Autopilot": "now: Autopilot",
   "now: Supervised": "now: Supervised",
+  "{0} (changes by Kiro)": "{0} (changes by Kiro)",
+  "{0} (new file, by Kiro)": "{0} (new file, by Kiro)",
   "{0} credits": "{0} credits",
   "… {0} more lines": "… {0} more lines"
 }

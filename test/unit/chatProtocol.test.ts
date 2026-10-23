@@ -23,6 +23,7 @@ describe('messages from the webview', () => {
       { type: 'copy', text: 'x' },
       { type: 'compact', sessionId: 's1' },
       { type: 'pickContext', kind: 'steering' },
+      { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 0 },
       { type: 'command', command: 'kiroStudio.restart' },
     ];
     for (const message of messages) expect(parseWebviewMessage(message)).toEqual(message);
@@ -53,6 +54,9 @@ describe('messages from the webview', () => {
     { type: 'answer', sessionId: 's1', approvalId: 3, kind: 'allow_forever' },
     { type: 'setConfig', sessionId: 's1', configId: 'model' },
     { type: 'pickContext', kind: 'everything' },
+    { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: -1 },
+    { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 1.5 },
+    { type: 'openDiff', sessionId: 's1', index: 0 },
     { type: 'command', command: 'workbench.action.terminal.new' },
     { type: 'command', command: 'kiroStudio.debug.sendPrompt' },
     { type: 'copy', text: 'x'.repeat(1_000_001) },

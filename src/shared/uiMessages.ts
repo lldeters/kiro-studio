@@ -51,6 +51,7 @@ export const UI_MESSAGES = [
   'Reject changes',
   'Kiro saves this as a rule; it also applies to later sessions.',
   'Kiro finished and asks you to review its changes.',
+  'Open diff',
   // Toolbar
   'Agent',
   'Model',

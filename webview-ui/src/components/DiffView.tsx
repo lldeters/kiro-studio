@@ -10,7 +10,15 @@ interface Row {
 }
 
 /** A unified diff with three lines of context around each change. */
-export function DiffView({ oldText, newText }: { oldText: string | null; newText: string }) {
+export function DiffView({
+  oldText,
+  newText,
+  maxLines = MAX_LINES,
+}: {
+  oldText: string | null;
+  newText: string;
+  maxLines?: number;
+}) {
   const t = useT();
   const { rows, hidden } = useMemo(() => {
     const patch = structuredPatch('a', 'b', oldText ?? '', newText, '', '', { context: 3 });
@@ -23,8 +31,8 @@ export function DiffView({ oldText, newText }: { oldText: string | null; newText
         all.push({ kind: sign === '+' ? 'add' : sign === '-' ? 'remove' : 'context', text: line.slice(1) });
       }
     }
-    return { rows: all.slice(0, MAX_LINES), hidden: Math.max(0, all.length - MAX_LINES) };
-  }, [oldText, newText]);
+    return { rows: all.slice(0, maxLines), hidden: Math.max(0, all.length - maxLines) };
+  }, [oldText, newText, maxLines]);
 
   return (
     <div className="diff" role="group">
