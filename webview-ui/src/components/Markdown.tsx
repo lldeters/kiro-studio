@@ -1,6 +1,7 @@
-import { isValidElement, memo, type ReactNode } from 'react';
+import { isValidElement, memo, useMemo, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { splitBlocks } from '../markdownBlocks';
 import { post } from '../vscode';
 import { CodeBlock } from './CodeBlock';
 
@@ -87,12 +88,25 @@ function components(streaming: boolean): Components {
   };
 }
 
+/** Below this length one block is as cheap as several. */
+const SPLIT_FROM_CHARS = 800;
+
+/** One block of text. It re-renders only when its own text changes, which is what makes a long streaming answer cheap. */
+const Block = memo(function Block({ text, streaming }: { text: string; streaming: boolean }) {
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components(streaming)}>
+      {text}
+    </ReactMarkdown>
+  );
+});
+
 export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+  const blocks = useMemo(() => (text.length < SPLIT_FROM_CHARS ? [text] : splitBlocks(text)), [text]);
   return (
     <div className="markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components(streaming)}>
-        {text}
-      </ReactMarkdown>
+      {blocks.map((block, index) => (
+        <Block key={index} text={block} streaming={streaming && index === blocks.length - 1} />
+      ))}
     </div>
   );
 });

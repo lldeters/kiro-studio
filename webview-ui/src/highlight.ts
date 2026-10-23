@@ -106,15 +106,55 @@ function load(): Promise<HighlighterCore> {
   return highlighter;
 }
 
+/**
+ * Tokens already computed, newest last. A list that scrolls mounts its code blocks again and again, and tokenising is
+ * the most expensive thing a row does, so a block that was highlighted once is highlighted at once the next time.
+ */
+const cache = new Map<string, ThemedToken[][]>();
+let cachedChars = 0;
+const MAX_CACHED_CHARS = 1_500_000;
+
+const cacheKey = (code: string, lang: string): string => `${currentTheme()}\0${lang}\0${code}`;
+
+/** The tokens of a block that was highlighted before, without waiting. */
+export function cachedHighlight(code: string, language: string | undefined): ThemedToken[][] | undefined {
+  const lang = resolveLanguage(language);
+  if (lang === undefined) return undefined;
+  const key = cacheKey(code, lang);
+  const hit = cache.get(key);
+  if (hit) {
+    // Used again: it goes to the end, so the oldest ones are the first to go.
+    cache.delete(key);
+    cache.set(key, hit);
+  }
+  return hit;
+}
+
+function remember(code: string, lang: string, tokens: ThemedToken[][]): void {
+  const key = cacheKey(code, lang);
+  if (code.length > MAX_CACHED_CHARS / 4 || cache.has(key)) return;
+  cache.set(key, tokens);
+  cachedChars += code.length;
+  for (const [oldest] of cache) {
+    if (cachedChars <= MAX_CACHED_CHARS) break;
+    cache.delete(oldest);
+    cachedChars -= oldest.slice(oldest.indexOf('\0', oldest.indexOf('\0') + 1) + 1).length;
+  }
+}
+
 /** Highlighted lines of tokens, or undefined when the language is not supported or highlighting failed. */
 export async function highlight(code: string, language: string | undefined): Promise<ThemedToken[][] | undefined> {
   const lang = resolveLanguage(language);
   const loader = lang === undefined ? undefined : GRAMMARS[lang];
   if (lang === undefined || loader === undefined) return undefined;
+  const known = cachedHighlight(code, lang);
+  if (known) return known;
   try {
     const instance = await load();
     if (!instance.getLoadedLanguages().includes(lang)) await instance.loadLanguage((await loader()).default as never);
-    return instance.codeToTokensBase(code, { lang, theme: currentTheme() });
+    const tokens = instance.codeToTokensBase(code, { lang, theme: currentTheme() });
+    remember(code, lang, tokens);
+    return tokens;
   } catch {
     return undefined;
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ThemedToken } from 'shiki/core';
-import { highlight, resolveLanguage } from '../highlight';
+import { cachedHighlight, highlight, resolveLanguage } from '../highlight';
 import { useT } from '../i18n';
 import { post } from '../vscode';
 import { MermaidBlock } from './MermaidBlock';
@@ -33,9 +33,10 @@ export function Tokens({ lines }: { lines: ThemedToken[][] }) {
 
 export function CodeBlock({ code, language, streaming }: { code: string; language?: string; streaming?: boolean }) {
   const t = useT();
-  const [lines, setLines] = useState<ThemedToken[][]>();
-  const [copied, setCopied] = useState(false);
   const text = code.replace(/\n$/, '');
+  // A block seen before is shown highlighted from the first paint, so that scrolling does not flicker.
+  const [lines, setLines] = useState<ThemedToken[][] | undefined>(() => cachedHighlight(text, language));
+  const [copied, setCopied] = useState(false);
   const isMermaid = language?.trim().toLowerCase() === 'mermaid';
 
   useEffect(() => {

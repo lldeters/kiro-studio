@@ -6,6 +6,7 @@ import type { SpecHostMessage } from '../src/shared/specProtocol';
 import { PatchTracker, tabView } from '../src/view/chatPresenter';
 import { specView } from '../src/view/specPresenter';
 import { configOptions, u, update } from '../test/support/kiro';
+import { longSession } from '../test/support/longSession';
 
 function feed(session: Session, ...updates: Record<string, unknown>[]): void {
   for (const body of updates) {
@@ -286,7 +287,37 @@ function specScenario(): Step[] {
   return [{ type: 'init', strings: {}, spec: specView({ name: 'password-reset', documents }, true) }];
 }
 
+/** The length of the long sessions in turns; `PREVIEW_TURNS=200 npm run preview -- --scenario long --measure`. */
+const TURNS = Number(process.env['PREVIEW_TURNS'] ?? 1000);
+
+/** A long session, sent in full, as when the user switches to it. */
+function longScenario(): Step[] {
+  const session = longSession(TURNS);
+  return [init([session]), { type: 'session', session: new PatchTracker('posix').full(session) }];
+}
+
+/** The same session, then a new answer that streams in 150 small pieces, 30 ms apart. */
+function longStreamingScenario(): Step[] {
+  const session = longSession(TURNS);
+  const tracker = new PatchTracker('posix');
+  const steps: Step[] = [init([session]), { type: 'session', session: tracker.full(session) }, 300];
+  session.beginTurn('One more question');
+  for (let i = 0; i < 150; i++) {
+    // A paragraph every fourth piece, a code block every twentieth: the shape of a real answer.
+    const text =
+      i % 20 === 19
+        ? '\n\n```ts\nconst answer = compute(input);\nreturn answer.value;\n```\n\n'
+        : `Piece ${i} of the answer, with some \`code\` and **emphasis**.${i % 4 === 3 ? '\n\n' : ' '}`;
+    feed(session, u.agent(text, { messageId: 'live' }));
+    const change = tracker.diff(session);
+    if (change && 'sessionId' in change) steps.push({ type: 'patch', patch: change }, 30);
+  }
+  return steps;
+}
+
 export const SCENARIOS: Record<string, Step[]> = {
+  long: longScenario(),
+  'long-streaming': longStreamingScenario(),
   spec: specScenario(),
   conversation: conversation(),
   streaming: streaming(),

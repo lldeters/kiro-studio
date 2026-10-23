@@ -3,6 +3,11 @@ import { useT } from '../i18n';
 
 type State = { kind: 'code' } | { kind: 'svg'; svg: string } | { kind: 'error'; message: string };
 
+/** Diagrams drawn so far, by theme and source: a row that scrolls back into view does not draw again. */
+const drawn = new Map<string, string>();
+const MAX_DRAWN = 40;
+const drawnKey = (code: string): string => `${isDark() ? 'dark' : 'light'}\0${code}`;
+
 const isDark = (): boolean =>
   !document.body.classList.contains('vscode-light') && !document.body.classList.contains('vscode-high-contrast-light');
 
@@ -14,9 +19,13 @@ const isDark = (): boolean =>
 export function MermaidBlock({ code, streaming }: { code: string; streaming: boolean }) {
   const t = useT();
   const id = `mermaid-${useId().replace(/:/g, '')}`;
-  const [state, setState] = useState<State>({ kind: 'code' });
+  const [state, setState] = useState<State>(() => {
+    const svg = drawn.get(drawnKey(code));
+    return svg === undefined ? { kind: 'code' } : { kind: 'svg', svg };
+  });
 
   useEffect(() => {
+    if (drawn.has(drawnKey(code))) return;
     let current = true;
     const timer = setTimeout(
       () => {
@@ -26,6 +35,11 @@ export function MermaidBlock({ code, streaming }: { code: string; streaming: boo
             // `strict` makes Mermaid sanitise the labels; the page has no script permission besides.
             mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: isDark() ? 'dark' : 'default' });
             const { svg } = await mermaid.render(id, code);
+            drawn.set(drawnKey(code), svg);
+            for (const key of drawn.keys()) {
+              if (drawn.size <= MAX_DRAWN) break;
+              drawn.delete(key);
+            }
             if (current) setState({ kind: 'svg', svg });
           } catch (error) {
             if (current) setState({ kind: 'error', message: error instanceof Error ? error.message : String(error) });

@@ -6,12 +6,14 @@
  *   npm run build:webview
  *   npm run preview -- --scenario conversation --out preview.png
  *   npm run preview -- --list
+ *   npm run preview -- --scenario long --measure     render time, DOM size, frame times while scrolling
+ *   npm run preview -- --scenario long-streaming --measure
  */
 import { createServer } from 'node:http';
 import { readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
-import { chromium } from 'playwright-core';
+import { chromium, type CDPSession, type Page } from 'playwright-core';
 import { chatHtml } from '../src/view/chatHtml';
 import { SCENARIOS, THEME_CLASSES, THEMES } from './preview-scenarios';
 
@@ -89,12 +91,40 @@ try {
       problems.push(`console: ${message.text()} (${message.location().url})`);
     }
   });
+  const measure = args.includes('--measure');
+  const cdp = measure ? await page.context().newCDPSession(page) : undefined;
+  await cdp?.send('Performance.enable');
+  const profile = measure && args.includes('--profile');
+  if (profile) {
+    await cdp?.send('Profiler.enable');
+    await cdp?.send('Profiler.setSamplingInterval', { interval: 200 });
+    await cdp?.send('Profiler.start');
+  }
+  if (measure) {
+    // Long tasks (over 50 ms) block the page; collect them from the start.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __longTasks: number[] };
+      w.__longTasks = [];
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) w.__longTasks.push(entry.duration);
+      }).observe({ entryTypes: ['longtask'] });
+    });
+  }
   await page.goto(`http://127.0.0.1:${port}/`);
   // The host sends its state only after the page said it is ready; the spec page loads its code lazily.
   await page.waitForFunction(() => (window as unknown as { __posted: unknown[] }).__posted.length > 0);
+  const metrics = async (): Promise<Record<string, number>> =>
+    Object.fromEntries(((await cdp?.send('Performance.getMetrics'))?.metrics ?? []).map((m) => [m.name, m.value]));
+  const before = await metrics();
+  const started = Date.now();
+  let firstContent = 0;
   for (const step of scenario) {
     if (typeof step === 'number') await page.waitForTimeout(step);
     else await page.evaluate((m) => window.postMessage(m, '*'), step as never);
+    if (measure && firstContent === 0 && typeof step !== 'number' && step.type === 'session') {
+      await page.waitForSelector('.message', { timeout: 60_000 });
+      firstContent = Date.now() - started;
+    }
   }
   await page.waitForTimeout(Number(option('wait', '600')));
   // Show another tab or press a button before the screenshot, for example --click Tasks.
@@ -109,6 +139,8 @@ try {
     await page.keyboard.type(typed);
     await page.waitForTimeout(200);
   }
+  if (measure) await report(page, metrics, before, firstContent);
+  if (profile) await printProfile(cdp);
   await page.screenshot({ path: out });
   const posted = await page.evaluate(() => (window as unknown as { __posted: unknown[] }).__posted);
   console.log(`saved ${out} (${width}x${height}); the page posted ${JSON.stringify(posted)}`);
@@ -119,6 +151,77 @@ try {
 } finally {
   await browser.close();
   server.close();
+}
+
+/** The functions that took the most own time while the scenario ran. */
+async function printProfile(cdp: CDPSession | undefined): Promise<void> {
+  const result = (await cdp?.send('Profiler.stop')) as
+    | {
+        profile: {
+          nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number } }[];
+          samples: number[];
+          timeDeltas: number[];
+        };
+      }
+    | undefined;
+  if (!result) return;
+  const { nodes, samples, timeDeltas } = result.profile;
+  const byId = new Map(nodes.map((n) => [n.id, n.callFrame]));
+  const self = new Map<string, number>();
+  samples.forEach((id, i) => {
+    const frame = byId.get(id);
+    if (!frame) return;
+    const name = `${frame.functionName || '(anonymous)'} ${frame.url.split('/').pop() ?? ''}:${frame.lineNumber}`;
+    self.set(name, (self.get(name) ?? 0) + (timeDeltas[i] ?? 0));
+  });
+  const top = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
+  console.log(top.map(([name, us]) => `${Math.round(us / 1000)} ms  ${name}`).join('\n'));
+}
+
+/** Prints what the page cost: time to the first content, DOM size, scripting time, long tasks, frame times while scrolling. */
+async function report(
+  page: Page,
+  metrics: () => Promise<Record<string, number>>,
+  before: Record<string, number>,
+  firstContent: number,
+): Promise<void> {
+  const after = await metrics();
+  const delta = (name: string): number => Math.round(((after[name] ?? 0) - (before[name] ?? 0)) * 1000);
+  const dom = await page.evaluate(() => document.querySelectorAll('*').length);
+  const frames = await page.evaluate(async () => {
+    const scroller = document.querySelector<HTMLElement>('[data-virtuoso-scroller="true"]');
+    if (!scroller) return undefined;
+    const times: number[] = [];
+    let last = performance.now();
+    for (let i = 0; i < 120; i++) {
+      scroller.scrollTop -= 2500;
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const now = performance.now();
+      times.push(now - last);
+      last = now;
+    }
+    times.sort((a, b) => a - b);
+    return {
+      scrolledFrames: times.length,
+      medianMs: Math.round(times[Math.floor(times.length / 2)] ?? 0),
+      p95Ms: Math.round(times[Math.floor(times.length * 0.95)] ?? 0),
+      maxMs: Math.round(times[times.length - 1] ?? 0),
+    };
+  });
+  const longTasks = await page.evaluate(() => (window as unknown as { __longTasks: number[] }).__longTasks);
+  console.log(
+    JSON.stringify({
+      msToFirstContent: firstContent,
+      domNodes: dom,
+      scriptMs: delta('ScriptDuration'),
+      layoutMs: delta('LayoutDuration'),
+      styleMs: delta('RecalcStyleDuration'),
+      taskMs: delta('TaskDuration'),
+      heapMB: Math.round((after['JSHeapUsedSize'] ?? 0) / 1e6),
+      longTasks: { count: longTasks.length, worstMs: Math.round(Math.max(0, ...longTasks)) },
+      scrolling: frames,
+    }),
+  );
 }
 
 function findChromium(): string {

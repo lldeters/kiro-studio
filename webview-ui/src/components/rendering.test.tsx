@@ -8,7 +8,7 @@ import { outbox } from '../vscode';
 import { Markdown, parseFileReference } from './Markdown';
 import { PlanPanel } from './PlanPanel';
 import { ToolCard } from './ToolCard';
-import { resolveLanguage } from '../highlight';
+import { cachedHighlight, highlight, resolveLanguage } from '../highlight';
 
 beforeEach(() => {
   useChat.setState({ ...initialState });
@@ -214,5 +214,23 @@ describe('plan', () => {
   it('is hidden without steps', () => {
     const { container } = render(<PlanPanel plan={[]} />);
     expect(container.textContent).toBe('');
+  });
+});
+
+describe('highlight cache', () => {
+  it('returns a block at once the second time and keeps different themes apart', async () => {
+    const code = 'const cached = 1;';
+    expect(cachedHighlight(code, 'ts')).toBeUndefined();
+    const first = await highlight(code, 'ts');
+    expect(first).toBeDefined();
+    expect(cachedHighlight(code, 'ts')).toBe(first);
+    expect(await highlight(code, 'typescript')).toBe(first); // an alias of the same language
+    document.body.classList.add('vscode-light');
+    try {
+      expect(cachedHighlight(code, 'ts')).toBeUndefined();
+    } finally {
+      document.body.classList.remove('vscode-light');
+    }
+    expect(cachedHighlight(code, 'not-a-language')).toBeUndefined();
   });
 });
