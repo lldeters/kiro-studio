@@ -34,8 +34,8 @@ export function homePattern(home: string): RegExp | undefined {
 }
 
 export interface Redactor {
-  redactText(text: string): string;
-  redactDeep(value: unknown, key?: string): unknown;
+  redactText: (text: string) => string;
+  redactDeep: (value: unknown, key?: string) => unknown;
 }
 
 export function createRedactor(home: string): Redactor {

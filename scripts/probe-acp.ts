@@ -711,8 +711,9 @@ async function main(): Promise<number> {
     // The SDK would strictly validate every session/update and silently drop the ones it does not know
     // (see docs/protocol-notes.md). So notifications never reach it: they are diverted here, while the
     // SDK keeps handling responses and agent->client requests. `$/` methods stay with the SDK.
+    // The scripts project uses the DOM stream types; Node's differ slightly.
     const rawStream = acp.ndJsonStream(
-      Writable.toWeb(toChild) as unknown as WritableStream<Uint8Array>,
+      Writable.toWeb(toChild),
       Readable.toWeb(proc.stdout) as unknown as ReadableStream<Uint8Array>,
     );
     const stream: acp.Stream = {
@@ -727,7 +728,7 @@ async function main(): Promise<number> {
               return;
             }
             try {
-              onNotification(message as acp.AnyNotification);
+              onNotification(message);
             } catch (e) {
               recorder.note('notification handler failed', describeError(e));
             }

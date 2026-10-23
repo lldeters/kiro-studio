@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
@@ -12,6 +13,7 @@ export default tseslint.config(
       'l10n/**',
       '.vscode-test/**',
       'webview-ui/dist/**',
+      'test/support/*.mjs',
     ],
   },
   js.configs.recommended,
@@ -19,7 +21,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ['*.mjs', '*.config.ts', '*.config.mts'] },
+        projectService: { allowDefaultProject: ['*.mjs', '*.config.ts'] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -42,6 +44,7 @@ export default tseslint.config(
   {
     files: ['**/*.mjs', '**/*.mts', '**/*.config.ts'],
     ...tseslint.configs.disableTypeChecked,
+    languageOptions: { globals: globals.node },
   },
   prettier,
 );
