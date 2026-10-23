@@ -30,11 +30,6 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('hooks.enabled', false);
   }
 
-  /** Where the chat is shown: one editor tab (the default), or a view in the sidebar. */
-  chatLocation(): 'editor' | 'sidebar' {
-    return this.config.get<string>('chatLocation') === 'sidebar' ? 'sidebar' : 'editor';
-  }
-
   specCodeLens(): boolean {
     return this.config.get<boolean>('specs.codeLens', true);
   }

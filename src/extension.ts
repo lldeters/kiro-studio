@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { AgentHost } from './host/agentHost';
 import { ChatController } from './host/chatController';
-import { ChatLocation } from './host/chatLocation';
 import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
@@ -23,8 +22,6 @@ export interface KiroStudioApi {
   readonly sessionCount: number;
   /** True while a chat webview is showing and has told the host that its page is loaded. */
   readonly chatReady: boolean;
-  /** How many chat tabs are open in the editor area (0 or 1). */
-  readonly chatEditorCount: number;
   /** The labels at the top of a Kiro panel view (`sessions`, `specs`, `steering`, `hooks`, `mcp`, `agents`). */
   panelLabels(view: string): Promise<string[]>;
   /** How many turns of the active session left a checkpoint (changed files). */
@@ -67,7 +64,6 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   const debug = new DebugChat(agentHost);
   const diffs = new DiffProvider();
   const chat = new ChatController(agentHost, setup, settings, diffs);
-  const location = new ChatLocation(context.extensionUri, chat, settings);
   const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
   const specs = new SpecsFeature({
     host: agentHost,
@@ -87,14 +83,6 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     diffs,
     panel,
     specs,
-    location,
-    // A chat tab that was open when the window closed comes back after a reload.
-    vscode.window.registerWebviewPanelSerializer(ChatLocation.viewType, {
-      deserializeWebviewPanel: (restored) => {
-        location.adopt(restored);
-        return Promise.resolve();
-      },
-    }),
     vscode.window.registerWebviewViewProvider(
       ChatViewProvider.viewType,
       new ChatViewProvider(context.extensionUri, chat),
@@ -118,7 +106,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     }),
   );
 
-  registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat, location });
+  registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat });
 
   const firstCheck = setup.check();
   return {
@@ -162,9 +150,6 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     },
     get chatReady() {
       return chat.visible;
-    },
-    get chatEditorCount() {
-      return location.editorCount;
     },
     get sessionCount() {
       return agentHost.agent?.store.all().length ?? 0;

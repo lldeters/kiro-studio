@@ -5,7 +5,7 @@ import { describeError } from '../acp/errors';
 import { loginInvocation } from '../kiro/cli';
 import type { AgentHost } from './agentHost';
 import type { ChatController } from './chatController';
-import type { ChatLocation } from './chatLocation';
+import { openChatInEditor } from './chatView';
 import type { DebugChat } from './debugChat';
 import type { ProtocolChannel } from './logger';
 import { showQuickMenu } from './quickMenu';
@@ -20,11 +20,10 @@ export interface CommandDeps {
   protocol: ProtocolChannel;
   debug: DebugChat;
   chat: ChatController;
-  location: ChatLocation;
 }
 
 export function registerCommands(deps: CommandDeps): void {
-  const { context, host, setup, settings, protocol, debug, chat, location } = deps;
+  const { context, host, setup, settings, protocol, debug, chat } = deps;
   const t = vscode.l10n.t;
 
   /** Runs a command body and shows its error instead of letting VS Code print a stack trace. */
@@ -41,11 +40,11 @@ export function registerCommands(deps: CommandDeps): void {
   };
 
   command('kiroStudio.showQuickMenu', () => showQuickMenu(host, setup, settings));
-  command('kiroStudio.openChat', () => location.show());
-  command('kiroStudio.openChatInEditor', () => location.showInEditor());
+  command('kiroStudio.openChat', () => vscode.commands.executeCommand('kiroStudio.chat.focus'));
+  command('kiroStudio.openChatInEditor', () => openChatInEditor(context.extensionUri, chat));
   command('kiroStudio.exportSession', () => chat.exportActive());
   command('kiroStudio.newSession', async () => {
-    await location.show();
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
     await chat.newSession();
   });
   command('kiroStudio.checkSetup', () => setup.check());

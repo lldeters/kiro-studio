@@ -39,9 +39,7 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ agentHost.ts ....... owns the KiroAgent of the window (created on first use), the approval picker, the active
 │   │                       session, the checkpoint services; merges change notifications to one per 40 ms
 │   ├─ chatController.ts .. talks to the chat webviews: sends changes (30 ms), validates and carries out requests
-│   ├─ chatView.ts ........ the sidebar view (only with `chatLocation` = sidebar); the page is built by src/view/chatHtml.ts
-│   ├─ chatLocation.ts .... where the chat is shown: the one editor tab (default; reused, kept alive while hidden,
-│   │                       restored after a reload) or the sidebar view; every "open the chat" goes through `kiroStudio.openChat`
+│   ├─ chatView.ts ........ the sidebar view and the editor-tab variant; the page is built by src/view/chatHtml.ts
 │   ├─ promptContext.ts ... pickers (files, folders, steering, specs) and readers (git diff, problems) for attachments
 │   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors and read-only texts
 │   ├─ panel/ ............. panel.ts (state, commands, actions), kiroFiles.ts (VS Code reader, watcher on `.kiro`),
@@ -189,16 +187,6 @@ webview has (only the last message can grow, tools are separate), the tools whos
 `meta` when it changed. `PatchTracker` computes this per webview; changes are merged to about one send per 30 ms.
 Only the active session is streamed; switching tabs sends the new one in full. Drafts (text and attachments) are kept
 per session in the webview and survive it being hidden through VS Code's webview state.
-
-Where the chat lives (`ChatLocation`, setting `kiroStudio.chatLocation`): by default the chat is **one editor tab**
-("Kiro Chat", beside the code) and the Kiro Studio sidebar holds only the menu (sessions, specs, steering, hooks, MCP,
-agents, status); with `sidebar` the chat is the first view of that sidebar, as before. The `kiroStudio.chat` view has the
-`when` clause `config.kiroStudio.chatLocation == 'sidebar'`, so changing the setting moves the chat without a reload.
-There is at most one chat tab: asking for it again reveals it. The tab keeps its page while hidden
-(`retainContextWhenHidden`, so scroll position, draft and a long session survive a switch to the code) and a
-`WebviewPanelSerializer` brings it back after a reload. Everything that wants the chat on screen (a new session, opening
-a session, a spec action, a pending question) runs `kiroStudio.openChat`, which looks at the setting. Several chat
-surfaces show the same session: the sidebar view and the tab, if both exist, stay in step.
 
 Rendering: `react-markdown` with `remark-gfm` (no raw HTML), Shiki with the JavaScript regex engine (no WebAssembly;
 languages and themes load lazily as chunks), lazily loaded Mermaid in `strict` mode that draws only when the streaming

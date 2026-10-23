@@ -22,8 +22,7 @@ real Kiro session._
 
 ## What it does
 
-- **Chat** as one wide editor tab next to your code (or, if you prefer, a view in the sidebar: `kiroStudio.chatLocation`),
-  with sessions as tabs. The Kiro Studio sidebar is the menu: sessions, specs, steering, hooks, MCP servers, agents. Streaming Markdown, highlighted code, Mermaid diagrams,
+- **Chat** in the sidebar or an editor tab, with sessions as tabs. Streaming Markdown, highlighted code, Mermaid diagrams,
   tool calls as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
   `git diff`, steering files, specs), pasted or dropped images, and agent, model, effort and Supervised/Autopilot in a toolbar.
 - **Questions from Kiro** are answered in the chat with exactly the options Kiro offered, with the change shown. In
@@ -56,8 +55,7 @@ real Kiro session._
 1. Install the extension and open a folder. The **Kiro Studio** icon appears in the activity bar.
 2. If the CLI is not found or you are not signed in, the view says so and offers the fix. _Kiro Studio: Open Getting Started_
    walks through it.
-3. Open the chat with the chat icon in the title of the **Sessions** view (or _Kiro Studio: Open Chat_), start a session
-   with **+** and ask something. The first start of the CLI can take a while (up to
+3. Start a session with **+** in the chat and ask something. The first start of the CLI can take a while (up to
    about 20 seconds on Windows).
 
 ## Settings

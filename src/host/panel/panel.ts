@@ -420,7 +420,7 @@ export class KiroPanel implements vscode.Disposable {
       );
       host.setActive(id);
     }
-    await vscode.commands.executeCommand('kiroStudio.openChat');
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
   }
 
   private async forkSession(node: Record<string, string>): Promise<void> {
@@ -432,7 +432,7 @@ export class KiroPanel implements vscode.Disposable {
       () => host.ensureAgent().forkSession(id, node.cwd ?? host.workspaceRoot()),
     );
     host.setActive(session.id);
-    await vscode.commands.executeCommand('kiroStudio.openChat');
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
     await this.refreshSessions();
   }
 
@@ -482,7 +482,7 @@ export class KiroPanel implements vscode.Disposable {
     if (answer !== confirm) return;
     const { host } = this.deps;
     const session = host.activeSession ?? (await host.newSession());
-    await vscode.commands.executeCommand('kiroStudio.openChat');
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
     void host.ensureAgent().prompt(session.id, GENERATE_STEERING_PROMPT);
   }
 

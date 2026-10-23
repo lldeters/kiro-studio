@@ -108,7 +108,6 @@
   "Input": "Eingabe",
   "Kiro": "Kiro",
   "Kiro CLI": "Kiro CLI",
-  "Kiro Chat": "Kiro-Chat",
   "Kiro Studio does not run in untrusted workspaces.": "Kiro Studio läuft nicht in nicht vertrauenswürdigen Arbeitsbereichen.",
   "Kiro Studio: {0}": "Kiro Studio: {0}",
   "Kiro asks for your answer. Click to open the question.": "Kiro wartet auf deine Antwort. Klicke, um die Frage zu öffnen.",
@@ -191,7 +190,6 @@
   "Revert {0} files to their state before this turn?": "{0} Dateien auf den Stand vor diesem Durchlauf zurücksetzen?",
   "Revert {0} to its state before this turn?": "{0} auf den Stand vor diesem Durchlauf zurücksetzen?",
   "Reverted": "Zurückgenommen",
-  "Reverted one file to its state before the turn.": "Eine Datei wurde auf den Stand vor dem Durchgang zurückgesetzt.",
   "Reverted {0} files to their state before the turn.": "{0} Dateien auf den Stand vor dem Durchlauf zurückgesetzt.",
   "Review": "Prüfung",
   "Runs remotely": "Läuft entfernt",
@@ -314,5 +312,6 @@
   "{0} min ago": "vor {0} Min.",
   "{0} of {1} tasks": "{0} von {1} Aufgaben",
   "{0} tools": "{0} Werkzeuge",
-  "… {0} more lines": "… {0} weitere Zeilen"
+  "… {0} more lines": "… {0} weitere Zeilen",
+  "Reverted one file to its state before the turn.": "Eine Datei wurde auf den Stand vor dem Durchgang zurückgesetzt."
 }
