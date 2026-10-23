@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+*.vsix
+.vscode-test/
+# Raw protocol logs written by scripts/probe-acp.ts; may contain account details.
+probe-logs/

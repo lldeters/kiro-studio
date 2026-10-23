@@ -1,0 +1,22 @@
+{
+  "name": "kiro-studio",
+  "displayName": "Kiro Studio",
+  "description": "Unofficial graphical VS Code front end for the locally installed Kiro CLI, built on the Agent Client Protocol. Not affiliated with AWS or Kiro.",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "probe": "tsx scripts/probe-acp.ts",
+    "validate-wire": "tsx scripts/validate-wire.ts",
+    "typecheck": "tsc -p scripts/tsconfig.json"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "2.0.1",
+    "@types/node": "^20.17.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
