@@ -1,22 +1,325 @@
 {
   "name": "kiro-studio",
   "displayName": "Kiro Studio",
-  "description": "Unofficial graphical VS Code front end for the locally installed Kiro CLI, built on the Agent Client Protocol. Not affiliated with AWS or Kiro.",
-  "version": "0.0.0",
-  "private": true,
+  "description": "%extension.description%",
+  "version": "0.1.0",
+  "publisher": "lldeters",
   "license": "Apache-2.0",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lldeters/kiro-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lldeters/kiro-studio/issues"
+  },
+  "homepage": "https://github.com/lldeters/kiro-studio#readme",
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "kiro",
+    "acp",
+    "agent client protocol",
+    "ai",
+    "agent"
+  ],
   "engines": {
-    "node": ">=20"
+    "vscode": "^1.93.0",
+    "node": ">=20.19"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.js",
+  "l10n": "./l10n",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "%capabilities.virtualWorkspaces%"
+    },
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "%capabilities.untrustedWorkspaces%",
+      "restrictedConfigurations": [
+        "kiroStudio.autonomy",
+        "kiroStudio.defaultMode",
+        "kiroStudio.defaultModel",
+        "kiroStudio.defaultEffort"
+      ]
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kiro-studio",
+          "title": "%viewsContainers.kiroStudio%",
+          "icon": "resources/kiro-studio.svg"
+        }
+      ]
+    },
+    "views": {
+      "kiro-studio": [
+        {
+          "id": "kiroStudio.status",
+          "name": "%views.status%",
+          "visibility": "visible"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == untrusted",
+        "contents": "%viewsWelcome.untrusted%"
+      },
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == cliMissing",
+        "contents": "%viewsWelcome.cliMissing%"
+      },
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == tooOld",
+        "contents": "%viewsWelcome.tooOld%"
+      },
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == notSignedIn",
+        "contents": "%viewsWelcome.notSignedIn%"
+      },
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == error",
+        "contents": "%viewsWelcome.error%"
+      },
+      {
+        "view": "kiroStudio.status",
+        "when": "kiroStudio.state == checking",
+        "contents": "%viewsWelcome.checking%"
+      }
+    ],
+    "commands": [
+      {
+        "command": "kiroStudio.showQuickMenu",
+        "title": "%command.showQuickMenu%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.checkSetup",
+        "title": "%command.checkSetup%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kiroStudio.restart",
+        "title": "%command.restart%",
+        "category": "Kiro Studio",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "kiroStudio.login",
+        "title": "%command.login%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.setCliPath",
+        "title": "%command.setCliPath%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.toggleAutonomy",
+        "title": "%command.toggleAutonomy%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.showProtocolLog",
+        "title": "%command.showProtocolLog%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.showKiroLogs",
+        "title": "%command.showKiroLogs%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.openWalkthrough",
+        "title": "%command.openWalkthrough%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.debug.newSession",
+        "title": "%command.debug.newSession%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.debug.sendPrompt",
+        "title": "%command.debug.sendPrompt%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.debug.cancel",
+        "title": "%command.debug.cancel%",
+        "category": "Kiro Studio"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kiroStudio.checkSetup",
+          "when": "view == kiroStudio.status",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kiroStudio.restart",
+          "when": "view == kiroStudio.status",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kiro Studio",
+      "properties": {
+        "kiroStudio.cliPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "%config.cliPath%"
+        },
+        "kiroStudio.autonomy": {
+          "type": "string",
+          "enum": [
+            "supervised",
+            "autopilot"
+          ],
+          "enumDescriptions": [
+            "%config.autonomy.supervised%",
+            "%config.autonomy.autopilot%"
+          ],
+          "default": "supervised",
+          "markdownDescription": "%config.autonomy%"
+        },
+        "kiroStudio.autoAllowInAutopilot": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.autoAllowInAutopilot%"
+        },
+        "kiroStudio.hooks.enabled": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application",
+          "markdownDescription": "%config.hooksEnabled%"
+        },
+        "kiroStudio.defaultMode": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.defaultMode%"
+        },
+        "kiroStudio.defaultModel": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.defaultModel%"
+        },
+        "kiroStudio.defaultEffort": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "%config.defaultEffort%"
+        },
+        "kiroStudio.logging.level": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "%config.logging.off%",
+            "%config.logging.messages%",
+            "%config.logging.verbose%"
+          ],
+          "default": "messages",
+          "markdownDescription": "%config.logging.level%"
+        }
+      }
+    },
+    "walkthroughs": [
+      {
+        "id": "kiroStudio.gettingStarted",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "install",
+            "title": "%walkthrough.install.title%",
+            "description": "%walkthrough.install.description%",
+            "media": {
+              "markdown": "resources/walkthrough/install.md"
+            }
+          },
+          {
+            "id": "signIn",
+            "title": "%walkthrough.signIn.title%",
+            "description": "%walkthrough.signIn.description%",
+            "media": {
+              "markdown": "resources/walkthrough/sign-in.md"
+            },
+            "completionEvents": [
+              "onContext:kiroStudio.state == ready"
+            ]
+          },
+          {
+            "id": "check",
+            "title": "%walkthrough.check.title%",
+            "description": "%walkthrough.check.description%",
+            "media": {
+              "markdown": "resources/walkthrough/check.md"
+            }
+          }
+        ]
+      }
+    ]
   },
   "scripts": {
+    "build": "node esbuild.mjs",
+    "build:prod": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json && tsc -p scripts/tsconfig.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vscode-test",
+    "l10n:export": "vscode-l10n-dev export --outDir ./l10n ./src",
+    "package": "npm run build:prod && vsce package --no-dependencies -o dist/kiro-studio.vsix",
+    "vscode:prepublish": "npm run build:prod",
     "probe": "tsx scripts/probe-acp.ts",
-    "validate-wire": "tsx scripts/validate-wire.ts",
-    "typecheck": "tsc -p scripts/tsconfig.json"
+    "validate-wire": "tsx scripts/validate-wire.ts"
+  },
+  "dependencies": {
+    "@agentclientprotocol/sdk": "2.0.1"
   },
   "devDependencies": {
-    "@agentclientprotocol/sdk": "2.0.1",
-    "@types/node": "^20.17.0",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "@types/vscode": "1.93.0",
+    "@vscode/l10n-dev": "^0.0.35",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.10",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^5.0.5"
   }
 }

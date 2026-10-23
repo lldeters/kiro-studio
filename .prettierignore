@@ -1,0 +1,9 @@
+dist
+out
+node_modules
+probe-logs
+l10n
+.vscode-test
+package-lock.json
+LICENSE
+docs

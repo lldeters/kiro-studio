@@ -1,0 +1,10 @@
+**
+!dist/extension.js
+!dist/extension.js.LEGAL.txt
+!l10n/**
+!resources/**
+!package.json
+!package.nls*.json
+!README.md
+!LICENSE
+!NOTICE
