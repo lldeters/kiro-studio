@@ -5,7 +5,7 @@
  */
 import * as vscode from 'vscode';
 import { describeError } from '../acp/errors';
-import { isInsideAny, currentPlatform } from '../util/paths';
+import { currentPlatform, isInsideAny, normalizeAgentPath } from '../util/paths';
 import {
   parseWebviewMessage,
   type AgentView,
@@ -201,6 +201,12 @@ export class ChatController implements vscode.Disposable {
         case 'openFile':
           await this.openFile(message.path, message.line);
           return;
+        case 'openLink':
+          if (/^(https?|mailto):/i.test(message.url)) await vscode.env.openExternal(vscode.Uri.parse(message.url));
+          return;
+        case 'copy':
+          await vscode.env.clipboard.writeText(message.text);
+          return;
         case 'command':
           await vscode.commands.executeCommand(message.command);
           return;
@@ -224,16 +230,28 @@ export class ChatController implements vscode.Disposable {
     agent.prompt(sessionId, text).catch((error: unknown) => session.addNotice('error', describeError(error)));
   }
 
+  /**
+   * Opens a file named in the chat. The path may be relative (the model writes `src/a.ts`), so it is resolved against
+   * the session's folder, and it must end up inside the workspace or that folder. A file that does not exist is
+   * ignored without an error, because the model may mention paths that are not there.
+   */
   private async openFile(path: string, line?: number): Promise<void> {
     const session = this.host.activeSession;
-    const roots = [
-      ...(vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
-      ...(session?.cwd ? [session.cwd] : []),
-    ];
-    if (!isInsideAny(roots, path, currentPlatform())) return;
-    const selection =
+    const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    const roots = [...folders, ...(session?.cwd ? [session.cwd] : [])];
+    const base = session?.cwd ?? folders[0];
+    const platform = currentPlatform();
+    const absolute = normalizeAgentPath(path, platform, base);
+    if (absolute === undefined || !isInsideAny(roots, absolute, platform)) return;
+    const uri = vscode.Uri.file(absolute);
+    try {
+      await vscode.workspace.fs.stat(uri);
+    } catch {
+      return;
+    }
+    const position =
       line === undefined ? undefined : new vscode.Range(Math.max(0, line - 1), 0, Math.max(0, line - 1), 0);
-    await vscode.window.showTextDocument(vscode.Uri.file(path), { preview: true, ...(selection ? { selection } : {}) });
+    await vscode.window.showTextDocument(uri, { preview: true, ...(position ? { selection: position } : {}) });
   }
 
   dispose(): void {

@@ -4,6 +4,7 @@ import type { HostMessage } from '../../src/shared/chatProtocol';
 import { App } from './App';
 import { useChat } from './store';
 import { post } from './vscode';
+import '@vscode/codicons/dist/codicon.css';
 import './styles.css';
 
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {

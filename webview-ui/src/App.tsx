@@ -1,5 +1,6 @@
 import { Banner } from './components/Banner';
 import { Composer } from './components/Composer';
+import { PlanPanel } from './components/PlanPanel';
 import { Tabs } from './components/Tabs';
 import { Transcript } from './components/Transcript';
 import { useT } from './i18n';
@@ -21,6 +22,7 @@ export function App() {
       {session ? (
         <>
           <Transcript session={session} />
+          {session.plan && <PlanPanel plan={session.plan} />}
           <Composer session={session} />
         </>
       ) : (

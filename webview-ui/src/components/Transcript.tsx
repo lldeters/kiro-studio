@@ -1,38 +1,66 @@
-import { useEffect, useRef } from 'react';
+import { memo, useRef } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import type { ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
+import { Markdown } from './Markdown';
+import { ToolCard } from './ToolCard';
 
-/** Whether the list is scrolled to the bottom (within a few pixels), so that new text follows only then. */
-function atBottom(element: HTMLElement): boolean {
-  return element.scrollHeight - element.scrollTop - element.clientHeight < 24;
-}
+/** In tests there is no layout, so the list is told how many items to render. */
+const testProps =
+  import.meta.env.MODE === 'test' ? ({ initialItemCount: 1000, initialTopMostItemIndex: 0 } as const) : {};
 
 export function Transcript({ session }: { session: SessionView }) {
-  const container = useRef<HTMLDivElement>(null);
-  const follow = useRef(true);
   const tools = new Map(session.tools.map((tool) => [tool.toolCallId, tool]));
-
-  useEffect(() => {
-    const element = container.current;
-    if (element && follow.current) element.scrollTop = element.scrollHeight;
-  });
+  const busy = session.phase !== 'idle';
+  const lastId = session.items[session.items.length - 1]?.id;
+  const list = useRef<VirtuosoHandle>(null);
+  // Whether the reader is at the bottom. Only the reader's own scrolling changes it, so a diagram or highlighted code
+  // that makes the list taller after it was drawn does not lose the position.
+  const stick = useRef(true);
 
   return (
-    <div
-      className="transcript"
-      ref={container}
-      onScroll={(event) => {
-        follow.current = atBottom(event.currentTarget);
-      }}
-    >
-      {session.items.map((item) => (
-        <Item key={item.id} item={item} tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)} />
-      ))}
+    <div className="transcript">
+      <Virtuoso
+        key={session.id}
+        ref={list}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 48;
+        }}
+        totalListHeightChanged={() => {
+          if (stick.current) list.current?.scrollToIndex({ index: 'LAST', align: 'end' });
+        }}
+        style={{ height: '100%' }}
+        initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
+        data={session.items}
+        computeItemKey={(_index, item) => item.id}
+        // Follow new text only while the reader is at the bottom; scrolling up stops it.
+        followOutput={() => (stick.current ? 'auto' : false)}
+        increaseViewportBy={600}
+        itemContent={(_index, item) => (
+          <div className={`row${item.subtaskId ? ' subtask' : ''}`}>
+            <Item
+              item={item}
+              tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)}
+              streaming={busy && item.id === lastId}
+            />
+          </div>
+        )}
+        {...testProps}
+      />
     </div>
   );
 }
 
-function Item({ item, tool }: { item: ItemView; tool: ToolView | undefined }) {
+const Item = memo(function Item({
+  item,
+  tool,
+  streaming,
+}: {
+  item: ItemView;
+  tool: ToolView | undefined;
+  streaming: boolean;
+}) {
   const t = useT();
   switch (item.kind) {
     case 'user':
@@ -46,23 +74,21 @@ function Item({ item, tool }: { item: ItemView; tool: ToolView | undefined }) {
       return (
         <div className="message assistant">
           <div className="author">{t('Kiro')}</div>
-          <div className="text">{item.text}</div>
+          <Markdown text={item.text} streaming={streaming} />
         </div>
       );
     case 'thought':
       return (
-        <div className="message thought">
-          <div className="author">{t('Thinking')}</div>
-          <div className="text">{item.text}</div>
-        </div>
+        <details className="message thought">
+          <summary>
+            {streaming && <span className="spinner small" aria-hidden="true" />} {t('Thinking')}
+          </summary>
+          <Markdown text={item.text} streaming={streaming} />
+        </details>
       );
     case 'notice':
       return <div className={`notice ${item.level ?? 'info'}`}>{item.text}</div>;
     case 'tool':
-      return tool ? (
-        <div className={`tool ${tool.state}`}>
-          <span className="tool-title">{tool.title}</span>
-        </div>
-      ) : null;
+      return tool ? <ToolCard tool={tool} /> : null;
   }
-}
+});

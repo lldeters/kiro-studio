@@ -87,8 +87,11 @@ try {
     }
   });
   await page.goto(`http://127.0.0.1:${port}/`);
-  for (const message of scenario) await page.evaluate((m) => window.postMessage(m, '*'), message as never);
-  await page.waitForTimeout(400);
+  for (const step of scenario) {
+    if (typeof step === 'number') await page.waitForTimeout(step);
+    else await page.evaluate((m) => window.postMessage(m, '*'), step as never);
+  }
+  await page.waitForTimeout(Number(option('wait', '600')));
   await page.screenshot({ path: out });
   const posted = await page.evaluate(() => (window as unknown as { __posted: unknown[] }).__posted);
   console.log(`saved ${out} (${width}x${height}); the page posted ${JSON.stringify(posted)}`);

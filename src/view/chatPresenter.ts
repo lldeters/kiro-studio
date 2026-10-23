@@ -85,7 +85,13 @@ export function toolView(tool: ToolCallState, waiting: boolean, platform: Platfo
     } else if (item.type === 'terminal') content.push({ type: 'terminal', terminalId: item.terminalId });
   }
   // The preview carries the final content before the write happens; it stands in for a diff that has not arrived.
-  if (!content.some((c) => c.type === 'diff') && tool.preview?.modifiedContent !== undefined && tool.preview.file) {
+  const writes = tool.kind === undefined || tool.kind === 'edit';
+  if (
+    writes &&
+    !content.some((c) => c.type === 'diff') &&
+    tool.preview?.modifiedContent !== undefined &&
+    tool.preview.file
+  ) {
     const path = normalizeAgentPath(tool.preview.file, platform) ?? tool.preview.file;
     const oldText = tool.preview.originalContent ?? null;
     content.push({

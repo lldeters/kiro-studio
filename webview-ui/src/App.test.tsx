@@ -44,11 +44,11 @@ describe('chat app', () => {
     expect(container.textContent).toBe('');
   });
 
-  it('shows the conversation of the active session', () => {
+  it('shows the conversation of the active session', async () => {
     render(<App />);
     receive(init(), { type: 'session', session: session() });
-    expect(screen.getByText('Hello')).toBeTruthy();
-    expect(screen.getByText('Hi there')).toBeTruthy();
+    expect(await screen.findByText('Hello')).toBeTruthy();
+    expect(await screen.findByText('Hi there')).toBeTruthy();
     expect(screen.getByText('My session')).toBeTruthy();
   });
 
@@ -94,14 +94,15 @@ describe('chat app', () => {
     expect(screen.getByPlaceholderText<HTMLTextAreaElement>('Ask Kiro…').disabled).toBe(true);
   });
 
-  it('streams text into the last message', () => {
+  it('streams text into the last message', async () => {
     render(<App />);
     receive(init(), { type: 'session', session: session({ items: [item(1, 'assistant', 'Hel')] }) });
+    await screen.findByText('Hel');
     receive({
       type: 'patch',
       patch: { sessionId: 's1', itemsFrom: 0, items: [item(1, 'assistant', 'Hello')], tools: [] },
     });
-    expect(screen.getByText('Hello')).toBeTruthy();
+    expect(await screen.findByText('Hello')).toBeTruthy();
   });
 
   it('switches, closes and opens sessions through the tabs', () => {

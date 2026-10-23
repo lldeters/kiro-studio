@@ -25,6 +25,36 @@ function init(sessions: Session[], overrides: { setup?: SetupView; phase?: 'star
   };
 }
 
+const ANSWER = `The test fails because \`parseLine\` now returns \`undefined\` for blank lines (see \`src/parser.ts:42\`).
+That is a change in behaviour, not a bug in the test.
+
+## What I changed
+
+1. \`parseLine\` returns an empty token list for blank lines
+2. The caller no longer needs the \`undefined\` check
+3. I added a regression test
+
+\`\`\`ts
+export function parseLine(line: string): Token[] {
+  if (line.trim() === '') return [];
+  return tokenize(line).map((token) => ({ ...token, line }));
+}
+\`\`\`
+
+| File | Change |
+| --- | --- |
+| \`src/parser.ts\` | blank lines handled |
+| \`test/parser.test.ts\` | new case |
+
+\`\`\`mermaid
+flowchart LR
+  A[Read line] --> B{Blank?}
+  B -- yes --> C[Return empty list]
+  B -- no --> D[Tokenize]
+\`\`\`
+
+See the [docs](https://example.com/docs) for the token format.`;
+
 function conversation(): HostMessage[] {
   const session = new Session('sess_preview_1', { cwd: '/ws' });
   session.applySessionResult({
@@ -37,17 +67,13 @@ function conversation(): HostMessage[] {
     session,
     u.thought('The user wants me to look at the failing test first.'),
     u.agent('I will start by reading the test and the parser it covers.\n\n'),
-    u.toolCall(
-      't1',
-      {
-        title: 'Read File',
-        kind: 'read',
-        status: 'completed',
-        rawInput: { path: '/ws/src/parser.ts' },
-        locations: [{ path: '/ws/src/parser.ts' }],
-      },
-      { preview: undefined },
-    ),
+    u.toolCall('t1', {
+      title: 'Read File',
+      kind: 'read',
+      status: 'completed',
+      rawInput: { path: '/ws/src/parser.ts' },
+      locations: [{ path: '/ws/src/parser.ts' }],
+    }),
     u.toolCall('t2', {
       title: 'Search',
       kind: 'search',
@@ -60,22 +86,47 @@ function conversation(): HostMessage[] {
       kind: 'execute',
       status: 'failed',
       rawInput: { command: 'npm test' },
+      rawOutput: '1 failed, 12 passed',
       locations: [],
     }),
     u.toolCall('t4', {
       title: 'Write File',
       kind: 'edit',
-      status: 'pending',
-      rawInput: { path: '/ws/src/parser.ts' },
+      status: 'completed',
       locations: [{ path: '/ws/src/parser.ts' }],
+      content: [
+        {
+          type: 'diff',
+          path: '/ws/src/parser.ts',
+          oldText: 'export function parseLine(line: string) {\n  return tokenize(line);\n}\n',
+          newText:
+            "export function parseLine(line: string): Token[] {\n  if (line.trim() === '') return [];\n  return tokenize(line);\n}\n",
+        },
+      ],
     }),
+    u.toolCall('t5', {
+      title: 'Write File',
+      kind: 'edit',
+      status: 'pending',
+      rawInput: { path: '/ws/test/parser.test.ts' },
+      locations: [{ path: '/ws/test/parser.test.ts' }],
+    }),
+    u.agent(ANSWER, { messageId: 'final' }),
+    {
+      sessionUpdate: 'plan',
+      entries: [
+        { content: 'Find the cause', status: 'completed', priority: 'medium' },
+        { content: 'Fix parseLine', status: 'in_progress', priority: 'medium' },
+        { content: 'Add a regression test', status: 'pending', priority: 'medium' },
+      ],
+    },
   );
   session.addApproval({
     title: 'Write File',
     type: 'tool_approval',
-    files: [{ path: '/ws/src/parser.ts' }],
-    toolCallId: 't4',
-    resource: 'src/parser.ts',
+    files: [{ path: '/ws/test/parser.test.ts' }],
+    toolCallId: 't5',
+    resource: 'test/parser.test.ts',
     capability: 'fs_write',
     options: [
       { optionId: 'accept', name: 'Allow', kind: 'allow_once' },
@@ -93,8 +144,37 @@ function conversation(): HostMessage[] {
 
 const setupOnly = (setup: SetupView): HostMessage[] => [init([], { setup })];
 
-export const SCENARIOS: Record<string, HostMessage[]> = {
+/** Messages, and pauses in milliseconds between them. */
+export type Step = HostMessage | number;
+
+/** A long answer that arrives in pieces while the reader is at the bottom, like a real turn. */
+function streaming(): Step[] {
+  const session = new Session('sess_preview_s', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'auto' }),
+  });
+  session.title = 'Streaming';
+  session.beginTurn('Explain the build.');
+  const tracker = new PatchTracker('posix');
+  const steps: Step[] = [init([session]), { type: 'session', session: tracker.full(session) }, 200];
+  for (let i = 1; i <= 24; i++) {
+    feed(
+      session,
+      u.agent(
+        `Paragraph ${i}: the build bundles the extension host and the webview separately, then packages both.\n\n`,
+        { messageId: 'a' },
+      ),
+    );
+    const change = tracker.diff(session);
+    if (change && 'sessionId' in change) steps.push({ type: 'patch', patch: change }, 60);
+  }
+  return steps;
+}
+
+export const SCENARIOS: Record<string, Step[]> = {
   conversation: conversation(),
+  streaming: streaming(),
   empty: [init([])],
   connecting: [init([], { phase: 'starting' })],
   cliMissing: setupOnly('cliMissing'),

@@ -1,0 +1,42 @@
+import { structuredPatch } from 'diff';
+import { useMemo } from 'react';
+import { useT } from '../i18n';
+
+const MAX_LINES = 300;
+
+interface Row {
+  kind: 'add' | 'remove' | 'context' | 'hunk';
+  text: string;
+}
+
+/** A unified diff with three lines of context around each change. */
+export function DiffView({ oldText, newText }: { oldText: string | null; newText: string }) {
+  const t = useT();
+  const { rows, hidden } = useMemo(() => {
+    const patch = structuredPatch('a', 'b', oldText ?? '', newText, '', '', { context: 3 });
+    const all: Row[] = [];
+    for (const hunk of patch.hunks) {
+      all.push({ kind: 'hunk', text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@` });
+      for (const line of hunk.lines) {
+        if (line.startsWith('\\')) continue; // "\ No newline at end of file"
+        const sign = line[0];
+        all.push({ kind: sign === '+' ? 'add' : sign === '-' ? 'remove' : 'context', text: line.slice(1) });
+      }
+    }
+    return { rows: all.slice(0, MAX_LINES), hidden: Math.max(0, all.length - MAX_LINES) };
+  }, [oldText, newText]);
+
+  return (
+    <div className="diff" role="group">
+      {rows.map((row, index) => (
+        <div key={index} className={`diff-line ${row.kind}`}>
+          <span className="diff-sign" aria-hidden="true">
+            {row.kind === 'add' ? '+' : row.kind === 'remove' ? '−' : ' '}
+          </span>
+          <span className="diff-text">{row.text}</span>
+        </div>
+      ))}
+      {hidden > 0 && <div className="diff-more muted">{t('… {0} more lines', hidden)}</div>}
+    </div>
+  );
+}

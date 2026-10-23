@@ -169,11 +169,16 @@ export type WebviewMessage =
   | { type: 'cancel'; sessionId: string }
   | { type: 'answer'; sessionId: string; approvalId: number; kind: ApprovalKind }
   | { type: 'setConfig'; sessionId: string; configId: string; value: string }
+  /** A path as it appears in the chat; relative paths are resolved against the session's folder by the host. */
   | { type: 'openFile'; path: string; line?: number }
+  /** Only `http`, `https` and `mailto` links are opened. */
+  | { type: 'openLink'; url: string }
+  | { type: 'copy'; text: string }
   | { type: 'command'; command: WebviewCommand };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const MAX_COPY_CHARS = 1_000_000;
 const KINDS: readonly string[] = ['allow_once', 'allow_always', 'reject_once', 'reject_always'];
 
 /** Validates a message from the webview. The host never trusts the shape of what a webview posts. */
@@ -216,6 +221,14 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
       const path = str('path');
       if (path === undefined) return undefined;
       return typeof raw.line === 'number' ? { type: 'openFile', path, line: raw.line } : { type: 'openFile', path };
+    }
+    case 'openLink': {
+      const url = str('url');
+      return url === undefined ? undefined : { type: 'openLink', url };
+    }
+    case 'copy': {
+      const text = str('text');
+      return text === undefined || text.length > MAX_COPY_CHARS ? undefined : { type: 'copy', text };
     }
     case 'command': {
       const command = str('command');
