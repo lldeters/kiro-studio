@@ -37,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   host = agentHost;
   const debug = new DebugChat(agentHost);
   const chat = new ChatController(agentHost, setup, settings);
+  agentHost.suppressApprovalPrompt = () => chat.visible;
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
 

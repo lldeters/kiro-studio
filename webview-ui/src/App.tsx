@@ -1,7 +1,9 @@
+import { ApprovalDock } from './components/ApprovalDock';
 import { Banner } from './components/Banner';
 import { Composer } from './components/Composer';
 import { PlanPanel } from './components/PlanPanel';
 import { Tabs } from './components/Tabs';
+import { Toolbar } from './components/Toolbar';
 import { Transcript } from './components/Transcript';
 import { useT } from './i18n';
 import { activeSession, useChat } from './store';
@@ -23,6 +25,8 @@ export function App() {
         <>
           <Transcript session={session} />
           {session.plan && <PlanPanel plan={session.plan} />}
+          <ApprovalDock session={session} />
+          <Toolbar session={session} />
           <Composer session={session} />
         </>
       ) : (

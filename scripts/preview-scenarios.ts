@@ -20,7 +20,7 @@ function init(sessions: Session[], overrides: { setup?: SetupView; phase?: 'star
     ...(sessions[0] ? { activeId: sessions[0].id } : {}),
     setup: overrides.setup ?? 'ready',
     agent: { phase: overrides.phase ?? 'ready' },
-    capabilities: { image: true },
+    capabilities: { image: true, compact: true },
     autonomySetting: 'supervised',
   };
 }
@@ -134,6 +134,7 @@ function conversation(): HostMessage[] {
       { optionId: 'reject', name: 'Deny', kind: 'reject_once' },
     ],
   });
+  feed(session, u.contextUsage(84));
   session.addNotice('info', 'Automatically allowed once (Autopilot): Read File src/parser.ts');
   session.addNotice('error', 'Could not reach the model. Retrying…');
   const other = new Session('sess_preview_2');

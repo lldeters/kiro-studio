@@ -30,7 +30,7 @@ export const initialState: ChatState = {
   activeId: undefined,
   setup: 'checking',
   agent: { phase: 'stopped' },
-  capabilities: { image: false },
+  capabilities: { image: false, compact: false },
   autonomySetting: 'supervised',
   sessions: {},
 };

@@ -25,7 +25,13 @@ export class ApprovalUi implements vscode.Disposable {
   private open: { entry: Entry; picker: vscode.QuickPick<Choice> } | undefined;
   private readonly unsubscribe: (() => void)[] = [];
 
-  constructor(private readonly agent: KiroAgent) {
+  /**
+   * @param suppress true while the chat view shows the requests itself; no picker opens then (unless asked for).
+   */
+  constructor(
+    private readonly agent: KiroAgent,
+    private readonly suppress: () => boolean = () => false,
+  ) {
     this.unsubscribe.push(
       agent.permissions.requested.on((entry) => {
         this.queue.push(entry);
@@ -46,8 +52,8 @@ export class ApprovalUi implements vscode.Disposable {
   }
 
   /** Opens the picker for the oldest open request, if none is showing. */
-  showNext(): void {
-    if (this.open) return;
+  showNext(force = false): void {
+    if (this.open || (!force && this.suppress())) return;
     const entry = this.queue[0];
     if (!entry) return;
     this.show(entry);

@@ -9,6 +9,7 @@ import { currentPlatform, isInsideAny, normalizeAgentPath } from '../util/paths'
 import {
   parseWebviewMessage,
   type AgentView,
+  type ChatCapabilities,
   type HostMessage,
   type SessionPatch,
   type SessionView,
@@ -65,6 +66,8 @@ export class ChatController implements vscode.Disposable {
   setVisible(webview: vscode.Webview, visible: boolean): void {
     for (const sink of this.sinks) if (sink.webview === webview) sink.visible = visible;
     this.host.notifyChanged();
+    // Nobody can see the questions in the chat any more: hand them to the picker.
+    if (!this.visible) this.host.showPendingApproval();
   }
 
   /** Connects a webview. The returned disposable detaches it again. */
@@ -105,8 +108,12 @@ export class ChatController implements vscode.Disposable {
     return { setup: this.setup.state, agent };
   }
 
-  private capabilities() {
-    return { image: this.host.agent?.capabilities?.prompt.image ?? false };
+  private capabilities(): ChatCapabilities {
+    const capabilities = this.host.agent?.capabilities;
+    return {
+      image: capabilities?.prompt.image ?? false,
+      compact: capabilities?.extensionMethods.has('_kiro/session/compact') ?? false,
+    };
   }
 
   private sendInit(sink: Sink): void {
@@ -204,6 +211,9 @@ export class ChatController implements vscode.Disposable {
         case 'openLink':
           if (/^(https?|mailto):/i.test(message.url)) await vscode.env.openExternal(vscode.Uri.parse(message.url));
           return;
+        case 'compact':
+          await this.compact(message.sessionId);
+          return;
         case 'copy':
           await vscode.env.clipboard.writeText(message.text);
           return;
@@ -213,6 +223,20 @@ export class ChatController implements vscode.Disposable {
       }
     } catch (error) {
       void vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
+    }
+  }
+
+  /** Asks Kiro to summarise the conversation to free context. Only offered when the CLI advertises the method. */
+  private async compact(sessionId: string): Promise<void> {
+    const agent = this.host.agent;
+    const session = agent?.store.get(sessionId);
+    if (!agent || !session || session.busy) return;
+    session.addNotice('info', vscode.l10n.t('Compacting the context…'));
+    try {
+      await agent.callExtension('_kiro/session/compact', { sessionId });
+      session.addNotice('info', vscode.l10n.t('The context was compacted.'));
+    } catch (error) {
+      session.addNotice('error', vscode.l10n.t('Could not compact the context: {0}', describeError(error)));
     }
   }
 

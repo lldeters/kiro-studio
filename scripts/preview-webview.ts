@@ -56,7 +56,7 @@ const server = createServer((request, response) => {
       const injected = `<style>:root{${Object.entries(theme)
         .map(([k, v]) => `--vscode-${k}:${v}`)
         .join(';')}}body{margin:0}</style>
-<script nonce="${nonce}">window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m)});</script>`;
+<script nonce="${nonce}">document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('vscode-${themeName}'));window.__posted=[];window.acquireVsCodeApi=()=>({postMessage:m=>window.__posted.push(m)});</script>`;
       response.setHeader('content-type', 'text/html');
       response.end(page.replace('</head>', `${injected}</head>`));
       return;

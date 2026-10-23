@@ -61,9 +61,14 @@ export class AgentHost implements vscode.Disposable {
     return this.approvalUi?.pendingCount ?? 0;
   }
 
-  /** Opens the oldest open request again (after it was dismissed). */
+  /** True while the chat view shows Kiro's questions itself, so that no picker needs to open. */
+  suppressApprovalPrompt: () => boolean = () => false;
+
+  /** Brings the oldest open request to the user: in the chat if it is showing, else in a picker. */
   showPendingApproval(): void {
-    this.approvalUi?.showNext();
+    if (this.pendingApprovals === 0) return;
+    if (this.suppressApprovalPrompt()) void vscode.commands.executeCommand('kiroStudio.chat.focus');
+    else this.approvalUi?.showNext(true);
   }
 
   /** The session the chat shows: the one chosen last, or the first one if that is gone. */
@@ -118,7 +123,7 @@ export class AgentHost implements vscode.Disposable {
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },
     });
     this.current = agent;
-    this.approvalUi = new ApprovalUi(agent);
+    this.approvalUi = new ApprovalUi(agent, () => this.suppressApprovalPrompt());
     const approvalChanges = this.approvalUi.onDidChange(() => this.notify());
     this.subscriptions.push(
       () => {

@@ -128,6 +128,8 @@ export interface AgentView {
 
 export interface ChatCapabilities {
   image: boolean;
+  /** The CLI advertises `_kiro/session/compact`. */
+  compact: boolean;
 }
 
 export type HostMessage =
@@ -154,6 +156,7 @@ export const WEBVIEW_COMMANDS = [
   'kiroStudio.login',
   'kiroStudio.setCliPath',
   'kiroStudio.restart',
+  'kiroStudio.toggleAutonomy',
   'kiroStudio.openWalkthrough',
   'kiroStudio.showProtocolLog',
   'workbench.trust.manage',
@@ -174,6 +177,7 @@ export type WebviewMessage =
   /** Only `http`, `https` and `mailto` links are opened. */
   | { type: 'openLink'; url: string }
   | { type: 'copy'; text: string }
+  | { type: 'compact'; sessionId: string }
   | { type: 'command'; command: WebviewCommand };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -225,6 +229,10 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'openLink': {
       const url = str('url');
       return url === undefined ? undefined : { type: 'openLink', url };
+    }
+    case 'compact': {
+      const sessionId = str('sessionId');
+      return sessionId === undefined ? undefined : { type: 'compact', sessionId };
     }
     case 'copy': {
       const text = str('text');

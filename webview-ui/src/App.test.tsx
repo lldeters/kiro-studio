@@ -23,7 +23,7 @@ const init = (extra: Partial<Extract<HostMessage, { type: 'init' }>> = {}): Host
   activeId: 's1',
   setup: 'ready',
   agent: { phase: 'ready' },
-  capabilities: { image: false },
+  capabilities: { image: false, compact: false },
   autonomySetting: 'supervised',
   ...extra,
 });
@@ -165,10 +165,15 @@ describe('chat app', () => {
       type: 'status',
       setup: 'ready',
       agent: { phase: 'reconnecting', attempt: 2 },
-      capabilities: { image: false },
+      capabilities: { image: false, compact: false },
     });
     expect(screen.getByText('The connection to Kiro was lost. Trying to reconnect (2).')).toBeTruthy();
-    receive({ type: 'status', setup: 'ready', agent: { phase: 'failed' }, capabilities: { image: false } });
+    receive({
+      type: 'status',
+      setup: 'ready',
+      agent: { phase: 'failed' },
+      capabilities: { image: false, compact: false },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Restart the connection' }));
     expect(outbox).toEqual([{ type: 'command', command: 'kiroStudio.restart' }]);
   });
