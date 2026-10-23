@@ -1,0 +1,8 @@
+Kiro Studio
+Copyright 2026 lldeters
+
+This product is an independent, unofficial project. It is not affiliated with, endorsed by, or sponsored by AWS
+or Kiro. It contains no Kiro logos or other Kiro assets.
+
+Licensed under the Apache License, Version 2.0; see LICENSE. The licences of bundled third-party packages are in
+THIRD_PARTY_NOTICES.txt, which `npm run package` generates into the .vsix.

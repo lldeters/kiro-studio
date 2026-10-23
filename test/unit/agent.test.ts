@@ -236,11 +236,11 @@ describe('cancel', () => {
         sessionId: ctx.sessionId,
         toolCall: { toolCallId: 't1', status: 'pending', title: 'Write File' },
         options: [{ optionId: 'accept', name: 'Allow', kind: 'allow_once' }],
-        _meta: { kiro: { consent: { capability: 'fs_write', resource: 'a', askType: 'explicit' } } },
+        _meta: { kiro: { consent: { capability: 'fs_write', resource: 'a' } } },
       });
       return rec(rec(answer.result).outcome).outcome === 'cancelled' ? 'cancelled' : 'end_turn';
     };
-    const h = make({ fake: { turn: asking } });
+    const h = make({ fake: { turn: asking, autopilot: 'off' } });
     const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
     const turn = h.agent.prompt(session.id, 'write');
     await until(() => session.approvals.length === 1);

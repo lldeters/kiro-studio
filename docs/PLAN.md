@@ -190,14 +190,14 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 
 ### Entschieden (2026-10-23)
 
-- **E1 – Freigaben im Autopilot: automatisch erlauben.** Ist der Autopilot an, beantwortet die Extension Kiros Rückfragen
-  selbst mit „einmal erlauben“ (`allow_once`). Dabei gilt: nie automatisch eine dauerhafte Option (`allow_always`,
-  `reject_always`) wählen; jede automatische Antwort im Chat sichtbar protokollieren („Automatisch erlaubt“); im
-  Supervised-Modus immer fragen; als Einstellung abschaltbar. **Meine Auslegung, bitte bestätigen:** Zunächst beantworte ich
-  nur Anfragen automatisch, die Kiro als `askType: "implicit"` kennzeichnet (so wurde es beobachtet). Alles andere bleibt
-  sichtbar, bis der Lauf `--autopilot on` zeigt, welche anderen Werte es gibt. Das hält deine ursprüngliche Vorgabe ein, Kiros
-  eigene Ask-Regeln nicht auszuhebeln; wenn du wirklich jede Anfrage automatisch erlaubt haben willst, ist das eine kleine
-  Änderung.
+- **E1 – Freigaben im Autopilot: automatisch erlauben (bestätigt am 2026-10-23, „Automatisch erlauben bitte“).** Ist der
+  Autopilot an, beantwortet die Extension **jede** Berechtigungsanfrage von Kiro, die „einmal erlauben“ (`allow_once`)
+  anbietet, selbst mit `allow_once`, unabhängig vom `askType`. Dabei gilt: nie automatisch eine dauerhafte Option
+  (`allow_always`, `reject_always`) wählen; jede automatische Antwort im Chat sichtbar protokollieren („Automatisch
+  erlaubt“); im Supervised-Modus immer fragen; als Einstellung abschaltbar (`kiroStudio.autoAllowInAutopilot`). Die
+  Prüfung am Turn-Ende („Review changes“) ist keine Berechtigung, sondern eine Bewertung des Ergebnisses; sie und
+  Anfragen ohne „einmal erlauben“ zeigt die Extension weiter dir. Kiros eigene Deny-Regeln bleiben wirksam, weil Kiro
+  dafür gar nicht erst nachfragt; Kiros Ask-Regeln werden im Autopilot dagegen mit „einmal erlauben“ beantwortet.
 - **E2 – Checkpoints:** Schatten-Git-Repo als verlässliche Basis für Revert und „View all changes“. Kiros eigene Checkpoints
   prüfe ich später und nutze sie höchstens als Zusatz.
 - **E3 – Beispiel-Spec:** zurückgestellt. Du kennst Specs noch nicht (Erklärung in der Antwort vom 2026-10-23); das ist erst
@@ -213,8 +213,8 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
    nichts. Schick mir wieder `summary.json` und `wire.ndjson` (vorher durchsehen). Alternativ schaltest du `kiro.dev` und
    `agentclientprotocol.com` in den Umgebungseinstellungen frei, dann lese ich die Doku selbst.
 2. ~~Freigabe für Phase 1.~~ Erteilt (2026-10-23, „Du hast mein Go“).
-3. **Publisher-ID und Name für die Copyright-Zeile.** `package.json` braucht einen `publisher`; für die Apache-Lizenz lege ich
-   eine `NOTICE`-Datei mit dem Copyright-Inhaber an, sobald ich den Namen kenne. Soll das Repo öffentlich sein?
+3. ~~Publisher-ID und Copyright-Name.~~ Entschieden: `lldeters` (Publisher in `package.json`, Copyright-Zeile in `NOTICE`). Das
+   Repo ist bereits öffentlich; `probe-logs/` ist ausgeschlossen, damit keine Konto-Daten hochgeladen werden.
 4. **Beispiel-Spec** (E3): erst in Phase 4.
 
 ## 8. Probe ausführen
@@ -266,7 +266,7 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
 | # | Annahme | Was passiert, wenn sie falsch ist |
 | --- | --- | --- |
 | A1 | „Reject changes“ am Turn-Ende ist eine normale Antwort mit der Option `reject_once`; Kiro stellt danach nicht selbständig Dateien wieder her. | Die Extension zeigt weiter genau die angebotenen Optionen. Eine mögliche Wiederherstellung durch Kiro fiele uns erst im Lauf `--review reject` auf. Revert über das Schatten-Repo kommt in Phase 2. |
-| A2 | Im Autopilot sind nur Rückfragen mit `askType: "implicit"` automatisch zu erlauben. | Andere Werte werden dir gezeigt, nicht automatisch erlaubt (sicherer Standard). Du kannst die Auslegung E1 erweitern lassen. |
+| A2 | Im Autopilot sendet Kiro keine „Review changes“-Anfrage am Turn-Ende (so liest sich die Doku und passt zu den Aufzeichnungen); `--autopilot on` hat es nicht bestätigt. | Kommt sie doch, zeigt die Extension sie dir (Entscheidung E1) und fragt nicht automatisch. |
 | A3 | Die CLI beendet sich nach geschlossenem stdin nicht zuverlässig. | Nach 5 s Gnadenfrist wird der Prozessbaum beendet. Beendet sie sich doch, passiert nichts weiter. |
 | A4 | Abgemeldet bedeutet: `whoami` endet mit Fehler oder liefert kein JSON in der ersten Zeile. | Im schlimmsten Fall steht „bereit“ oder „nicht angemeldet“ im falschen Zustand; die Statusanzeige und „Einrichtung prüfen“ zeigen den Fehler dann beim ersten Verbinden. |
 | A5 | `terminal` bleibt abgeschaltet; Hooks laufen nur mit Opt-in. Der Hook-Verkehr nach dem Opt-in ist nicht beobachtet. | Hook-Nachrichten werden ignoriert, solange kein Code sie auswertet (Phase 3). |
@@ -275,7 +275,7 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
 ### Voreinstellungen, die ich gewählt habe
 
 - `kiroStudio.autonomy`: **supervised** (nicht Autopilot). Neue Sessions fragen also nach.
-- `kiroStudio.autoAllowInAutopilot`: **an**, wirkt aber nur im Autopilot und nur für `allow_once` (Entscheidung E1). Die Einstellung gilt
+- `kiroStudio.autoAllowInAutopilot`: **an**, wirkt aber nur im Autopilot und nur als `allow_once` (Entscheidung E1). Die Einstellung gilt
   nur auf Anwendungsebene, ein Repository kann sie nicht per `.vscode/settings.json` einschalten.
 - `kiroStudio.hooks.enabled`: **aus** (Entscheidung E4), ebenfalls nur auf Anwendungsebene.
 - `kiroStudio.cliPath`: nur auf Maschinenebene, aus demselben Grund.

@@ -27,7 +27,7 @@
   "config.autonomy": "Autonomie neuer Sessions. **Supervised**: Kiro fragt, bevor es Dateien ändert, und zeigt am Ende eines Turns eine Prüfung. **Autopilot**: Kiro arbeitet ohne diese Prüfung.",
   "config.autonomy.supervised": "Kiro fragt vor Dateiänderungen und zeigt am Ende jedes Turns eine Prüfung.",
   "config.autonomy.autopilot": "Kiro arbeitet ohne Prüfung am Turn-Ende. Zu Berechtigungsanfragen siehe `#kiroStudio.autoAllowInAutopilot#`.",
-  "config.autoAllowInAutopilot": "Im Autopilot beantwortet Kiro Studio implizite Berechtigungsanfragen von Kiro automatisch mit \"einmal erlauben\". Eine dauerhafte \"immer\"-Option wird nie automatisch gewählt, jede automatische Antwort wird protokolliert, und im Supervised-Modus wird immer gefragt. Nur in den Benutzereinstellungen.",
+  "config.autoAllowInAutopilot": "Im Autopilot beantwortet Kiro Studio jede Berechtigungsanfrage von Kiro, die \"einmal erlauben\" anbietet, automatisch mit \"einmal erlauben\". Eine dauerhafte \"immer\"-Option wird nie automatisch gewählt, die Prüfung am Turn-Ende bleibt bei dir, jede automatische Antwort wird protokolliert, und im Supervised-Modus wird immer gefragt. Kiros eigene Deny-Regeln gelten weiter, weil Kiro dafür nicht nachfragt. Nur in den Benutzereinstellungen.",
   "config.hooksEnabled": "Kiro darf Hooks aus `.kiro/hooks` und `~/.kiro/hooks` laden und ausführen. Das schließt deine globalen Hooks ein, die Befehle ausführen können. Nur in den Benutzereinstellungen.",
   "config.defaultMode": "ID des Agenten (Modus), der in neuen Sessions gewählt wird, zum Beispiel `vibe`. Leer übernimmt Kiros Standard.",
   "config.defaultModel": "ID des Modells, das in neuen Sessions gewählt wird, zum Beispiel `auto`. Leer übernimmt Kiros Standard.",

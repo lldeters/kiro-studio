@@ -2,10 +2,11 @@
  * Answers Kiro's `session/request_permission` requests.
  *
  * Rules (docs/PLAN.md decision E1):
- * - In Autopilot, with the setting on, a request that Kiro marks `askType: "implicit"` is answered with
- *   `allow_once` automatically. Every such answer is recorded in the session.
+ * - In Autopilot, with the setting on, every tool permission request that offers `allow_once` is answered with
+ *   `allow_once` automatically, whatever its `askType`. Every such answer is recorded in the session.
  * - A persistent option (`allow_always`, `reject_always`) is never chosen automatically.
- * - Everything else waits for the user. The UI shows the request and answers it through {@link answer}; a
+ * - The end-of-turn "Review changes" request (`turn_approval`) is a review of results, not a permission, and always
+ *   waits for the user, as does a request that offers no `allow_once`. The UI shows the request and answers it through {@link answer}; a
  *   dismissed prompt does not answer anything, because "dismissed" must not silently mean "deny" (for "Review
  *   changes" that would reject the whole turn).
  */
@@ -78,7 +79,6 @@ export class PermissionBroker {
     if (
       allowOnce &&
       details.type === 'tool_approval' &&
-      details.askType === 'implicit' &&
       session.isAutopilot &&
       this.deps.settings.autoAllowInAutopilot()
     ) {

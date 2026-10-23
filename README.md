@@ -15,8 +15,8 @@ Agent Client Protocol (ACP).
 - Starts `kiro-cli acp` on demand, keeps the connection alive (restart with back-off, sessions are resumed) and
   ends the whole process tree on exit.
 - Answers Kiro's file requests through the editor (unsaved changes win) and asks you for every permission request.
-  Autopilot can answer routine write requests for you (`kiroStudio.autoAllowInAutopilot`); see
-  [docs/PLAN.md](docs/PLAN.md), decision E1.
+  In Autopilot, Kiro Studio allows every permission request once for you (`kiroStudio.autoAllowInAutopilot`, on by
+  default, never a permanent "always" rule); Supervised always asks. See [docs/PLAN.md](docs/PLAN.md), decision E1.
 - Debug commands to start a session and send a prompt; the answer appears in the "Kiro Studio: Chat (debug)" output.
 
 Next: the chat view (phase 2), the Kiro panel (3), specs (4), polish (5).

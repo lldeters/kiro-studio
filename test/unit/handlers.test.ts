@@ -47,13 +47,13 @@ describe('permission requests', () => {
     expect(session.approvals).toHaveLength(0);
   });
 
-  it("answers Autopilot's implicit asks itself, once, and records it", async () => {
+  it.each(['implicit', 'explicit'])("answers Autopilot's %s asks itself, once, and records it", async (askType) => {
     const answers: JsonObject[] = [];
     const h = make({
       settings: { autonomy: 'autopilot' },
       fake: {
         autopilot: 'on',
-        turn: askingTurn(() => [permissionRequest('tool-1', { askType: 'implicit' })], answers),
+        turn: askingTurn(() => [permissionRequest('tool-1', { askType })], answers),
       },
     });
     const session = await h.agent.newSession({ cwd: '/ws' });
@@ -67,7 +67,6 @@ describe('permission requests', () => {
 
   it.each([
     ['the setting is off', { autonomy: 'autopilot' as const, autoAllow: false }, { askType: 'implicit' }],
-    ['Kiro marks the ask as explicit', { autonomy: 'autopilot' as const }, { askType: 'explicit' }],
     [
       'Kiro does not offer a one-time allow',
       { autonomy: 'autopilot' as const },

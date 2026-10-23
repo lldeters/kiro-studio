@@ -22,8 +22,10 @@ from documentation only is listed in PLAN.md under "Assumptions".
    get an explicit JSON-RPC error.
 4. **Approvals are the user's, with one explicit exception.** The client answers a permission request itself only
    when the user chose Autopilot and the setting for automatic approval is on (PLAN.md decision E1). It then
-   answers `allow_once` only, never a persistent `*_always` option, logs every automatic answer in the chat, and
-   shows every request it is not allowed to answer. In Supervised mode it always asks.
+   answers every tool permission request that offers `allow_once` with `allow_once`, never with a persistent
+   `*_always` option, and logs every automatic answer in the chat. The end-of-turn "Review changes" request and
+   requests without a one-time allow are always shown. In Supervised mode it always asks. Kiro's own deny rules are
+   unaffected, because Kiro does not ask for what it denies.
 5. **No private data in logs.** The protocol channel redacts tokens, e-mail addresses and the home directory.
 
 ## Process and layer model
