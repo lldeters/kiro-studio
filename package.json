@@ -75,7 +75,8 @@
           "type": "webview",
           "id": "kiroStudio.chat",
           "name": "%views.chat%",
-          "visibility": "visible"
+          "visibility": "visible",
+          "when": "config.kiroStudio.chatLocation == 'sidebar'"
         },
         {
           "id": "kiroStudio.sessions",
@@ -196,7 +197,8 @@
       {
         "command": "kiroStudio.openChat",
         "title": "%command.openChat%",
-        "category": "Kiro Studio"
+        "category": "Kiro Studio",
+        "icon": "$(comment-discussion)"
       },
       {
         "command": "kiroStudio.openChatInEditor",
@@ -492,6 +494,16 @@
           "group": "navigation@2"
         },
         {
+          "command": "kiroStudio.openChat",
+          "when": "view == kiroStudio.sessions",
+          "group": "navigation@-2"
+        },
+        {
+          "command": "kiroStudio.newSession",
+          "when": "view == kiroStudio.sessions",
+          "group": "navigation@-1"
+        },
+        {
           "command": "kiroStudio.sessions.search",
           "when": "view == kiroStudio.sessions && !kiroStudio.sessionsSearching",
           "group": "navigation@1"
@@ -737,6 +749,19 @@
           "default": "",
           "scope": "machine",
           "markdownDescription": "%config.cliPath%"
+        },
+        "kiroStudio.chatLocation": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "sidebar"
+          ],
+          "default": "editor",
+          "markdownEnumDescriptions": [
+            "%config.chatLocation.editor%",
+            "%config.chatLocation.sidebar%"
+          ],
+          "markdownDescription": "%config.chatLocation%"
         },
         "kiroStudio.autonomy": {
           "type": "string",

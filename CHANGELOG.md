@@ -27,6 +27,11 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - **Tooling:** unit, webview and integration tests, CI on Windows, macOS and Linux with VS Code 1.93 and stable, a
   `.vsix` with the licences of all bundled packages and a check of its contents.
 
+### Changed
+
+- The chat opens as one editor tab by default and the sidebar holds the menu (a layout test; `kiroStudio.chatLocation` =
+  `sidebar` brings the old layout back). "Reverted one file" is no longer "Reverted 1 files".
+
 ### Known limits
 
 - Not yet tried against a real Kiro CLI beyond probe runs; see the assumptions in [docs/PLAN.md](docs/PLAN.md).

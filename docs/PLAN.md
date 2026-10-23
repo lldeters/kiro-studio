@@ -517,3 +517,21 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
    am Ende „Kiro: Fertig“.
 4. VS Code auf Deutsch stellen: die Einführung sollte deutsch sein (A23).
 5. Eine lange Sitzung öffnen und eine Antwort streamen lassen: kein Ruckeln.
+
+## 14. Layout-Test: Chat als Editor-Tab (Variante B)
+
+Auf deinen Wunsch nach einem Test (2026-10-24): Der Chat öffnet sich als **ein** Editor-Tab („Kiro Chat“, neben dem Code), die
+Seitenleiste „Kiro Studio“ ist das Menü (Sitzungen, Specs, Steering, Hooks, MCP, Agents, Status).
+
+- **Einstellung `kiroStudio.chatLocation`:** `editor` (Standard) oder `sidebar` (wie vorher: Chat als erste Ansicht der Seitenleiste).
+  Die Chat-Ansicht der Seitenleiste ist nur im Modus `sidebar` sichtbar (`when`-Bedingung); ein Wechsel wirkt sofort.
+- **Ein Tab:** Ein weiterer Aufruf holt den vorhandenen Tab nach vorn. Der Tab behält seine Seite im Hintergrund (Scrollposition,
+  Entwurf), und nach einem Neuladen von VS Code kommt er wieder.
+- **Zugänge:** Chat-Symbol und „+“ im Titel der Sitzungen-Ansicht, Willkommenstext dieser Ansicht, Befehl *Open Chat*, Statusleiste;
+  außerdem öffnet sich der Chat von selbst beim Öffnen einer Sitzung, bei einer neuen Spec und bei „Kiro schreiben lassen“.
+- Nebenbei: „Reverted 1 files“ heißt jetzt „Reverted one file“; der Tab heißt „Kiro Chat“, damit „Kiro Studio“ nicht mehrfach als Name erscheint.
+
+**Zurückrollen:** Einstellung `kiroStudio.chatLocation` auf `sidebar` stellen (kein Update nötig). Soll der Code ganz zurück, genügt es,
+den Commit „feat(layout): chat as one editor tab…“ rückgängig zu machen (`git revert`).
+
+**Was ich nicht prüfen konnte:** wie sich das Layout in deinem VS Code mit den anderen Erweiterungen in der rechten Seitenleiste anfühlt.

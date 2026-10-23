@@ -52,10 +52,31 @@ suite('Kiro Studio', () => {
     ]);
   });
 
-  test('opens the chat view and its page reports that it loaded', async () => {
+  test('opens the chat as one editor tab and its page reports that it loaded', async () => {
     const api = await activate();
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     await vscode.commands.executeCommand('kiroStudio.openChat');
-    await waitFor(() => api.chatReady, 'the chat page to load (script, style and policy)');
+    await waitFor(() => api.chatReady && api.chatEditorCount === 1, 'the chat page to load (script, style and policy)');
+    // Asking again brings the tab to the front; there is never a second one.
+    await vscode.commands.executeCommand('kiroStudio.openChat');
+    await vscode.commands.executeCommand('kiroStudio.openChatInEditor');
+    assert.strictEqual(api.chatEditorCount, 1);
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await waitFor(() => api.chatEditorCount === 0, 'the chat tab to close');
+  });
+
+  test('shows the chat as a view in the sidebar when asked to', async () => {
+    const api = await activate();
+    const config = vscode.workspace.getConfiguration('kiroStudio');
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    await config.update('chatLocation', 'sidebar', vscode.ConfigurationTarget.Global);
+    try {
+      await vscode.commands.executeCommand('kiroStudio.openChat');
+      await waitFor(() => api.chatReady, 'the chat view in the sidebar to load');
+      assert.strictEqual(api.chatEditorCount, 0, 'no tab is opened');
+    } finally {
+      await config.update('chatLocation', undefined, vscode.ConfigurationTarget.Global);
+    }
   });
 
   test('reports a missing CLI when the configured path does not exist', async () => {

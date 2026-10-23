@@ -80,7 +80,7 @@ export class AgentHost implements vscode.Disposable {
   /** Brings the oldest open request to the user: in the chat if it is showing, else in a picker. */
   showPendingApproval(): void {
     if (this.pendingApprovals === 0) return;
-    if (this.suppressApprovalPrompt()) void vscode.commands.executeCommand('kiroStudio.chat.focus');
+    if (this.suppressApprovalPrompt()) void vscode.commands.executeCommand('kiroStudio.openChat');
     else this.approvalUi?.showNext(true);
   }
 

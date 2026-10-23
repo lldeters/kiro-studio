@@ -327,7 +327,9 @@ export class ChatController implements vscode.Disposable {
     if (result.restored.length > 0) {
       session.addNotice(
         'info',
-        vscode.l10n.t('Reverted {0} files to their state before the turn.', result.restored.length),
+        result.restored.length === 1
+          ? vscode.l10n.t('Reverted one file to its state before the turn.')
+          : vscode.l10n.t('Reverted {0} files to their state before the turn.', result.restored.length),
       );
     }
     if (result.failed.length > 0) {

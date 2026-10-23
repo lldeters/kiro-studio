@@ -178,7 +178,7 @@ export class SpecActions {
       () => host.newSession(),
     );
     if (options.mode !== undefined) await this.useMode(session, options.mode);
-    await vscode.commands.executeCommand('kiroStudio.chat.focus');
+    await vscode.commands.executeCommand('kiroStudio.openChat');
     const target = session;
     host
       .ensureAgent()

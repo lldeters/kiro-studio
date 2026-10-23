@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 interface Manifest {
   contributes: {
     commands: { command: string; title: string }[];
-    views: Record<string, { id: string }[]>;
+    views: Record<string, { id: string; when?: string }[]>;
     viewsWelcome: { view: string; contents: string }[];
     menus: Record<string, { command: string; when?: string }[]>;
-    configuration: { properties: Record<string, unknown> };
+    configuration: { properties: Record<string, { default?: unknown; enum?: string[] }> };
   };
 }
 
@@ -45,5 +45,25 @@ describe('manifest', () => {
     for (const command of manifest.contributes.commands)
       expect(nls[command.title.replace(/%/g, '')], command.command).toBeTruthy();
     for (const id of views) expect(manifest.contributes.views['kiro-studio']?.find((v) => v.id === id)).toBeDefined();
+  });
+
+  it('shows the chat in the editor by default and as a sidebar view only when asked', () => {
+    const setting = manifest.contributes.configuration.properties['kiroStudio.chatLocation'];
+    expect(setting?.default).toBe('editor');
+    expect(setting?.enum).toEqual(['editor', 'sidebar']);
+    const chat = manifest.contributes.views['kiro-studio']?.find((v) => v.id === 'kiroStudio.chat');
+    expect(chat?.when).toBe("config.kiroStudio.chatLocation == 'sidebar'");
+    // Every other view stays in the sidebar whatever the setting says.
+    const others = manifest.contributes.views['kiro-studio']?.filter((v) => v.id !== 'kiroStudio.chat') ?? [];
+    expect(others.filter((v) => v.when !== undefined)).toEqual([]);
+  });
+
+  it('offers to open the chat from the sessions view, where the menu now starts', () => {
+    const entries = manifest.contributes.menus['view/title'] ?? [];
+    const onSessions = entries
+      .filter((e) => (e.when ?? '').includes('view == kiroStudio.sessions'))
+      .map((e) => e.command);
+    expect(onSessions).toContain('kiroStudio.openChat');
+    expect(onSessions).toContain('kiroStudio.newSession');
   });
 });
