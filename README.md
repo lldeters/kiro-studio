@@ -31,6 +31,10 @@ Output goes to `probe-logs/<timestamp>/` (`summary.json`, `wire.ndjson`, `stderr
 logs are redacted on a best-effort basis; read them before sharing. `npm run validate-wire -- <wire.ndjson>`
 checks which recorded messages the ACP SDK's own schemas would reject.
 
+## License
+
+Apache License 2.0, see [LICENSE](LICENSE).
+
 ## Requirements and limits (planned)
 
 - Kiro CLI with the V3 engine (`kiro-cli update` if yours is older). The headless mode that needs `KIRO_API_KEY`

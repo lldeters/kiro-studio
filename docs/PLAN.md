@@ -3,8 +3,8 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0 abgeschlossen, erster Probe-Lauf auf deiner Maschine ausgewertet, wartet auf deine Freigabe.**
-Dieses Dokument braucht von dir vor allem Antworten auf Abschnitt 7 und noch ein paar kurze Probe-Läufe (Abschnitt 8).
+**Status: Phase 0 abgeschlossen, erster Probe-Lauf ausgewertet, deine Entscheidungen vom 2026-10-23 sind eingearbeitet
+(Abschnitt 7). Es fehlen noch die Freigabe für Phase 1 und ein paar kurze Probe-Läufe (Abschnitt 8).**
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -50,7 +50,7 @@ Details und Belege in `protocol-notes.md`, Abschnitt 16. `[V]` = auf deiner Masc
 3. **Supervised/Autopilot ist eine Config-Option** (`autopilot` = `on`/`off`), kein eigener Modus `[V]`. Im Supervised-Modus
    kommt am Turn-Ende eine zweite Freigabe „Review changes“ (`turn_approval`) `[V]`.
 4. **Autopilot heißt nicht „keine Rückfragen“.** In den Aufzeichnungen fragt Kiro auch mit `autopilot: on` bei
-   Schreibzugriffen (`askType: "implicit"`). Das berührt deine Vorgabe, Kiros Regeln nie auszuhebeln (Frage 2). Auf deiner
+   Schreibzugriffen (`askType: "implicit"`). Daraus folgt Entscheidung E1 (Abschnitt 7). Auf deiner
    Maschine ist das noch nicht nachgestellt (Lauf `--autopilot on`).
 5. **Kiro schreibt Dateien über den Client, wenn man `fs` anbietet** `[V]`: Existenzprüfung per `fs/read_text_file`, dann
    `fs/write_text_file`, Rücklesen, danach „Review changes“. Die Extension kann also Schreibzugriffe zurückhalten,
@@ -94,7 +94,7 @@ Siehe [ARCHITECTURE.md](ARCHITECTURE.md). Kernpunkte:
 | Webview | React, Vite, `react-markdown` + `remark-gfm`, Shiki (JS-Regex-Engine), Mermaid lazy, `react-virtuoso`, Zustand | wie im Prompt; `@vscode/webview-ui-toolkit` bleibt tabu. |
 | Tests | Vitest, `@vscode/test-cli`, Fake-Agent über In-Memory-Streams | wie im Prompt. Aufzeichnungen Dritter nur lokal als Gegenprobe, bis die Lizenzfrage (MIT, Namensnennung) sauber gelöst ist; Fixtures kommen aus Probe-Ausgaben oder sind handgeschrieben. |
 | Protokoll-Log | Output-Channel „Kiro Studio: Protocol“, Schwärzung (Tokens, E-Mail, Home-Pfad) | Die Schwärzfunktion der Probe wandert nach `src/util/redact.ts`. |
-| Lizenz | vorerst `UNLICENSED` | Frage 6 |
+| Lizenz | **Apache-2.0** (`LICENSE`, `package.json`) | Entscheidung E5. Das gebündelte SDK steht ebenfalls unter Apache-2.0; die Lizenztexte der gebündelten Pakete kommen beim Packaging in Phase 1 in die `.vsix`. |
 
 ## 5. Phasenplan
 
@@ -134,7 +134,7 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
 - Schreibzugriffe laufen über `fs/write_text_file` `[V]`: Die Extension hält die Antwort bis zur Entscheidung zurück, zeigt den
   Diff (bei neuen Dateien steht der Inhalt schon im ersten `tool_call`) und schreibt erst dann, Hunks einzeln. Wie Kiro auf eine
   Ablehnung oder eine lange Wartezeit reagiert, klärt `--review reject`; bis dahin ist das ein Plan, kein Versprechen.
-- Supervised/Autopilot-Umschalter (Config-Option `autopilot`), Verhalten laut Frage 2.
+- Supervised/Autopilot-Umschalter (Config-Option `autopilot`), Verhalten laut Entscheidung E1.
 - Eingabe: Enter, Shift+Enter, Esc = Abbrechen (erst nach `turn_start`, begrenzte Wartezeit). Steer: nur wenn `_session/steer`
   angekündigt ist, sonst Abbrechen + neuer Prompt als ausdrücklich so benannte Ersatzlösung.
 - `/`-Autovervollständigung (angekündigte Commands + gemappte Aktionen), `#`-Kontext (`#file`, `#folder`, `#current`,
@@ -151,13 +151,13 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
 Sessions (`session/list` mit Scopes workspace/user und Quellen local/remote, öffnen mit Replay, umbenennen nur wenn
 angekündigt, forken, suchen), Specs, Steering, Hooks, MCP, Agents.
 MCP-Status, Steering-Dokumente und Session-Liste live aus den Broadcasts `_kiro/mcp/status`, `_kiro/steering/documents_changed`
-und `_kiro/sessions/changed` `[V]` (Teilobjekte nach `sessionId` zusammenführen); Hook-Zustand erst nach dem Opt-in (Frage 5).
+und `_kiro/sessions/changed` `[V]` (Teilobjekte nach `sessionId` zusammenführen); Hook-Zustand erst nach dem Opt-in (Entscheidung E4).
 
 ### Phase 4 – Specs
 
 Assistent „Neue Spec“ (zuerst Modus setzen, dann strukturierter Prompt), Spec-Ansicht mit Tabs, Mermaid und
 Fortschritt, CodeLens und Task-Ausführung, Review-Modus. Das `tasks.md`-Format wird an einer **echten** Kiro-Spec
-ermittelt (Frage 4), nicht aus der Doku geraten.
+ermittelt (offen, E3), nicht aus der Doku geraten.
 
 ### Phase 5 – Feinschliff
 
@@ -170,11 +170,11 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 | R1 | ~~Kiro verlangt `protocolVersion: 2`.~~ **Geschlossen:** Kiro akzeptiert und beantwortet 1 `[V]`. | – | Das stabile SDK genügt. |
 | R2 | Das SDK verwirft eine unbekannte `session/update` still. | Verlorene Updates, Zustand falsch. | Umleitung auf Stream-Ebene (eingebaut in die Probe, in Phase 1 als Test). |
 | R3 | `_kiro/*`-Angebot unterscheidet sich je CLI-Version. | Funktionen fehlen oder brechen. | Alles über `extensionMethods` und beobachtete Broadcasts freischalten, nie über die Version; UI mit Leerzustand je Funktion. |
-| R4 | Unklar, wie Kiro auf eine verzögerte oder verweigerte `fs/write_text_file`-Antwort und auf „Reject changes“ reagiert. (Dass Kiro `fs/*` nutzt, ist bestätigt `[V]`.) | Hunk-Review vor dem Schreiben funktioniert evtl. nur eingeschränkt. | Lauf `--review reject`; Allow/Deny mit Diff-Vorschau und Schatten-Repo als Rückfallebene (Frage 3). |
+| R4 | Unklar, wie Kiro auf eine verzögerte oder verweigerte `fs/write_text_file`-Antwort und auf „Reject changes“ reagiert. (Dass Kiro `fs/*` nutzt, ist bestätigt `[V]`.) | Hunk-Review vor dem Schreiben funktioniert evtl. nur eingeschränkt. | Lauf `--review reject`; Allow/Deny mit Diff-Vorschau und Schatten-Repo als Rückfallebene (Entscheidung E2). |
 | R5 | Protokollfakten stammen teils aus Drittquellen und einer älteren CLI. | Falsche Annahmen. | Belegstufen in den Notizen; Probe auf deiner CLI; Integrationstests gegen die echte CLI als manueller Schritt. |
 | R6 | Spät und ungeordnet eintreffende Config-Updates, wirkungslose frühe Writes. | Falscher Modell-/Effort-Stand. | Schreibreihenfolge und Verwerfen veralteter Antworten im Session-Store, mit Tests. |
 | R7 | Frühes `session/cancel` wird ignoriert. | Abbrechen wirkt nicht. | Erst nach `turn_start` senden, begrenzte Wartezeit, UI zeigt „bricht ab…“ bis zur Antwort. |
-| R8 | Hook-Opt-in ändert das Verhalten (globale Hooks laufen). | Überraschende Befehle. | Opt-in nur bewusst, nie im Probe-Standardlauf (Frage 5). |
+| R8 | Hook-Opt-in ändert das Verhalten (globale Hooks laufen). | Überraschende Befehle. | Opt-in nur bewusst (Entscheidung E4: Einstellung, Standard aus), nie im Probe-Standardlauf. |
 | R9 | Entwicklung kostet Credits. | Kosten. | Fake-Agent für Tests; Probe mit `--no-prompt` ist kostenlos. |
 | R10 | Windows: Pfade kommen in drei Schreibweisen (klein geschriebener Laufwerksbuchstabe mit Backslashes, `file:///c%3A/…`, doppelt kodiert in `kiro-snapshot-v2://`), außerdem `.cmd`-Wrapper und CRLF. | Pfadvergleiche und Diffs schlagen nur unter Windows fehl. | Pfadnormalisierung zentral und früh testen, CI-Matrix, `kiro-cli.exe` bevorzugen. Installationsort ist bekannt: `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe` `[V]`. |
 | R11 | Sehr lange Chats, große `rawOutput`/`preview`-Nutzlasten. | Webview träge, Nachrichten über dem SDK-Größenlimit. | Virtualisierung, gekürzte Darstellung, Nachrichtenlimit konfigurieren und messen. |
@@ -184,36 +184,36 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 | R15 | Die CLI endet nicht, wenn stdin schließt `[V]`; ihr Agent-Server läuft als Kindprozess. | Verwaiste Prozesse nach dem Deaktivieren oder Beenden von VS Code. | Beenden des Prozessbaums (`taskkill /T` unter Windows), Test, ob nach dem Beenden Prozesse übrig bleiben. Lauf `--exit-wait 30`. |
 | R16 | Notifications (auch `session/update` und `_kiro/*`) kommen vor der `session/new`-Antwort `[V]`. | Verlorene oder falsch zugeordnete Updates. | Dispatcher akzeptiert unbekannte Session-IDs und hält die Nachrichten, bis `session/new` antwortet; Test mit dem Fake-Agenten. |
 
-## 7. Offene Fragen an dich
+## 7. Entscheidungen und offene Fragen
 
-Die ersten beiden sind für den Start von Phase 1 bzw. Phase 2 wichtig. Der Rest ist nicht eilig.
+### Entschieden (2026-10-23)
 
-1. **Weitere Probe-Läufe (blockieren den Start von Phase 1 nur teilweise).** Lauf 1 ist ausgewertet (danke). Für Phase 1 und 2
-   fehlen noch `--review reject`, `--autopilot on` und `--exit-wait 30 --no-prompt`; Befehle in Abschnitt 8. Ein Lauf mit Prompt
-   kostete bei dir rund 0,1 Credit, `--no-prompt` nichts. Schick mir wieder `summary.json` und `wire.ndjson` (vorher durchsehen; die
-   Schwärzung ist nur ein Hilfsmittel). Alternativ schaltest du `kiro.dev` und `agentclientprotocol.com` in den
-   Umgebungseinstellungen frei, dann lese ich die Doku selbst.
-2. **Freigaben im Autopilot-Modus (Trade-off, wirkt auf Phase 2).** Kiro fragt bei Schreibzugriffen auch im Autopilot
-   (`askType: "implicit"`). Optionen:
-   - **A (Empfehlung):** Immer anzeigen, was Kiro fragt. Ein optionaler Schalter „Implizite Rückfragen einmalig erlauben“
-     beantwortet nur Anfragen mit `askType: implicit` automatisch mit `allow_once` und nie `allow_always`; ausdrückliche
-     Regeln von Kiro (vermutlich `explicit`, das prüft die Probe) werden immer gezeigt.
-   - **B:** Im Autopilot alles automatisch einmalig erlauben (so macht es T3 Code). Bequem, hebelt aber Kiros ask-Regeln aus,
-     was du ausgeschlossen hast.
-   - **C:** Nie automatisch antworten. Sicher, aber Autopilot fühlt sich nicht wie in der Kiro IDE an.
-3. **Checkpoint-Grundlage für Revert und „View all changes“.** Dein Prompt: Schatten-Git-Repo, das auch greift, wenn Kiro
-   selbst schreibt. Kiro hat eigene Checkpoints (`checkpoints: true`, `kiro-snapshot-v2://`). Empfehlung: dein Schatten-Repo
-   wie beschrieben als verlässliche Basis; Kiros Checkpoints später prüfen und nur als Zusatz nutzen, wenn sie ein Client
-   zuverlässig lesen und zurückspielen kann. Einverstanden?
-4. **Beispiel-Spec (Phase-0-Punkt 4).** Auf dieser Maschine gibt es keine `.kiro/specs/…`. Entweder legst du eine echte Spec
-   (gern entschärft) unter `fixtures/specs/` ab, was nichts kostet und am verlässlichsten ist, oder ich lasse Kiro in Phase 4 eine
-   kleine Test-Spec erzeugen (kostet Credits). Empfehlung: du lieferst eine. Nötig erst in Phase 4.
-5. **Hooks-Opt-in.** Ohne `clientCapabilities._meta.kiro.hooks` lädt V3 keine Hooks; mit Opt-in muss der Client `_kiro/hooks/*`
-   beantworten und globale Hooks laufen. Soll Kiro Studio Hooks aktivieren (Empfehlung: ja, als Einstellung, Standard an, sobald die Probe
-   mit `--hooks` zeigt, was dabei vom Client verlangt wird)? Entscheidung in Phase 3.
-6. **Publisher, Extension-ID, Lizenz.** `package.json` braucht einen `publisher`; die Lizenz steht auf `UNLICENSED`. Soll es
-   MIT werden? Soll das Repo öffentlich sein?
-7. ~~Windows-Installationspfad der CLI.~~ Erledigt: `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe` steht jetzt in der Kandidatenliste.
+- **E1 – Freigaben im Autopilot: automatisch erlauben.** Ist der Autopilot an, beantwortet die Extension Kiros Rückfragen
+  selbst mit „einmal erlauben“ (`allow_once`). Dabei gilt: nie automatisch eine dauerhafte Option (`allow_always`,
+  `reject_always`) wählen; jede automatische Antwort im Chat sichtbar protokollieren („Automatisch erlaubt“); im
+  Supervised-Modus immer fragen; als Einstellung abschaltbar. **Meine Auslegung, bitte bestätigen:** Zunächst beantworte ich
+  nur Anfragen automatisch, die Kiro als `askType: "implicit"` kennzeichnet (so wurde es beobachtet). Alles andere bleibt
+  sichtbar, bis der Lauf `--autopilot on` zeigt, welche anderen Werte es gibt. Das hält deine ursprüngliche Vorgabe ein, Kiros
+  eigene Ask-Regeln nicht auszuhebeln; wenn du wirklich jede Anfrage automatisch erlaubt haben willst, ist das eine kleine
+  Änderung.
+- **E2 – Checkpoints:** Schatten-Git-Repo als verlässliche Basis für Revert und „View all changes“. Kiros eigene Checkpoints
+  prüfe ich später und nutze sie höchstens als Zusatz.
+- **E3 – Beispiel-Spec:** zurückgestellt. Du kennst Specs noch nicht (Erklärung in der Antwort vom 2026-10-23); das ist erst
+  für Phase 4 nötig und kein Hindernis für Phase 1 bis 3.
+- **E4 – Hooks: Opt-in.** Kiro Studio aktiviert Hooks nur, wenn du es einschaltest (Einstellung `kiroStudio.hooks.enabled`,
+  Standard aus), mit Hinweis, dass dann auch deine globalen Hooks laufen. Details in Phase 3.
+- **E5 – Lizenz: Apache-2.0.** `LICENSE` und `package.json` sind angelegt.
+
+### Offen
+
+1. **Weitere Probe-Läufe.** Lauf 1 ist ausgewertet. Für Phase 1 und 2 fehlen noch `--review reject`, `--autopilot on` und
+   `--exit-wait 30 --no-prompt`; Befehle in Abschnitt 8. Ein Lauf mit Prompt kostete bei dir rund 0,1 Credit, `--no-prompt`
+   nichts. Schick mir wieder `summary.json` und `wire.ndjson` (vorher durchsehen). Alternativ schaltest du `kiro.dev` und
+   `agentclientprotocol.com` in den Umgebungseinstellungen frei, dann lese ich die Doku selbst.
+2. **Freigabe für Phase 1.**
+3. **Publisher-ID und Name für die Copyright-Zeile.** `package.json` braucht einen `publisher`; für die Apache-Lizenz lege ich
+   eine `NOTICE`-Datei mit dem Copyright-Inhaber an, sobald ich den Namen kenne. Soll das Repo öffentlich sein?
+4. **Beispiel-Spec** (E3): erst in Phase 4.
 
 ## 8. Probe ausführen
 

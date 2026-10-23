@@ -17,8 +17,10 @@ parts proven by the probe on a real Kiro CLI 2.33.1 (Windows 11), by recordings 
 2. **Capabilities, not versions.** A feature is switched on only when the `initialize` result advertises it.
 3. **Tolerant on input, strict on output.** Unknown messages and metadata are ignored; requests we cannot serve
    get an explicit JSON-RPC error.
-4. **Kiro's rules stay Kiro's.** The client never answers an approval on the user's behalf unless the user
-   chose that explicitly and Kiro's own ask rules are not involved (PLAN.md question 2).
+4. **Approvals are the user's, with one explicit exception.** The client answers a permission request itself only
+   when the user chose Autopilot and the setting for automatic approval is on (PLAN.md decision E1). It then
+   answers `allow_once` only, never a persistent `*_always` option, logs every automatic answer in the chat, and
+   shows every request it is not allowed to answer. In Supervised mode it always asks.
 5. **No private data in logs.** The protocol channel redacts tokens, e-mail addresses and the home directory.
 
 ## Process and layer model
@@ -134,7 +136,7 @@ such write before it happens, can hold it until the user decided, and can snapsh
 files bypass `fs/*` and are only caught by the snapshot. A shadow git repository in the extension's storage tracks the
 workspace independently of the user's own repository, which is never touched. A snapshot is taken before a turn and after it; "View all changes" and
 "Revert" work from those two trees, regardless of whether Kiro or the client wrote the file. Kiro's own
-checkpoints (`kiro-snapshot-v2://`) are evaluated as an optional enhancement (PLAN.md question 3).
+checkpoints (`kiro-snapshot-v2://`) are evaluated as an optional enhancement (PLAN.md decision E2).
 
 ## Testing
 

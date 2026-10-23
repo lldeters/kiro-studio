@@ -301,7 +301,7 @@ Permission request in Supervised mode (`autopilot: "off"`), normalised. **[R]**
   missing. **[R]** So "Autopilot" does not mean "no questions reach the client". T3 Code answers these itself in its
   full-access mode, which is exactly what the task description forbids for Kiro's own ask rules. Other values of
   `askType` (presumably `explicit` for a rule that says "ask"), and whether command execution asks in Autopilot:
-  **[P]**. See PLAN.md question 2.
+  **[P]**. The consequence is PLAN.md decision E1: Kiro Studio answers such requests itself only in Autopilot, only with `allow_once`.
 
 **Second approval at the end of a Supervised turn ("Review changes")**: **[R][V]**
 
@@ -440,7 +440,7 @@ session, so no MCP server starts. **[T]**
   sent in the run (nothing needed OAuth) nor in the recordings. Direction and response **[P]**.
 - `clientCapabilities._meta.kiro.hooks: { enabled: true, v2: true }`: **required for V3 to load any hooks**.
   `enabled` alone makes Kiro send `_kiro/hooks/*` requests the client must answer. **[T]** Not in the task
-  description. Kiro Studio needs a decision (PLAN.md question). The probe only sends it with `--hooks`
+  description. Kiro Studio makes it an opt-in setting, off by default (PLAN.md decision E4). The probe only sends it with `--hooks`
   because it may run your global hooks.
 - `clientCapabilities.elicitation.form` is advertised by T3 Code; Kiro does not appear to use it in these runs.
 - `fs`: **used by Kiro** for reads and writes when advertised (section 7). **[V]** `terminal`: was not advertised in the

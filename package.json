@@ -4,7 +4,7 @@
   "description": "Unofficial graphical VS Code front end for the locally installed Kiro CLI, built on the Agent Client Protocol. Not affiliated with AWS or Kiro.",
   "version": "0.0.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=20"
   },
