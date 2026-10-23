@@ -7,8 +7,9 @@ This file describes how the pieces fit together. Phases, risks and open question
 [PLAN.md](PLAN.md); wire-level facts live in [protocol-notes.md](protocol-notes.md). Keep this file in
 step with the code after every phase.
 
-**State after Phase 0:** only `scripts/probe-acp.ts` exists. Everything below is the target design; the
-parts already proven by the probe or by reading the SDK are marked *(proven)*.
+**State after Phase 0:** only the probe tooling in `scripts/` exists. Everything below is the target design; the
+parts proven by the probe on a real Kiro CLI 2.33.1 (Windows 11), by recordings or by reading the SDK are marked
+*(proven)*.
 
 ## Principles
 
@@ -36,7 +37,7 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ dispatcher.ts ....... tolerant typed parsing of notifications, own lenient types
 │   ├─ capabilities.ts ..... initialize result → feature flags
 │   ├─ sessions.ts ......... session store, routing by sessionId, reducers, turn state machine
-│   └─ handlers/ ........... permissions, fs, terminal, openExternalUrl
+│   └─ handlers/ ........... permissions, fs (Kiro really uses it), terminal (if proven useful), openExternalUrl
 │
 ├─ workspace/ .............. file watchers + parsers: specs, steering, hooks, mcp, agents (jsonc-parser edits)
 ├─ checkpoints/ ............ shadow git repo in extension storage, diffs, revert
@@ -71,6 +72,9 @@ Registration order *(proven by the recordings)*:
 2. Before `session/new` and `session/load`: the dispatcher, because Kiro sends `available_commands_update` and
    the whole replay *before* those responses arrive.
 3. `initialize` → read capabilities → `session/new` / `session/load` with `mcpServers` re-sent on every load.
+4. Notifications can carry a `sessionId` the client has not received yet: on Kiro 2.33.1 `available_commands_update`
+   and seven `_kiro/*` broadcasts arrive 0.2 to 17 s before the `session/new` response. The dispatcher therefore
+   accepts unknown ids and holds those messages until the response names the session *(proven)*.
 
 Do not use the SDK's `buildSession()`/`ActiveSession` helper: it attaches its queue only after `session/new`.
 
@@ -91,7 +95,13 @@ Do not use the SDK's `buildSession()`/`ActiveSession` helper: it attaches its qu
 
 The store is a pure TypeScript module without a VS Code import so that it can be tested with the fake agent.
 
-### Restart and resume
+### Startup, shutdown, restart and resume
+
+Startup is slow on Windows (`initialize` 4.7 s, `session/new` 17 s on a cold start), so the connection is built in the
+background with generous timeouts (60 s and 120 s) and the UI shows a "connecting" state *(proven)*. Shutdown sends
+`session/close`, closes stdin and, because the CLI did not exit on its own within 5 s, ends the whole process tree
+(`taskkill /T` on Windows) so that the agent-server child does not linger *(proven; whether it ever exits by itself
+is still being probed)*.
 
 A crashed process is restarted with exponential backoff. After `initialize`, sessions that were open are
 re-opened with `session/load` (client-side MCP servers sent again). A turn that was running is marked as
@@ -112,13 +122,17 @@ Security: strict CSP with nonce, narrow `localResourceRoots`, sanitised Markdown
 Specs, steering, hooks, MCP settings and custom agents are plain files under `.kiro/` and `~/.kiro/`. They are
 read through watchers and parsers in `workspace/`; JSON edits preserve formatting (`jsonc-parser`). Actions
 (create a spec, generate steering) go through prompts or advertised commands, not through invented methods.
-Live state that only the agent knows (MCP status, hook list) comes from advertised request methods or
-`_kiro/*` broadcasts, whichever the installed CLI provides.
+Live state that only the agent knows comes from `_kiro/*` broadcasts and advertised request methods, whichever the
+installed CLI provides. Kiro 2.33.1 pushes `_kiro/mcp/status` (full snapshot), `_kiro/steering/documents_changed`
+(documents with content), `_kiro/tools/didChange` (tool tags) and `_kiro/sessions/changed` (partial objects, merged by
+`sessionId`) *(proven)*. Hook state arrives only after the client opted in to hooks.
 
 ## Checkpoints and revert
 
-A shadow git repository in the extension's storage tracks the workspace independently of the user's own
-repository, which is never touched. A snapshot is taken before a turn and after it; "View all changes" and
+Kiro writes its own file tools' output through the client's `fs/write_text_file` *(proven)*, so the client sees every
+such write before it happens, can hold it until the user decided, and can snapshot the old content first. Shell-written
+files bypass `fs/*` and are only caught by the snapshot. A shadow git repository in the extension's storage tracks the
+workspace independently of the user's own repository, which is never touched. A snapshot is taken before a turn and after it; "View all changes" and
 "Revert" work from those two trees, regardless of whether Kiro or the client wrote the file. Kiro's own
 checkpoints (`kiro-snapshot-v2://`) are evaluated as an optional enhancement (PLAN.md question 3).
 

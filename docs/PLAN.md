@@ -3,8 +3,8 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0 abgeschlossen, wartet auf deine Freigabe.** Dieses Dokument braucht von dir vor allem
-Antworten auf Abschnitt 7, und für die erste Frage ein Ergebnis von deinem Rechner.
+**Status: Phase 0 abgeschlossen, erster Probe-Lauf auf deiner Maschine ausgewertet, wartet auf deine Freigabe.**
+Dieses Dokument braucht von dir vor allem Antworten auf Abschnitt 7 und noch ein paar kurze Probe-Läufe (Abschnitt 8).
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -13,57 +13,64 @@ Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenh
 
 | Geliefert | Zustand |
 | --- | --- |
-| `scripts/probe-acp.ts` (`npm run probe`) | Lauffähig und typgeprüft. Getestet gegen einen Replay-Agenten, der echte aufgezeichnete Kiro-Nachrichten abspielt: Handshake, Session, Freigaben, Ablehnung, Absturz, kaputte Zeile, CLI nicht gefunden. **Nicht gegen eine echte `kiro-cli` gelaufen.** |
-| `docs/protocol-notes.md` | Jede Aussage trägt eine Belegstufe (Doku laut deinem Prompt / Aufzeichnung / SDK-Quelltext / offen). |
+| `scripts/probe-acp.ts` (`npm run probe`) | Lauffähig und typgeprüft. Getestet gegen einen Replay-Agenten mit echten aufgezeichneten Kiro-Nachrichten (Handshake, Session, Freigaben, Ablehnung, Absturz, kaputte Zeile, CLI nicht gefunden, CLI beendet nicht bei geschlossenem stdin) und **einmal gegen deine echte `kiro-cli` 2.33.1 unter Windows 11**. |
+| `scripts/validate-wire.ts`, `scripts/redact.ts` | Prüft ein Probe-Log gegen die Schemas des SDK; Schwärzung von Tokens, E-Mail und Home-Pfad in allen Schreibweisen, die Kiro verwendet. |
+| `docs/protocol-notes.md` | Jede Aussage trägt eine Belegstufe: Doku laut deinem Prompt, Aufzeichnung Dritter, SDK-Quelltext, **verifiziert auf deiner Maschine `[V]`**, oder offen. |
 | `docs/ARCHITECTURE.md` | Zieldesign, plus was bereits belegt ist. |
 | `docs/PLAN.md` | Dieses Dokument. |
 | Repo-Gerüst | Nur das, was die Probe braucht (`package.json`, `.gitignore`, `scripts/`). Kein Feature-Code. |
 
-**Warum nicht gegen die echte CLI:** In diesem Cloud-Container ist `kiro-cli` nicht installiert und ein Login
-mit deinem Konto ist dort nicht sinnvoll. Außerdem blockiert die Netzwerkrichtlinie `kiro.dev`, `cli.kiro.dev`
-und `agentclientprotocol.com`; die Kiro-Doku konnte ich nicht direkt lesen, nur Suchausschnitte davon.
+**Wo etwas lief:** `kiro-cli` ist im Cloud-Container nicht installiert und ein Login mit deinem Konto ist dort nicht
+sinnvoll, deshalb lief die echte Probe bei dir. Außerdem blockiert die Netzwerkrichtlinie des Containers `kiro.dev`,
+`cli.kiro.dev` und `agentclientprotocol.com`; die Kiro-Doku konnte ich nicht direkt lesen, nur Suchausschnitte davon.
 
 **Woher die Protokollfakten stammen:**
 
-1. Dein Prompt (zitiert die Kiro-Doku, Stand Oktober 2026).
-2. 15 Aufzeichnungen echter Sitzungen mit `kiro-cli` **2.32.0** (V3-Engine) aus dem Kiro-Provider von
+1. **Dein Probe-Lauf 1** (`kiro-cli` 2.33.1, Kiro Agent Server 0.66.58, Windows 11, Google-Login, 2026-10-23): Tag `[V]`.
+   Alle 45 eingehenden Nachrichten bestehen die SDK-Schemas.
+2. Dein Prompt (zitiert die Kiro-Doku, Stand Oktober 2026).
+3. 15 Aufzeichnungen echter Sitzungen mit `kiro-cli` **2.32.0** (V3-Engine) aus dem Kiro-Provider von
    [T3 Code, PR 14693](https://github.com/pingdotgg/t3code/pull/14693) (MIT-Lizenz). Drittquelle, Oktober 2026,
-   Identity-Center-Login. Ich habe sie gegen die Schemas des SDK geprüft: alle 671 geprüften eingehenden Nachrichten sind gültig (Werkzeug: `npm run validate-wire`).
-3. Quelltext von `@agentclientprotocol/sdk` 2.0.1.
+   Identity-Center-Login. Alle 671 geprüften eingehenden Nachrichten bestehen die SDK-Schemas (Werkzeug: `npm run validate-wire`).
+4. Quelltext von `@agentclientprotocol/sdk` 2.0.1.
 
-Wo deine CLI abweicht, gilt deine CLI. Alles, was nur die Probe klären kann, steht als `[P]` in den Notizen.
+Wo deine CLI abweicht, gilt deine CLI. Was noch fehlt, steht als `[P]` in den Notizen (Abschnitt 17 dort).
 
 ## 2. Die wichtigsten Erkenntnisse
 
-Details und Belege in `protocol-notes.md`, Abschnitt 16.
+Details und Belege in `protocol-notes.md`, Abschnitt 16. `[V]` = auf deiner Maschine bestätigt.
 
-1. **`protocolVersion` ist in den Aufzeichnungen 2**, das SDK spricht standardmäßig v1 und nennt v2 experimentell.
-   Die Antwort von Kiro sieht auf der Leitung nach v1 aus. Was Kiro auf `protocolVersion: 1` antwortet, weiß ich
-   nicht. Das ist die erste Frage an die Probe (Risiko R1).
+1. **`protocolVersion: 1` funktioniert** `[V]`. Kiro antwortet mit 1; T3 Code sendet 2 und bekommt 2. Das stabile SDK (v1)
+   genügt, das experimentelle v2 brauchen wir nicht. Risiko R1 ist damit geschlossen.
 2. **Das SDK verwirft Nachrichten still.** Sein interner Router prüft jede `session/update` streng, bevor mein Code
-   sie sieht; schlägt die Prüfung fehl, geht die Nachricht verloren. Deshalb leitet die Extension `session/update`
-   und alle `_*`-Notifications auf Stream-Ebene in einen eigenen, toleranten Dispatcher um. Die Probe macht das
-   bereits so. Die SDK-Hilfe `buildSession()` scheidet aus, weil Kiro Updates **vor** der `session/new`-Antwort sendet.
-3. **Supervised/Autopilot ist eine Config-Option** (`autopilot` = `on`/`off`), kein eigener Modus. Im Supervised-Modus
-   kommt am Turn-Ende eine zweite Freigabe „Review changes“ (`turn_approval`).
-4. **Autopilot heißt nicht „keine Rückfragen“.** Auch mit `autopilot: on` fragt Kiro bei Schreibzugriffen
-   (`askType: "implicit"`). Das berührt deine Vorgabe, Kiros Regeln nie auszuhebeln (Frage 2).
-5. **Kiro schreibt Dateien vermutlich selbst.** Der Tool-Call enthält den fertigen Inhalt; die Aufzeichnungen
-   schalten `fs`/`terminal` aber ab, belegen also nichts darüber. Wenn Kiro `fs/write_text_file` nicht nutzt, ist
-   „Schreibzugriffe zurückhalten und Hunks einzeln annehmen“ vor dem Schreiben nicht möglich; es bleibt Allow/Deny
-   mit Diff-Vorschau vorher und Prüfung/Revert nachher. Die Probe meldet, ob `fs/*` genutzt wird.
-6. **`model` und `effortLevel` erscheinen spät** und nicht in der `session/new`- oder `session/load`-Antwort;
-   Schreibreihenfolge und Wartezeiten sind zu beachten (Notizen Abschnitt 3). Nach Möglichkeit klärt die Probe, ob
-   `model` auch ungefragt kommt.
+   sie sieht; schlägt die Prüfung fehl, geht die Nachricht verloren. Deine echten Nachrichten bestehen die Prüfung, aber
+   eine künftige CLI kann neue Update-Typen senden. Deshalb leitet die Extension `session/update` und alle
+   `_*`-Notifications auf Stream-Ebene in einen eigenen, toleranten Dispatcher um (die Probe macht das bereits so).
+   Die SDK-Hilfe `buildSession()` scheidet aus, weil Kiro Updates **vor** der `session/new`-Antwort sendet.
+3. **Supervised/Autopilot ist eine Config-Option** (`autopilot` = `on`/`off`), kein eigener Modus `[V]`. Im Supervised-Modus
+   kommt am Turn-Ende eine zweite Freigabe „Review changes“ (`turn_approval`) `[V]`.
+4. **Autopilot heißt nicht „keine Rückfragen“.** In den Aufzeichnungen fragt Kiro auch mit `autopilot: on` bei
+   Schreibzugriffen (`askType: "implicit"`). Das berührt deine Vorgabe, Kiros Regeln nie auszuhebeln (Frage 2). Auf deiner
+   Maschine ist das noch nicht nachgestellt (Lauf `--autopilot on`).
+5. **Kiro schreibt Dateien über den Client, wenn man `fs` anbietet** `[V]`: Existenzprüfung per `fs/read_text_file`, dann
+   `fs/write_text_file`, Rücklesen, danach „Review changes“. Die Extension kann also Schreibzugriffe zurückhalten,
+   Diffs und Hunks zeigen und ungespeicherte Editor-Inhalte liefern. Offen: was „Reject changes“ bewirkt (Lauf `--review reject`).
+6. **`model` erscheint ungefragt etwa 0,4 s nach `session/new`** `[V]`, nicht in der `session/new`-Antwort. `effortLevel`
+   gibt es nur bei Modellen mit Effort. Die Modellliste hängt vom Konto ab (bei dir 8 Modelle, in den Aufzeichnungen 21).
 7. **Abbrechen kann wirkungslos sein**, wenn es zu früh kommt. `session/cancel` ist eine Notification und wird erst
    nach `turn_start` gesendet.
-8. **Die Liste der `_kiro/*`-Methoden in 2.32.0 weicht von deinem Prompt ab:** keine `mcp/status`, `hooks/list`,
-   `account/getUsage`, `session/rename`, `_session/steer`; dafür `memory/*`, `session/export`, `session/history`,
-   `config/template`, `sourceProviders/*`. MCP- und Hook-Status kommen vermutlich als Broadcast-Notifications.
-   Die UI darf deshalb nicht an Request-Methoden hängen, sondern an „was die installierte CLI anbietet“.
+8. **Die `_kiro/*`-Liste weicht von deinem Prompt ab** `[V]`: keine Request-Methoden für `mcp/status`, `hooks/list`,
+   `account/getUsage`, `session/rename`, `_session/steer`. **MCP-Status, Tool-Kategorien, Steering-Dokumente (mit Inhalt)
+   und die Session-Liste kommen stattdessen als Broadcasts**, deren Nutzlasten jetzt dokumentiert sind. Das Kiro-Panel kann
+   live aus Push-Nachrichten gespeist werden. Die UI hängt an „was die installierte CLI anbietet“.
 9. **Hooks brauchen ein Opt-in des Clients** (`clientCapabilities._meta.kiro.hooks`), sonst lädt V3 keine Hooks.
 10. **Es gibt kein `/spec` in `available_commands_update`**; Spec-Workflows sind Modi (`spec`, `quick-spec`,
     `bug-fix`). Der Assistent „Neue Spec“ setzt also zuerst den Modus.
+11. **Start und Ende unter Windows** `[V]`: `initialize` dauerte 4,7 s, `session/new` 17 s; die CLI beendete sich nach
+    `session/close` und geschlossenem stdin nicht von selbst. Nötig sind großzügige Timeouts, ein „Verbinde…“-Zustand und
+    das Beenden des ganzen Prozessbaums (R14, R15).
+12. **Benachrichtigungen für eine neue Session kommen, bevor `session/new` die Session-ID liefert** `[V]`. Der Dispatcher
+    muss sie puffern (R16).
 
 ## 3. Architektur in Kürze
 
@@ -81,7 +88,7 @@ Siehe [ARCHITECTURE.md](ARCHITECTURE.md). Kernpunkte:
 | --- | --- | --- |
 | `engines.vscode` | **`^1.93.0`** | Die stabile Terminal-Shell-Integration (`onDidEndTerminalShellExecution`, `TerminalShellExecution`) gibt es erst ab 1.93; ich habe es an den Typen von `@types/vscode` 1.92 und 1.93 geprüft. Sie wird für `#terminal` gebraucht. `vscode.l10n` gäbe es schon ab 1.73, WebviewView und TreeView sind älter. VS Code 1.93 bringt Node 20 mit, passend zu „Node 20+“. Ohne `#terminal` wäre `^1.73.0` die untere Grenze (wegen `l10n`); die übrigen geplanten APIs habe ich nicht einzeln geprüft. |
 | SDK | `@agentclientprotocol/sdk` **2.0.1**, exakt gepinnt | Fluent-API (`client()`, `onRequest`, `connectWith`); `ClientSideConnection` gibt es nicht mehr. |
-| SDK-Einstiegspunkt | `/unstable` | Nur dort gibt es `session/fork` und `session/delete`. Die Entscheidung hängt von R1 ab (v1 oder v2). |
+| SDK-Einstiegspunkt | Stabil (v1); `/unstable` nur bei Bedarf | v1 funktioniert `[V]`, v2 entfällt. `session/fork` und `session/delete` gibt es als typisierte Methoden nur unter `/unstable`; entschieden wird in Phase 2, wenn die Fork-Parameter bekannt sind. Einen Einstiegspunkt konsequent verwenden. |
 | Eigene Schicht über dem SDK | Umleitung + toleranter Dispatcher | siehe Erkenntnis 2 |
 | Extension-Bundle | esbuild, CJS, SDK mit eingebündelt | Die Extension liefert kein `node_modules` aus. Wichtig: Das Wurzel-`package.json` bekommt **kein** `"type": "module"`, sonst lädt VS Code das CJS-Bundle als ESM. Skripte unter `scripts/` sind ESM über ein eigenes `scripts/package.json`. |
 | Webview | React, Vite, `react-markdown` + `remark-gfm`, Shiki (JS-Regex-Engine), Mermaid lazy, `react-virtuoso`, Zustand | wie im Prompt; `@vscode/webview-ui-toolkit` bleibt tabu. |
@@ -104,13 +111,16 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
 - `acp/connection.ts`: Prozess, Rohlog, Umleitung, Handler vor `initialize` bzw. `session/new`, Neustart mit
   Backoff, Wiederaufnahme per `session/load` (MCP-Server erneut senden), sauberes Beenden.
 - `acp/capabilities.ts`, `acp/sessions.ts` (Store, Turn-Automat, Freigabe-Queue), Handler für Freigaben, `fs`
-  (über die VS-Code-API, ungespeicherte Editor-Inhalte beachten), `terminal`, `_kiro/openExternalUrl`.
-  `fs`/`terminal` werden nur angeboten, wenn die Probe zeigt, dass Kiro sie nutzt, sonst nicht (Frage entfällt).
+  (über die VS-Code-API: offene, ungespeicherte Editoren zuerst, fehlende Datei als `-32002`), `_kiro/openExternalUrl`.
+  `fs` wird angeboten, weil Kiro es nutzt `[V]`; `terminal` erst, wenn der Lauf `--terminal` gezeigt hat, was Kiro damit tut.
+- Verbindung unter Windows: `initialize` ≥ 60 s und `session/new` ≥ 120 s Zeitlimit, sichtbarer „Verbinde…“-Zustand; Beenden
+  mit `session/close`, stdin schließen, dann den Prozessbaum beenden (`taskkill /T`), falls die CLI nicht selbst endet.
+  Der Dispatcher nimmt Notifications mit noch unbekannter Session-ID an und hält sie, bis `session/new` antwortet.
 - Statusleiste mit Quick-Menü, Onboarding (Willkommensansicht + Walkthrough), Workspace-Trust-Sperre.
 - Vorläufige Freigabe-UI per QuickPick und ein Debug-Befehl „Prompt senden“, damit die Verbindung ohne Chat testbar ist.
 - **Abnahme:** Tests grün; mit deiner CLI: verbinden, Session anlegen, Prompt senden, Freigabe beantworten,
   Prozess abschießen und wiederaufnehmen. Windows-, macOS- und Linux-Pfade in der CI-Matrix.
-- **Voraussetzung:** Probe-Ergebnis (Frage 1).
+- **Voraussetzung:** Probe-Läufe aus Abschnitt 8 (mindestens `--review reject`, `--autopilot on`, `--exit-wait 30`). Lauf 1 liegt vor.
 
 ### Phase 2 – Chat
 
@@ -121,6 +131,9 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
   Der Status eines Tool-Calls ist nicht monoton; „wartet auf Freigabe“ kommt aus der Freigabe-Queue, nicht aus `status`.
 - Inline-Freigaben mit genau den angebotenen Optionen (nach `kind` gewählt), einschließlich der „Review changes“-Freigabe;
   `allow_always` mit Hinweis, dass Kiro daraus eine dauerhafte Regel macht.
+- Schreibzugriffe laufen über `fs/write_text_file` `[V]`: Die Extension hält die Antwort bis zur Entscheidung zurück, zeigt den
+  Diff (bei neuen Dateien steht der Inhalt schon im ersten `tool_call`) und schreibt erst dann, Hunks einzeln. Wie Kiro auf eine
+  Ablehnung oder eine lange Wartezeit reagiert, klärt `--review reject`; bis dahin ist das ein Plan, kein Versprechen.
 - Supervised/Autopilot-Umschalter (Config-Option `autopilot`), Verhalten laut Frage 2.
 - Eingabe: Enter, Shift+Enter, Esc = Abbrechen (erst nach `turn_start`, begrenzte Wartezeit). Steer: nur wenn `_session/steer`
   angekündigt ist, sonst Abbrechen + neuer Prompt als ausdrücklich so benannte Ersatzlösung.
@@ -137,7 +150,8 @@ Nach jeder Phase: build, lint, test grün; kurze Zusammenfassung an dich; Commit
 
 Sessions (`session/list` mit Scopes workspace/user und Quellen local/remote, öffnen mit Replay, umbenennen nur wenn
 angekündigt, forken, suchen), Specs, Steering, Hooks, MCP, Agents.
-MCP- und Hook-Zustand aus dem, was die CLI anbietet (Request-Methode oder Broadcast); Hooks nach Frage 5.
+MCP-Status, Steering-Dokumente und Session-Liste live aus den Broadcasts `_kiro/mcp/status`, `_kiro/steering/documents_changed`
+und `_kiro/sessions/changed` `[V]` (Teilobjekte nach `sessionId` zusammenführen); Hook-Zustand erst nach dem Opt-in (Frage 5).
 
 ### Phase 4 – Specs
 
@@ -153,30 +167,32 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 
 | # | Risiko | Wirkung | Gegenmaßnahme |
 | --- | --- | --- | --- |
-| R1 | Kiro verlangt `protocolVersion: 2`, das SDK-Standard ist v1 (v2 experimentell). | Handshake scheitert, oder Verhalten weicht ab. | Probe testet beide Werte. Fällt es auf v2, entscheiden wir über `experimental/v2` oder eine dünne eigene JSON-RPC-Schicht. Die Umleitung und der Dispatcher sind davon kaum betroffen. |
+| R1 | ~~Kiro verlangt `protocolVersion: 2`.~~ **Geschlossen:** Kiro akzeptiert und beantwortet 1 `[V]`. | – | Das stabile SDK genügt. |
 | R2 | Das SDK verwirft eine unbekannte `session/update` still. | Verlorene Updates, Zustand falsch. | Umleitung auf Stream-Ebene (eingebaut in die Probe, in Phase 1 als Test). |
 | R3 | `_kiro/*`-Angebot unterscheidet sich je CLI-Version. | Funktionen fehlen oder brechen. | Alles über `extensionMethods` und beobachtete Broadcasts freischalten, nie über die Version; UI mit Leerzustand je Funktion. |
-| R4 | Kiro nutzt `fs/*` nicht und schreibt selbst. | Kein Zurückhalten und Hunk-Review vor dem Schreiben. | Allow/Deny mit Diff-Vorschau vorher, Schatten-Repo nachher (Frage 3). |
+| R4 | Unklar, wie Kiro auf eine verzögerte oder verweigerte `fs/write_text_file`-Antwort und auf „Reject changes“ reagiert. (Dass Kiro `fs/*` nutzt, ist bestätigt `[V]`.) | Hunk-Review vor dem Schreiben funktioniert evtl. nur eingeschränkt. | Lauf `--review reject`; Allow/Deny mit Diff-Vorschau und Schatten-Repo als Rückfallebene (Frage 3). |
 | R5 | Protokollfakten stammen teils aus Drittquellen und einer älteren CLI. | Falsche Annahmen. | Belegstufen in den Notizen; Probe auf deiner CLI; Integrationstests gegen die echte CLI als manueller Schritt. |
 | R6 | Spät und ungeordnet eintreffende Config-Updates, wirkungslose frühe Writes. | Falscher Modell-/Effort-Stand. | Schreibreihenfolge und Verwerfen veralteter Antworten im Session-Store, mit Tests. |
 | R7 | Frühes `session/cancel` wird ignoriert. | Abbrechen wirkt nicht. | Erst nach `turn_start` senden, begrenzte Wartezeit, UI zeigt „bricht ab…“ bis zur Antwort. |
 | R8 | Hook-Opt-in ändert das Verhalten (globale Hooks laufen). | Überraschende Befehle. | Opt-in nur bewusst, nie im Probe-Standardlauf (Frage 5). |
 | R9 | Entwicklung kostet Credits. | Kosten. | Fake-Agent für Tests; Probe mit `--no-prompt` ist kostenlos. |
-| R10 | Windows: Prozessstart, Pfade (`file://`, Laufwerksbuchstaben), `.cmd`-Wrapper, CRLF. | Fehler nur auf Windows. | CI-Matrix früh, Pfadnormalisierung zentral, `kiro-cli.exe` bevorzugen. Ein echter Windows-Installationspfad fehlt mir (Frage 7). |
+| R10 | Windows: Pfade kommen in drei Schreibweisen (klein geschriebener Laufwerksbuchstabe mit Backslashes, `file:///c%3A/…`, doppelt kodiert in `kiro-snapshot-v2://`), außerdem `.cmd`-Wrapper und CRLF. | Pfadvergleiche und Diffs schlagen nur unter Windows fehl. | Pfadnormalisierung zentral und früh testen, CI-Matrix, `kiro-cli.exe` bevorzugen. Installationsort ist bekannt: `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe` `[V]`. |
 | R11 | Sehr lange Chats, große `rawOutput`/`preview`-Nutzlasten. | Webview träge, Nachrichten über dem SDK-Größenlimit. | Virtualisierung, gekürzte Darstellung, Nachrichtenlimit konfigurieren und messen. |
 | R12 | Namens- oder Markenprobleme („Kiro“). | Beanstandung beim Veröffentlichen. | Eigener Name und Icon, deutlicher Hinweis „inoffiziell“, keine Kiro-Assets. |
-| R13 | ACP-v2-SDK ändert sich ohne Vorwarnung. | Wartungsaufwand. | SDK exakt pinnen, ACP-Schicht klein und hinter eigenen Typen halten. |
+| R13 | Das SDK ändert sich (v2 ist ein Entwurf, 2.x kann Brüche bringen). | Wartungsaufwand. | SDK exakt pinnen, ACP-Schicht klein und hinter eigenen Typen halten. |
+| R14 | Langsamer Start: `initialize` 4,7 s, `session/new` 17 s unter Windows `[V]`. | Wirkt wie ein Hänger; zu knappe Zeitlimits brechen den Start ab. | Zeitlimits ≥ 60 s / 120 s, „Verbinde…“-Zustand, Verbindung früh und im Hintergrund aufbauen. |
+| R15 | Die CLI endet nicht, wenn stdin schließt `[V]`; ihr Agent-Server läuft als Kindprozess. | Verwaiste Prozesse nach dem Deaktivieren oder Beenden von VS Code. | Beenden des Prozessbaums (`taskkill /T` unter Windows), Test, ob nach dem Beenden Prozesse übrig bleiben. Lauf `--exit-wait 30`. |
+| R16 | Notifications (auch `session/update` und `_kiro/*`) kommen vor der `session/new`-Antwort `[V]`. | Verlorene oder falsch zugeordnete Updates. | Dispatcher akzeptiert unbekannte Session-IDs und hält die Nachrichten, bis `session/new` antwortet; Test mit dem Fake-Agenten. |
 
 ## 7. Offene Fragen an dich
 
 Die ersten beiden sind für den Start von Phase 1 bzw. Phase 2 wichtig. Der Rest ist nicht eilig.
 
-1. **Probe auf deinem Rechner laufen lassen (blockiert Phase 1).** Anleitung in Abschnitt 8. Ein Lauf kostet einen
-   Bruchteil eines Credits (in den Aufzeichnungen rund 0,02 Credits für einen Einzeiler; dein Standardmodell kann mehr
-   verbrauchen); `--no-prompt` ist kostenlos. Schickst du mir `summary.json` und `wire.ndjson` aus `probe-logs/<Lauf>/`
-   (vorher durchsehen, die Schwärzung ist nur ein Hilfsmittel), kann ich die Notizen schließen. Alternativ schaltest du
-   in den Umgebungseinstellungen `kiro.dev` und `agentclientprotocol.com` frei, dann lese ich die Doku selbst; die Probe
-   braucht trotzdem deine Maschine.
+1. **Weitere Probe-Läufe (blockieren den Start von Phase 1 nur teilweise).** Lauf 1 ist ausgewertet (danke). Für Phase 1 und 2
+   fehlen noch `--review reject`, `--autopilot on` und `--exit-wait 30 --no-prompt`; Befehle in Abschnitt 8. Ein Lauf mit Prompt
+   kostete bei dir rund 0,1 Credit, `--no-prompt` nichts. Schick mir wieder `summary.json` und `wire.ndjson` (vorher durchsehen; die
+   Schwärzung ist nur ein Hilfsmittel). Alternativ schaltest du `kiro.dev` und `agentclientprotocol.com` in den
+   Umgebungseinstellungen frei, dann lese ich die Doku selbst.
 2. **Freigaben im Autopilot-Modus (Trade-off, wirkt auf Phase 2).** Kiro fragt bei Schreibzugriffen auch im Autopilot
    (`askType: "implicit"`). Optionen:
    - **A (Empfehlung):** Immer anzeigen, was Kiro fragt. Ein optionaler Schalter „Implizite Rückfragen einmalig erlauben“
@@ -197,30 +213,30 @@ Die ersten beiden sind für den Start von Phase 1 bzw. Phase 2 wichtig. Der Rest
    mit `--hooks` zeigt, was dabei vom Client verlangt wird)? Entscheidung in Phase 3.
 6. **Publisher, Extension-ID, Lizenz.** `package.json` braucht einen `publisher`; die Lizenz steht auf `UNLICENSED`. Soll es
    MIT werden? Soll das Repo öffentlich sein?
-7. **Windows-Installationspfad der CLI.** Ich kenne nur `~/.local/bin` (laut Drittquelle) und PATH. Zeigt `where kiro-cli` auf
-   deinem Windows-11-Rechner einen Pfad, nimm ich ihn in die Kandidatenliste auf.
+7. ~~Windows-Installationspfad der CLI.~~ Erledigt: `%LOCALAPPDATA%\Kiro-Cli\kiro-cli.exe` steht jetzt in der Kandidatenliste.
 
 ## 8. Probe ausführen
 
-Voraussetzungen: Node 20+, installierte und angemeldete Kiro CLI (`kiro-cli whoami`).
+Voraussetzungen: Node 20+, installierte und angemeldete Kiro CLI (`kiro-cli whoami`). Wer die Probe schon einmal gestartet
+hat, holt zuerst den neuen Stand: `git pull` und `npm ci`.
 
 ```bash
-git fetch origin claude/dreamy-curie-tne5sj && git checkout claude/dreamy-curie-tne5sj
+git clone -b claude/dreamy-curie-tne5sj https://github.com/lldeters/kiro-studio.git && cd kiro-studio
 npm ci
 npm run probe                      # voller Lauf, ein Mini-Prompt, Supervised
 ```
 
-Weitere Läufe (jeweils eigener Ordner unter `probe-logs/`):
+Nächste Läufe (jeweils eigener Ordner unter `probe-logs/`; Lauf 1 ist erledigt):
 
 ```bash
-npm run probe -- --no-prompt                  # nur Handshake und Session, kostenlos
+npm run probe -- --review reject              # was passiert bei "Reject changes"? schreibt Kiro die alte Datei zurück?
 npm run probe -- --autopilot on               # was wird im Autopilot noch gefragt?
-npm run probe -- --protocol-version 2         # gegen den Standardwert 1 vergleichen
-npm run probe -- --terminal                   # führt von Kiro angeforderte Befehle im Temp-Ordner aus
+npm run probe -- --exit-wait 30 --no-prompt   # beendet sich die CLI irgendwann von selbst, wenn stdin zu ist?
 npm run probe -- --hooks --no-prompt          # Hook-Verkehr sehen (kann globale Hooks starten)
-npm run probe -- --cli "C:\\Pfad\\kiro-cli.exe"   # Windows, falls nicht im PATH
+npm run probe -- --terminal --prompt "Run the command: node --version"
+                                              # Form der Freigabeanfrage für einen Befehl (wird abgelehnt)
 ```
 
 Die Probe arbeitet in einem frischen Temp-Ordner und erlaubt Freigaben nur einmalig und nur, wenn alle genannten Pfade
 darin liegen (`--approve none` lehnt alles ab). Ergebnis: `summary.json` (Zusammenfassung), `wire.ndjson` (jede Zeile auf
-der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist von Git ausgeschlossen.
+der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist von Git ausgeschlossen. `npm run validate-wire -- probe-logs/<Lauf>/wire.ndjson` prüft die Nachrichten gegen die Schemas des SDK.
