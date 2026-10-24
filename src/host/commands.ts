@@ -83,6 +83,14 @@ export function registerCommands(deps: CommandDeps): void {
     await setup.check();
   });
 
+  // One listener for the sign-in terminal, replaced by the next sign-in: pushing each one to the subscriptions kept them
+  // all until the window closed.
+  let signIn: vscode.Disposable | undefined;
+  context.subscriptions.push({
+    dispose: () => {
+      signIn?.dispose();
+    },
+  });
   command('kiroStudio.login', () => {
     const cli = setup.cliPath;
     if (cli === undefined) {
@@ -91,12 +99,14 @@ export function registerCommands(deps: CommandDeps): void {
     }
     const terminal = vscode.window.createTerminal({ name: t('Kiro: sign in'), ...loginInvocation(cli) });
     terminal.show();
+    signIn?.dispose();
     const done = vscode.window.onDidCloseTerminal((closed) => {
       if (closed !== terminal) return;
       done.dispose();
+      if (signIn === done) signIn = undefined;
       void setup.check();
     });
-    context.subscriptions.push(done);
+    signIn = done;
   });
 
   command('kiroStudio.toggleAutonomy', async () => {
