@@ -50,8 +50,12 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - A failure to fetch the list of sessions popped an error on every reconnect; now only when the user refreshes it. A
   prompt to write steering files while Kiro was busy ended in an unhandled error; it now says so.
 - A session without an open folder starts in the home folder; the chat now says so.
+- Whether the reader had scrolled up in one session no longer decides whether the next one follows new text.
 - "Reverted one file" instead of "Reverted 1 files".
 
 ### Known limits
 
 - Not yet tried against a real Kiro CLI beyond probe runs; see the assumptions in [docs/PLAN.md](docs/PLAN.md).
+- When the connection to the CLI is lost and a session is resumed, Kiro replays the conversation but not Kiro Studio's
+  checkpoint cards: _View changes_ and _Revert_ of earlier turns are gone from the chat (the snapshots stay in the
+  separate repository).

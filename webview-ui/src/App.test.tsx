@@ -181,6 +181,22 @@ describe('chat app', () => {
     expect(screen.getByPlaceholderText('Ask Kiro…')).toBeTruthy();
   });
 
+  it('starts a list of its own for every session, so that a scrolled-up reader in one does not affect the next', () => {
+    const { container } = render(<App />);
+    receive(
+      init({
+        tabs: [
+          { id: 's1', title: 'One', busy: false, attention: false, lost: false },
+          { id: 's2', title: 'Two', busy: false, attention: false, lost: false },
+        ],
+      }),
+      { type: 'session', session: session() },
+    );
+    const first = container.querySelector('.transcript');
+    receive({ type: 'session', session: session({ id: 's2' }) });
+    expect(container.querySelector('.transcript')).not.toBe(first);
+  });
+
   it('offers to start a session when there is none', () => {
     render(<App />);
     receive(init({ tabs: [], activeId: undefined }));

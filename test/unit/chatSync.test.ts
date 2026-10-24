@@ -77,6 +77,31 @@ describe('host and page together', () => {
     expect(shown(state)?.id).toBe('b');
   });
 
+  it('shows a question of a session in the background as a mark on its tab, and the question itself once the tab is shown', () => {
+    const sync = new ChatSync('posix');
+    let state = run(initialState, sync.init(base([a, b], a), extras));
+    const question = b.addApproval({
+      title: 'Write File',
+      type: 'tool_approval',
+      files: [],
+      options: [{ optionId: 'o', name: 'Allow', kind: 'allow_once' }],
+    });
+    // b is not on show: the page learns that it asks, from the tab, without receiving b's transcript.
+    const quiet = sync.update(base([a, b], a));
+    expect(quiet.map((m) => m.type)).toEqual(['tabs']);
+    state = run(state, quiet);
+    expect(state.tabs.find((t) => t.id === 'b')?.attention).toBe(true);
+
+    // The user switches to b: the question is there.
+    state = run(state, sync.update(base([a, b], b)));
+    expect(shown(state)?.approvals.map((x) => x.title)).toEqual(['Write File']);
+
+    b.removeApproval(question.id);
+    state = run(state, sync.update(base([a, b], b)));
+    expect(shown(state)?.approvals).toEqual([]);
+    expect(state.tabs.find((t) => t.id === 'b')?.attention).toBe(false);
+  });
+
   it('sends nothing when nothing changed', () => {
     const sync = new ChatSync('posix');
     sync.init(base([a, b], a), extras);

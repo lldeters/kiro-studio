@@ -25,7 +25,8 @@ export function App() {
       <Banner />
       {session ? (
         <>
-          <Transcript session={session} />
+          {/* A list of its own per session: whether the reader had scrolled up in another one must not carry over. */}
+          <Transcript key={session.id} session={session} />
           {session.plan && <PlanPanel plan={session.plan} />}
           <ApprovalDock session={session} />
           <Toolbar session={session} />
