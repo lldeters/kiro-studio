@@ -113,6 +113,8 @@ npm run test:integration   # downloads VS Code; the CI runs it on Linux, macOS a
 npm run package            # dist/kiro-studio.vsix
 ```
 
+Releases: [docs/RELEASING.md](docs/RELEASING.md) (one-time setup, the check with a real CLI, publishing; German).
+
 ## Running the probe
 
 Requires Node 20+ and a Kiro CLI that is installed and signed in (`kiro-cli whoami`).
