@@ -92,6 +92,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - The checkpoint repository only grew: every snapshot of every window stayed reachable through the chain of commits and
   a reflog. A window now starts a chain of its own, writes no reflog and prunes what earlier windows left that is older
   than two days. Git is looked for once, not before every turn.
+- Setting the CLI path while the first check still ran (it can take half a minute) showed the result for the old path.
+  A check that is asked for while one runs now runs once more after it.
 
 ### Known limits
 
