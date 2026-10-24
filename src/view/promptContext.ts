@@ -15,12 +15,18 @@ export interface ContextDeps {
   /** Where a relative path starts. */
   base?: string;
   exists(path: string): Promise<boolean>;
-  /** Output of `git diff`, or undefined when there is no repository. */
-  gitDiff(): Promise<string | undefined>;
+  /** Output of `git diff` (cut off when it is very long), or undefined when there is no repository. */
+  gitDiff(): Promise<GitDiff | undefined>;
   /** The workspace problems, already formatted (see {@link formatProblems}). */
   problems(): Promise<string | undefined>;
   /** Whether the agent accepts images in a prompt (`promptCapabilities.image`). */
   imageSupported: boolean;
+}
+
+export interface GitDiff {
+  text: string;
+  /** The diff was longer than the limit and ends early. */
+  truncated: boolean;
 }
 
 export type SkipReason = 'outside' | 'missing' | 'empty' | 'unsupported';
@@ -73,11 +79,15 @@ export async function resolveAttachments(
       }
       case 'gitDiff': {
         const diff = await deps.gitDiff();
-        if (diff === undefined || diff.trim() === '') result.skipped.push({ reason: 'empty', label: 'git diff' });
+        if (diff === undefined || diff.text.trim() === '') result.skipped.push({ reason: 'empty', label: 'git diff' });
         else {
+          // Kiro must know that it does not see all of it, or it would take the end of the text for the end of the diff.
+          const cut = diff.truncated
+            ? '\n(The diff is longer and was cut off here. Run git diff to see all of it.)'
+            : '';
           result.blocks.push({
             type: 'text',
-            text: `Uncommitted changes (git diff):\n\`\`\`diff\n${diff.trimEnd()}\n\`\`\``,
+            text: `Uncommitted changes (git diff):\n\`\`\`diff\n${diff.text.trimEnd()}\n\`\`\`${cut}`,
           });
           result.labels.push('git diff');
         }

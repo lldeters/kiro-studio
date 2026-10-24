@@ -6,7 +6,7 @@ const deps = (extra: Partial<ContextDeps> = {}): ContextDeps => ({
   roots: ['/ws'],
   base: '/ws',
   exists: () => Promise.resolve(true),
-  gitDiff: () => Promise.resolve('diff --git a/x b/x\n+new\n'),
+  gitDiff: () => Promise.resolve({ text: 'diff --git a/x b/x\n+new\n', truncated: false }),
   problems: () => Promise.resolve('- error a.ts:1:1 broken'),
   imageSupported: true,
   ...extra,
@@ -79,6 +79,21 @@ describe('resolveAttachments', () => {
     );
     expect(none.blocks).toEqual([]);
     expect(none.skipped.map((s) => s.reason)).toEqual(['empty', 'empty']);
+  });
+
+  it('tells Kiro when the git diff was cut off, and only then', async () => {
+    const cut = await resolveAttachments(
+      [{ kind: 'gitDiff' }],
+      deps({ gitDiff: () => Promise.resolve({ text: 'diff --git a/x b/x\n+one\n', truncated: true }) }),
+    );
+    expect(cut.blocks).toEqual([
+      {
+        type: 'text',
+        text: 'Uncommitted changes (git diff):\n```diff\ndiff --git a/x b/x\n+one\n```\n(The diff is longer and was cut off here. Run git diff to see all of it.)',
+      },
+    ]);
+    const whole = await resolveAttachments([{ kind: 'gitDiff' }], deps());
+    expect(whole.blocks[0]).toMatchObject({ text: expect.not.stringContaining('cut off') as string });
   });
 
   it('sends images only to an agent that accepts them', async () => {

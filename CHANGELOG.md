@@ -85,6 +85,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   sessions that are open on the connection.
 - A message that the host did not send (a turn had just started, the connection was lost, an attachment could not be
   read) was gone: the input had already been emptied. It now comes back into the input.
+- A `#git diff` longer than 300 KB was cut off in the middle of a line without a word, so Kiro took the end of the text
+  for the end of the diff. It now ends at a whole line and says that it was cut off.
 
 ### Known limits
 
