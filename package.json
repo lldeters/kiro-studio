@@ -858,6 +858,8 @@
     "l10n:export": "tsx scripts/l10n-export.ts",
     "notices": "tsx scripts/third-party-notices.ts",
     "package": "npm run build:prod && npm run notices && vsce package --no-dependencies -o dist/kiro-studio.vsix && tsx scripts/check-vsix.ts",
+    "release:prepare": "tsx scripts/prepare-release.ts",
+    "release:check": "tsx scripts/check-release.ts",
     "vscode:prepublish": "npm run build:prod",
     "probe": "tsx scripts/probe-acp.ts",
     "validate-wire": "tsx scripts/validate-wire.ts",
