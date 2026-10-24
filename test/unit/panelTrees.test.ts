@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agentsTree,
   hooksTree,
+  liveStateKey,
   mcpTree,
   sessionsTree,
   specsTree,
@@ -316,5 +317,33 @@ describe('agents tree', () => {
 
   it('has nothing to show without agents', () => {
     expect(agentsTree({ custom: [], modes: [], hasSession: false })).toEqual([]);
+  });
+});
+
+describe('live state key', () => {
+  const base = {
+    phase: 'ready',
+    sessions: [{ id: 'a', status: 'ready', title: 'One' }],
+    activeId: 'a',
+    modes: [{ id: 'vibe' }, { id: 'spec' }],
+    currentMode: 'vibe',
+  };
+
+  it('does not change while an answer streams, because nothing the views show does', () => {
+    expect(liveStateKey({ ...base, sessions: [{ id: 'a', status: 'ready', title: 'One' }] })).toBe(liveStateKey(base));
+  });
+
+  it('changes with a new session, a new title, a status, the active session, the agents and the connection', () => {
+    const key = liveStateKey(base);
+    const changed = [
+      { ...base, sessions: [...base.sessions, { id: 'b', status: 'ready', title: undefined }] },
+      { ...base, sessions: [{ id: 'a', status: 'ready', title: 'Renamed' }] },
+      { ...base, sessions: [{ id: 'a', status: 'lost', title: 'One' }] },
+      { ...base, activeId: 'b' },
+      { ...base, modes: [{ id: 'vibe' }] },
+      { ...base, currentMode: 'spec' },
+      { ...base, phase: 'reconnecting' },
+    ];
+    for (const input of changed) expect(liveStateKey(input), JSON.stringify(input)).not.toBe(key);
   });
 });

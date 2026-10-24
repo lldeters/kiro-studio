@@ -11,6 +11,7 @@ import { currentPlatform, isInsideAny } from '../../util/paths';
 import {
   agentsTree,
   hooksTree,
+  liveStateKey,
   mcpTree,
   sessionsTree,
   specsTree,
@@ -123,12 +124,31 @@ export class KiroPanel implements vscode.Disposable {
   // What Kiro tells us
   // -------------------------------------------------------------------------------------------------------------
 
-  private lastAgentReady = false;
+  private lastAgentReady: boolean | undefined;
+  private lastLiveState = '';
 
+  /**
+   * The host reports every change of a session, which during an answer is dozens a second. The views are built again, and
+   * the context key set, only when what they show has changed.
+   */
   private onHostChange(): void {
-    const ready = this.deps.host.agent?.state.phase === 'ready';
-    void vscode.commands.executeCommand('setContext', 'kiroStudio.agentReady', ready);
-    if (ready && !this.lastAgentReady) void this.refreshSessions();
+    const { host } = this.deps;
+    const agent = host.agent;
+    const session = host.activeSession;
+    const key = liveStateKey({
+      phase: agent?.state.phase ?? 'stopped',
+      sessions: (agent?.store.all() ?? []).map((s) => ({ id: s.id, status: s.status, title: s.title })),
+      activeId: session?.id,
+      modes: session?.modes.available ?? [],
+      currentMode: session?.modes.currentModeId,
+    });
+    if (key === this.lastLiveState) return;
+    this.lastLiveState = key;
+
+    const ready = agent?.state.phase === 'ready';
+    if (ready !== this.lastAgentReady)
+      void vscode.commands.executeCommand('setContext', 'kiroStudio.agentReady', ready);
+    if (ready && this.lastAgentReady !== true) void this.refreshSessions();
     this.lastAgentReady = ready;
     // The agents and the open sessions depend on the active session.
     this.refresh('agents', 'sessions');

@@ -68,17 +68,21 @@ class SpecPanel implements vscode.Disposable {
     );
   }
 
+  /** The view without what depends on the agent; built when the files are read, not on every change of a session. */
+  private base: SpecView | undefined;
+
   /** Reads the files again and sends what changed. */
   async reload(): Promise<void> {
     this.contents = await readSpecContents(vscodeFileReader, this.dir);
+    this.base = this.contents ? specView(this.contents, true) : undefined;
     this.push();
   }
 
   private view(): SpecView | undefined {
-    if (!this.contents) return undefined;
+    if (!this.base) return undefined;
     // An agent that has not been started yet is started by the first question.
     const agent = this.deps.host.agent;
-    return specView(this.contents, agent === undefined || agent.state.phase === 'ready');
+    return { ...this.base, canAsk: agent === undefined || agent.state.phase === 'ready' };
   }
 
   private send(message: SpecHostMessage): void {

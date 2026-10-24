@@ -25,6 +25,7 @@ export const UI_MESSAGES = [
   'The Kiro CLI could not be checked.',
   'Show the protocol log',
   'Connecting to Kiro… the first start can take a while.',
+  'Starting a session…',
   'The connection to Kiro was lost. Trying to reconnect ({0}).',
   'The Kiro CLI keeps stopping.',
   'Restart the connection',

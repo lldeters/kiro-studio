@@ -161,6 +161,8 @@ export interface AgentView {
   phase: 'stopped' | 'starting' | 'ready' | 'reconnecting' | 'failed';
   attempt?: number;
   message?: string;
+  /** A session is being started; the CLI can need many seconds for it. */
+  creating?: boolean;
 }
 
 export interface ChatCapabilities {

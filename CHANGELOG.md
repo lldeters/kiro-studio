@@ -37,6 +37,13 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   milliseconds and fall back to an estimate (host) or to showing the new text (page); counts are remembered.
 - A failure while building one session no longer leaves the page without it: nothing is marked as sent, the error goes
   to the protocol log, and the next change tries again.
+- A session that could not be loaded (opening it from the list, or resuming it after a restart) stayed behind as a tab
+  that was "starting" for ever. It is removed, or marked lost again if it was open before.
+- A new session became the active one only after the CLI had advertised the model and effort (up to 5 s), with no sign of
+  life. It is shown at once, a banner says that it is starting, and the defaults are written in the background; a
+  prompt sent meanwhile waits for them.
+- The Sessions and Agents views were rebuilt about 25 times a second while an answer streamed, and the spec view parsed
+  its tasks each time. They are rebuilt only when what they show has changed.
 - "Reverted one file" instead of "Reverted 1 files".
 
 ### Known limits

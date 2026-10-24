@@ -90,11 +90,31 @@ export class AgentHost implements vscode.Disposable {
     return sessions.find((s) => s.id === this.active) ?? sessions[0];
   }
 
-  /** Starts a session in the workspace folder (and the agent, if it is not running yet) and makes it the active one. */
+  private creating = 0;
+
+  /** How many sessions are being started (the CLI can need many seconds for one); the chat says so. */
+  get creatingSessions(): number {
+    return this.creating;
+  }
+
+  /**
+   * Starts a session in the workspace folder (and the agent, if it is not running yet) and makes it the active one at
+   * once. The user's defaults (agent, model, effort, autonomy) are written in the background, because waiting for the
+   * model to be advertised can take seconds; a prompt sent meanwhile waits for them.
+   */
   async newSession(): Promise<Session> {
-    const session = await this.ensureAgent().newSession({ cwd: this.workspaceRoot() });
-    this.setActive(session.id);
-    return session;
+    const agent = this.ensureAgent();
+    this.creating++;
+    this.notify();
+    try {
+      const session = await agent.newSession({ cwd: this.workspaceRoot(), applyDefaults: false });
+      this.setActive(session.id);
+      agent.applyDefaultsInBackground(session);
+      return session;
+    } finally {
+      this.creating--;
+      this.notify();
+    }
   }
 
   async closeSession(sessionId: string): Promise<void> {

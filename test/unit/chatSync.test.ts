@@ -66,6 +66,17 @@ describe('host and page together', () => {
     expect(messages[0]).toMatchObject({ type: 'tabs', activeId: 'b' });
   });
 
+  it('tells the page when a session is being started and when that is over', () => {
+    const sync = new ChatSync('posix');
+    let state = run(initialState, sync.init(base([a], a), extras));
+    const starting = { ...base([a], a), agent: { phase: 'ready' as const, creating: true } };
+    state = run(state, sync.update(starting));
+    expect(state.agent).toEqual({ phase: 'ready', creating: true });
+    state = run(state, sync.update(base([a, b], b)));
+    expect(state.agent).toEqual({ phase: 'ready' });
+    expect(shown(state)?.id).toBe('b');
+  });
+
   it('sends nothing when nothing changed', () => {
     const sync = new ChatSync('posix');
     sync.init(base([a, b], a), extras);

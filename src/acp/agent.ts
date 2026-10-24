@@ -308,6 +308,20 @@ export class KiroAgent {
     return session;
   }
 
+  /** Session ids whose defaults are being written in the background; a prompt waits for them. */
+  private readonly pendingDefaults = new Map<string, Promise<void>>();
+
+  /**
+   * Writes the user's defaults (agent, model, effort, autonomy) without making the caller wait: a new session can be shown
+   * and typed into at once. A prompt sent meanwhile waits for them, so that it runs with the agent and model that were set.
+   */
+  applyDefaultsInBackground(session: Session): void {
+    const pending = this.applyDefaults(session)
+      .catch((error: unknown) => this.deps.log.info(`defaults of ${session.id}: ${describeError(error)}`))
+      .finally(() => this.pendingDefaults.delete(session.id));
+    this.pendingDefaults.set(session.id, pending);
+  }
+
   /** Loads an existing session. The session object is created first, because replayed updates arrive before the response. */
   async loadSession(
     sessionId: string,
@@ -315,16 +329,30 @@ export class KiroAgent {
     options: { additionalDirectories?: string[] } = {},
   ): Promise<Session> {
     await this.start();
+    const existed = this.store.get(sessionId) !== undefined;
     const session = this.store.create(sessionId, { cwd });
     session.resetForReplay();
     session.cwd = cwd;
     this.dispatcher.sessionRegistered(sessionId);
-    const result = await this.ready.loadSession({
-      sessionId,
-      cwd,
-      ...(options.additionalDirectories === undefined ? {} : { additionalDirectories: options.additionalDirectories }),
-    });
-    session.applySessionResult(result);
+    try {
+      const result = await this.ready.loadSession({
+        sessionId,
+        cwd,
+        ...(options.additionalDirectories === undefined
+          ? {}
+          : { additionalDirectories: options.additionalDirectories }),
+      });
+      session.applySessionResult(result);
+    } catch (error) {
+      // A session that never loaded must not stay behind as a tab that is "starting" for ever; one that was open before
+      // is lost again, so that a later reconnect tries once more.
+      if (existed) session.markLost(`Could not load this session: ${describeError(error)}`);
+      else {
+        session.markClosed();
+        this.store.delete(sessionId);
+      }
+      throw error;
+    }
     return session;
   }
 
@@ -406,6 +434,9 @@ export class KiroAgent {
     if (session.busy) throw new Error('A turn is already running in this session');
     const { text, blocks = [], labels = [] } = typeof input === 'string' ? { text: input } : input;
     session.beginTurn(text, labels);
+    // Only when something is pending: an extra await would move the turn's first steps by a tick.
+    const defaults = this.pendingDefaults.get(sessionId);
+    if (defaults) await defaults;
     await this.hook('before', session);
     // A stop pressed while the turn was being prepared: the prompt is not sent at all.
     if (session.phase === 'cancelling') {

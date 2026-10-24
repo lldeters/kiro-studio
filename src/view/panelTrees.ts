@@ -39,6 +39,27 @@ const GOOD = 'testing.iconPassed';
 const BAD = 'errorForeground';
 const WARN = 'list.warningForeground';
 
+/**
+ * What the Sessions and Agents views show of the live state of the window. The host changes many times a second while an
+ * answer streams; the views only need to be built again when this key changes (a title, a status, the active session,
+ * the agents on offer), not for every chunk of text.
+ */
+export function liveStateKey(input: {
+  phase: string;
+  sessions: readonly { id: string; status: string; title?: string | undefined }[];
+  activeId?: string | undefined;
+  modes: readonly { id: string }[];
+  currentMode?: string | undefined;
+}): string {
+  return JSON.stringify([
+    input.phase,
+    input.sessions.map((s) => [s.id, s.status, s.title ?? null]),
+    input.activeId ?? null,
+    input.modes.map((m) => m.id),
+    input.currentMode ?? null,
+  ]);
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Sessions
 // ---------------------------------------------------------------------------------------------------------------

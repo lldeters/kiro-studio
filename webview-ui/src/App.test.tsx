@@ -212,6 +212,19 @@ describe('chat app', () => {
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull();
   });
 
+  it('says that a session is being started, and stops saying it when the session is there', () => {
+    render(<App />);
+    receive(init({ agent: { phase: 'ready', creating: true } }), { type: 'session', session: session() });
+    expect(screen.getByText('Starting a session…')).toBeTruthy();
+    receive({
+      type: 'status',
+      setup: 'ready',
+      agent: { phase: 'ready' },
+      capabilities: { image: false, compact: false },
+    });
+    expect(screen.queryByText('Starting a session…')).toBeNull();
+  });
+
   it('shows connection progress and failure', () => {
     render(<App />);
     receive(init({ tabs: [], activeId: undefined, agent: { phase: 'starting' } }));

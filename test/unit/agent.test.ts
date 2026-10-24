@@ -95,6 +95,22 @@ describe('new session', () => {
     expect(session.configValue('effortLevel')).toBe('high');
   });
 
+  it('can write the defaults in the background: the session is there at once and a prompt waits for them', async () => {
+    const h = make({ settings: { mode: 'spec', model: 'claude-opus-5.5', autonomy: 'supervised' } });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(configWrites(h.fake)).toEqual([]);
+    h.agent.applyDefaultsInBackground(session);
+
+    const prompt = h.agent.prompt(session.id, 'Hello');
+    await prompt;
+    const order = h.fake.received
+      .map((m) => m.method)
+      .filter((m) => m === 'session/prompt' || m === 'session/set_config_option');
+    // Every write of a default went out before the prompt did.
+    expect(order[order.length - 1]).toBe('session/prompt');
+    expect(configWrites(h.fake)).toEqual(['mode=spec', 'model=claude-opus-5.5', 'autopilot=off']);
+  });
+
   it('says so when a default is not offered and carries on', async () => {
     const h = make({ settings: { model: 'no-such-model', effort: 'low' } });
     const session = await h.agent.newSession({ cwd: '/ws' });
@@ -347,6 +363,30 @@ describe('load session', () => {
     expect(h.fake.requestsOf('session/load')).toMatchObject([
       { params: { sessionId: 'sess_old', cwd: '/ws', mcpServers: [] } },
     ]);
+  });
+
+  it('leaves no tab behind when a session cannot be loaded', async () => {
+    const h = make();
+    await h.agent.start();
+    h.fake.on('session/load', () => {
+      throw new RpcError(-32002, 'Session not found');
+    });
+    const seen: string[] = [];
+    h.agent.store.added.on((session) => seen.push(session.id));
+    await expect(h.agent.loadSession('sess_gone', '/ws')).rejects.toThrow('Session not found');
+    expect(seen).toEqual(['sess_gone']);
+    expect(h.agent.store.get('sess_gone')).toBeUndefined();
+  });
+
+  it('marks a session that was open before as lost again when loading it fails, so that it can be tried again', async () => {
+    const h = make();
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    h.fake.on('session/load', () => {
+      throw new RpcError(-32603, 'The CLI is busy');
+    });
+    await expect(h.agent.loadSession('sess_old', '/ws')).rejects.toThrow('The CLI is busy');
+    expect(h.agent.store.get('sess_old')).toBe(session);
+    expect(session.status).toBe('lost');
   });
 
   it('refuses to load when the agent cannot', async () => {

@@ -57,6 +57,9 @@ export function Banner() {
       if (agent.phase === 'starting') {
         text = t('Connecting to Kiro… the first start can take a while.');
         busy = true;
+      } else if (agent.phase === 'ready' && agent.creating) {
+        text = t('Starting a session…');
+        busy = true;
       } else if (agent.phase === 'reconnecting') {
         text = t('The connection to Kiro was lost. Trying to reconnect ({0}).', agent.attempt ?? 1);
         busy = true;

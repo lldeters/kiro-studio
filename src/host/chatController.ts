@@ -107,6 +107,7 @@ export class ChatController implements vscode.Disposable {
           phase: state.phase,
           ...(state.attempt === undefined ? {} : { attempt: state.attempt }),
           ...(state.message === undefined ? {} : { message: state.message }),
+          ...(this.host.creatingSessions > 0 ? { creating: true } : {}),
         }
       : { phase: 'stopped' };
     return { setup: this.setup.state, agent };
