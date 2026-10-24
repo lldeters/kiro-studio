@@ -8,6 +8,7 @@ resources/icon.svg
 !package.json
 !package.nls*.json
 !README.md
+!CHANGELOG.md
 !LICENSE
 !NOTICE
 !THIRD_PARTY_NOTICES.txt

@@ -100,6 +100,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   was not a whole number reached the editor as an invalid range. Both are ignored now.
 - _Add MCP server_ split the command at every space, so a program or an argument with spaces in its path was broken
   apart. Quotes now keep such a part together.
+- The package left out this changelog, so the Marketplace would have shown no Changelog tab. It is in the package now,
+  and the package check insists on it.
 
 ### Known limits
 

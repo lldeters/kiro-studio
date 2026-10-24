@@ -3,6 +3,8 @@
 const REQUIRED = [
   'package.json',
   'README.md',
+  // The Marketplace shows it as the Changelog tab.
+  'CHANGELOG.md',
   'LICENSE',
   'NOTICE',
   'THIRD_PARTY_NOTICES.txt',
