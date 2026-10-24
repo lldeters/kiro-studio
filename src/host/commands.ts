@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeError } from '../acp/errors';
 import { loginInvocation } from '../kiro/cli';
+import { currentAutonomy } from '../view/statusModel';
 import type { AgentHost } from './agentHost';
 import type { ChatController } from './chatController';
 import { openChatInEditor } from './chatView';
@@ -99,10 +100,11 @@ export function registerCommands(deps: CommandDeps): void {
   });
 
   command('kiroStudio.toggleAutonomy', async () => {
-    const next = settings.autonomy() === 'autopilot' ? 'supervised' : 'autopilot';
-    await settings.setAutonomy(next);
+    // From what the toolbar shows, not from the setting: the two can differ (a session opened from the list).
     const session = host.activeSession;
-    if (session && host.agent) {
+    const next = currentAutonomy(session, settings.autonomy()) === 'autopilot' ? 'supervised' : 'autopilot';
+    await settings.setAutonomy(next);
+    if (session?.status === 'ready' && session.configOption('autopilot') !== undefined && host.agent) {
       await host.agent.setConfig(session.id, 'autopilot', next === 'autopilot' ? 'on' : 'off');
     }
     void vscode.window.setStatusBarMessage(next === 'autopilot' ? t('Kiro: Autopilot') : t('Kiro: Supervised'), 3000);

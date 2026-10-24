@@ -1,5 +1,6 @@
 /** The menu behind the status bar item: the most useful actions for the current state. */
 import * as vscode from 'vscode';
+import { currentAutonomy } from '../view/statusModel';
 import type { AgentHost } from './agentHost';
 import type { SetupController } from './setup';
 import type { Settings } from './settings';
@@ -42,7 +43,7 @@ export async function showQuickMenu(host: AgentHost, setup: SetupController, set
       items.push(separator(t('Session')));
       items.push({ label: t('$(add) New session (debug)'), run: run('kiroStudio.debug.newSession') });
       items.push({ label: t('$(comment) Send a prompt (debug)'), run: run('kiroStudio.debug.sendPrompt') });
-      const autopilot = settings.autonomy() === 'autopilot';
+      const autopilot = currentAutonomy(host.activeSession, settings.autonomy()) === 'autopilot';
       items.push({
         label: autopilot ? t('$(shield) Switch to Supervised') : t('$(rocket) Switch to Autopilot'),
         description: autopilot ? t('now: Autopilot') : t('now: Supervised'),

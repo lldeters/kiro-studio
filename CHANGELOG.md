@@ -75,6 +75,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   lost with the old process stayed lost. Every start of the connection now resumes them.
 - _Revert_ took every file with CRLF line endings in a repository with `* text=auto` (usual on Windows) for one the user
   had changed since the turn, and asked again. The file is now compared with the same line-ending rules the snapshot used.
+- The Supervised/Autopilot button showed the session but switched from the setting, so with the setting on Supervised
+  and a session in Autopilot, "switch to Supervised" put the setting on Autopilot and left the session as it was. The
+  button, the command and the menu now start from the session on show.
 
 ### Known limits
 

@@ -38,6 +38,19 @@ export function spokenStatus(model: Pick<StatusModel, 'text' | 'tooltip'>): stri
   return tooltip === '' ? text : `${text}. ${tooltip}`;
 }
 
+/**
+ * The autonomy that is in effect: the one of the session on show (what the chat's toolbar shows), else the setting that
+ * new sessions get. A switch must start from this, or "switch to Supervised" could put the setting on Autopilot.
+ */
+export function currentAutonomy(
+  session: Session | undefined,
+  setting: 'supervised' | 'autopilot',
+): 'supervised' | 'autopilot' {
+  if (session?.status === 'ready' && session.configOption('autopilot') !== undefined)
+    return session.isAutopilot ? 'autopilot' : 'supervised';
+  return setting;
+}
+
 export function optionLabel(session: Session, id: string): string | undefined {
   const option = session.configOption(id);
   const value = option?.currentValue;
