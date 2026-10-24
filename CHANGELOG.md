@@ -44,6 +44,12 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   prompt sent meanwhile waits for them.
 - The Sessions and Agents views were rebuilt about 25 times a second while an answer streamed, and the spec view parsed
   its tasks each time. They are rebuilt only when what they show has changed.
+- A question from a session that the chat is not showing got no picker while the chat was open, and was only visible as a
+  dot on its tab. The chat now asks the questions of the session it shows; any other session's question opens the
+  picker, also when the user switches away from the session that asked.
+- A failure to fetch the list of sessions popped an error on every reconnect; now only when the user refreshes it. A
+  prompt to write steering files while Kiro was busy ended in an unhandled error; it now says so.
+- A session without an open folder starts in the home folder; the chat now says so.
 - "Reverted one file" instead of "Reverted 1 files".
 
 ### Known limits

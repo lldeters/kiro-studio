@@ -192,7 +192,8 @@ export class KiroPanel implements vscode.Disposable {
   }
 
   /** Lists the sessions Kiro knows. Without a connection there is nothing to ask; the view explains that. */
-  async refreshSessions(): Promise<void> {
+  /** Fetches the list of sessions. A failure is shown only when the user asked for the refresh, not on every reconnect. */
+  async refreshSessions(userAsked = false): Promise<void> {
     const agent = this.deps.host.agent;
     if (agent?.state.phase !== 'ready') {
       this.refresh('sessions');
@@ -208,7 +209,7 @@ export class KiroPanel implements vscode.Disposable {
       }
       this.sessionModel.replace(entries);
     } catch (error) {
-      void vscode.window.showErrorMessage(t('Kiro Studio: {0}', describeError(error)));
+      if (userAsked) void vscode.window.showErrorMessage(t('Kiro Studio: {0}', describeError(error)));
     }
     this.refresh('sessions');
   }
@@ -347,11 +348,11 @@ export class KiroPanel implements vscode.Disposable {
     );
     command('panel.refresh', () => {
       this.refresh();
-      return this.refreshSessions();
+      return this.refreshSessions(true);
     });
 
     // Sessions
-    command('sessions.refresh', () => this.refreshSessions());
+    command('sessions.refresh', () => this.refreshSessions(true));
     command('sessions.open', (id, cwd) => this.openSession(String(id), typeof cwd === 'string' ? cwd : undefined));
     command('sessions.fork', (node) => this.forkSession(data(node)));
     command('sessions.rename', (node) => this.renameSession(data(node)));
@@ -503,7 +504,14 @@ export class KiroPanel implements vscode.Disposable {
     const { host } = this.deps;
     const session = host.activeSession ?? (await host.newSession());
     await vscode.commands.executeCommand('kiroStudio.chat.focus');
-    void host.ensureAgent().prompt(session.id, GENERATE_STEERING_PROMPT);
+    if (session.busy) {
+      void vscode.window.showInformationMessage(t('Kiro is still working on a turn.'));
+      return;
+    }
+    host
+      .ensureAgent()
+      .prompt(session.id, GENERATE_STEERING_PROMPT)
+      .catch((error: unknown) => session.addNotice('error', describeError(error)));
   }
 
   private async showBuiltinSteering(name: string): Promise<void> {

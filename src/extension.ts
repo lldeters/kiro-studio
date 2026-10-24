@@ -71,7 +71,8 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     extensionUri: context.extensionUri,
     onDidChangeFiles: panel.onDidChangeFiles,
   });
-  agentHost.suppressApprovalPrompt = () => chat.visible;
+  // The chat answers a question itself only for the session it shows; another session's question gets a picker.
+  agentHost.suppressApprovalPrompt = (sessionId) => chat.visible && agentHost.activeSession?.id === sessionId;
   const statusBar = new StatusBarController(agentHost, setup);
   const view = new StatusView(agentHost, setup, settings);
 

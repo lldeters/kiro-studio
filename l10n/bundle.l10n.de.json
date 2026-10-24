@@ -151,6 +151,7 @@
   "Name of the steering file": "Name der Steering-Datei",
   "New name of the session": "Neuer Name der Sitzung",
   "New session": "Neue Sitzung",
+  "No folder is open, so Kiro works in your home folder.": "Es ist kein Ordner geöffnet, deshalb arbeitet Kiro in deinem Home-Ordner.",
   "No session yet.": "Noch keine Sitzung.",
   "Not sent: the Kiro CLI does not accept {0}.": "Nicht gesendet: Die Kiro CLI akzeptiert {0} nicht.",
   "Not sent: there is nothing in {0}.": "Nicht gesendet: In {0} gibt es nichts zu senden.",

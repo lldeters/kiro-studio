@@ -26,11 +26,13 @@ export class ApprovalUi implements vscode.Disposable {
   private readonly unsubscribe: (() => void)[] = [];
 
   /**
-   * @param suppress true while the chat view shows the requests itself; no picker opens then (unless asked for).
+   * @param suppress true for a request of a session that the chat is showing right now: the chat asks the question
+   *   itself, so no picker opens (unless asked for). A request of another session still gets a picker, because the chat
+   *   would show it only after the user switched tabs.
    */
   constructor(
     private readonly agent: KiroAgent,
-    private readonly suppress: () => boolean = () => false,
+    private readonly suppress: (sessionId: string) => boolean = () => false,
   ) {
     this.unsubscribe.push(
       agent.permissions.requested.on((entry) => {
@@ -51,12 +53,21 @@ export class ApprovalUi implements vscode.Disposable {
     return this.queue.length;
   }
 
-  /** Opens the picker for the oldest open request, if none is showing. */
+  /** The oldest request that waits for an answer. */
+  get oldest(): { session: Session; approval: PendingApproval } | undefined {
+    return this.queue[0];
+  }
+
+  /** True if the chat shows this request itself. */
+  shownInChat(entry: { session: Session }): boolean {
+    return this.suppress(entry.session.id);
+  }
+
+  /** Opens the picker for the oldest request that the chat does not show, if none is open. */
   showNext(force = false): void {
-    if (this.open || (!force && this.suppress())) return;
-    const entry = this.queue[0];
-    if (!entry) return;
-    this.show(entry);
+    if (this.open) return;
+    const entry = force ? this.queue[0] : this.queue.find((e) => !this.suppress(e.session.id));
+    if (entry) this.show(entry);
   }
 
   private show(entry: Entry): void {

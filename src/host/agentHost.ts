@@ -74,13 +74,14 @@ export class AgentHost implements vscode.Disposable {
     return this.approvalUi?.pendingCount ?? 0;
   }
 
-  /** True while the chat view shows Kiro's questions itself, so that no picker needs to open. */
-  suppressApprovalPrompt: () => boolean = () => false;
+  /** True while the chat shows the questions of this session itself, so that no picker needs to open for them. */
+  suppressApprovalPrompt: (sessionId: string) => boolean = () => false;
 
-  /** Brings the oldest open request to the user: in the chat if it is showing, else in a picker. */
+  /** Brings the oldest open request to the user: in the chat if it is showing that session, else in a picker. */
   showPendingApproval(): void {
-    if (this.pendingApprovals === 0) return;
-    if (this.suppressApprovalPrompt()) void vscode.commands.executeCommand('kiroStudio.chat.focus');
+    const oldest = this.approvalUi?.oldest;
+    if (!oldest) return;
+    if (this.suppressApprovalPrompt(oldest.session.id)) void vscode.commands.executeCommand('kiroStudio.openChat');
     else this.approvalUi?.showNext(true);
   }
 
@@ -108,6 +109,10 @@ export class AgentHost implements vscode.Disposable {
     this.notify();
     try {
       const session = await agent.newSession({ cwd: this.workspaceRoot(), applyDefaults: false });
+      if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length === 0) {
+        // Kiro can read and change everything it is pointed at; the user should know where that is.
+        session.addNotice('warning', vscode.l10n.t('No folder is open, so Kiro works in your home folder.'));
+      }
       this.setActive(session.id);
       agent.applyDefaultsInBackground(session);
       return session;
@@ -125,6 +130,8 @@ export class AgentHost implements vscode.Disposable {
   setActive(sessionId: string | undefined): void {
     this.active = sessionId;
     this.notify();
+    // A question of the session that was on show a moment ago is no longer asked in the chat.
+    this.approvalUi?.showNext();
   }
 
   private readonly checkpointServices = new Map<string, CheckpointService>();
@@ -184,7 +191,7 @@ export class AgentHost implements vscode.Disposable {
       },
     });
     this.current = agent;
-    this.approvalUi = new ApprovalUi(agent, () => this.suppressApprovalPrompt());
+    this.approvalUi = new ApprovalUi(agent, (sessionId) => this.suppressApprovalPrompt(sessionId));
     const approvalChanges = this.approvalUi.onDidChange(() => this.notify());
     this.subscriptions.push(
       () => {
