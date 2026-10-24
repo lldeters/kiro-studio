@@ -94,6 +94,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   than two days. Git is looked for once, not before every turn.
 - Setting the CLI path while the first check still ran (it can take half a minute) showed the result for the old path.
   A check that is asked for while one runs now runs once more after it.
+- A replay that rebuilt a session's transcript to at least its old length between two updates of the chat left the page
+  with the old items. The chat now notices from the last item it was sent that the transcript is a new one.
 
 ### Known limits
 
