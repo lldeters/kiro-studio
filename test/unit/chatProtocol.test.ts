@@ -72,6 +72,11 @@ describe('messages from the webview', () => {
     expect(parseWebviewMessage(message)).toBeUndefined();
   });
 
+  it('opens a file without a line when the line is not a whole number', () => {
+    for (const line of [Number.NaN, Number.POSITIVE_INFINITY, 2.5])
+      expect(parseWebviewMessage({ type: 'openFile', path: 'a.ts', line })).toEqual({ type: 'openFile', path: 'a.ts' });
+  });
+
   it('only lets the webview run the whitelisted commands', () => {
     for (const command of WEBVIEW_COMMANDS) expect(parseWebviewMessage({ type: 'command', command })).toBeDefined();
     expect(WEBVIEW_COMMANDS).not.toContain('workbench.action.terminal.new');

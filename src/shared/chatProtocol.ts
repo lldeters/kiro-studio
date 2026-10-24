@@ -317,7 +317,10 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'openFile': {
       const path = str('path');
       if (path === undefined) return undefined;
-      return typeof raw.line === 'number' ? { type: 'openFile', path, line: raw.line } : { type: 'openFile', path };
+      // A line that is not a whole number (NaN, Infinity) would make an invalid range in the editor.
+      return typeof raw.line === 'number' && Number.isInteger(raw.line)
+        ? { type: 'openFile', path, line: raw.line }
+        : { type: 'openFile', path };
     }
     case 'openLink': {
       const url = str('url');
