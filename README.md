@@ -89,8 +89,6 @@ real Kiro session._
 - Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 12) lists
   every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
 - The scripted stand-in for the CLI is a shell script, so the integration tests that use it are skipped on Windows.
-- After the connection to the CLI was lost and a session resumed, the checkpoint cards of earlier turns are gone from
-  the chat (the snapshots stay in the separate repository).
 - Only the first workspace folder is tracked by checkpoints. Sessions of a remote Kiro are listed but not driven specially.
 
 ## More

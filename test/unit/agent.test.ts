@@ -365,6 +365,21 @@ describe('load session', () => {
     ]);
   });
 
+  it('keeps the checkpoints of a session that is resumed, because Kiro does not replay them', async () => {
+    const h = make();
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    session.addCheckpoint({
+      id: 'c1',
+      files: [{ path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: true }],
+    });
+    await h.agent.loadSession('sess_old', '/ws');
+    expect(session.checkpoints.get('c1')?.files[0]).toMatchObject({ path: 'a.txt', reverted: true });
+    const markers = session.transcript.filter((item) => item.kind === 'checkpoint');
+    expect(markers).toHaveLength(1);
+    // The replayed conversation comes first, the checkpoint after it.
+    expect(session.transcript[session.transcript.length - 1]?.kind).toBe('checkpoint');
+  });
+
   it('leaves no tab behind when a session cannot be loaded', async () => {
     const h = make();
     await h.agent.start();

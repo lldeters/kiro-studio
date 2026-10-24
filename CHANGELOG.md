@@ -51,6 +51,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   prompt to write steering files while Kiro was busy ended in an unhandled error; it now says so.
 - A session without an open folder starts in the home folder; the chat now says so.
 - Whether the reader had scrolled up in one session no longer decides whether the next one follows new text.
+- After a lost connection Kiro replays the conversation but not our checkpoint cards, so _View changes_ and _Revert_ of
+  earlier turns disappeared. They are kept and put back after the replay (at its end: their place is not known).
 - "Reverted one file" instead of "Reverted 1 files".
 
 ### Known limits
