@@ -22,6 +22,7 @@ export class CheckpointService {
   private readonly recorded = new Map<string, Recorded>();
   private counter = 0;
   private failed: string | undefined;
+  private gitFound = false;
 
   constructor(
     private readonly repo: ShadowRepo,
@@ -46,7 +47,11 @@ export class CheckpointService {
   async before(session: Session): Promise<void> {
     if (this.failed !== undefined) return;
     try {
-      if (!(await this.repo.available())) return this.fail('Git was not found');
+      // Once is enough: starting `git --version` before every turn only delays it.
+      if (!this.gitFound) {
+        if (!(await this.repo.available())) return this.fail('Git was not found');
+        this.gitFound = true;
+      }
       this.pending.set(session.id, await this.repo.snapshot(`before turn in ${session.id}`));
     } catch (error) {
       this.fail(error instanceof Error ? error.message : String(error));

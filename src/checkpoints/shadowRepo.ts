@@ -60,6 +60,9 @@ const CONFIG = [
   'commit.gpgsign=false',
   '-c',
   'gc.auto=0',
+  // With a work tree Git would keep a reflog of HEAD, which keeps every snapshot reachable for ever.
+  '-c',
+  'core.logAllRefUpdates=false',
   ...IDENTITY,
 ];
 
@@ -71,6 +74,11 @@ export class ShadowRepo {
     private readonly gitDir: string,
     private readonly workTree: string,
     private readonly git: GitRunner = runGit,
+    /**
+     * Snapshots of earlier windows that are older than this are removed (a `git prune --expire` value). Checkpoints live
+     * as long as a window, so nothing can reach those any more; a younger one may still belong to another window.
+     */
+    private readonly pruneExpire = '2.days.ago',
   ) {}
 
   /** Operations run one after another: two `git add` on one index would fight over its lock. */
@@ -105,20 +113,36 @@ export class ShadowRepo {
     return (await this.git(['--version'], { cwd: this.workTree, timeoutMs: 10_000 })).code === 0;
   }
 
-  private async init(): Promise<void> {
-    if (this.initialised) return;
+  /** Returns true the first time, when the repository is set up for this window. */
+  private async init(): Promise<boolean> {
+    if (this.initialised) return false;
     await fs.mkdir(this.gitDir, { recursive: true });
     const created = await this.git(['init', '--quiet', '--bare', '--template=', this.gitDir], this.options);
     if (created.code !== 0) throw new Error(`git init failed: ${created.stderr.trim()}`);
     await fs.mkdir(path.join(this.gitDir, 'info'), { recursive: true });
     await fs.writeFile(path.join(this.gitDir, 'info', 'exclude'), `${EXCLUDE.join('\n')}\n`);
+    // The snapshots of earlier windows hang on one chain of commits from HEAD (and on the reflogs that versions before
+    // this one wrote) and would be kept for ever. This window starts a chain of its own; the old one becomes unreachable
+    // and is pruned below.
+    await this.run(['update-ref', '-d', 'HEAD']);
+    await fs.rm(path.join(this.gitDir, 'logs'), { recursive: true, force: true });
     this.initialised = true;
+    return true;
+  }
+
+  /**
+   * Removes the objects nothing reaches any more and that are older than {@link pruneExpire}. What the index holds is kept,
+   * so files that did not change are not stored again.
+   */
+  private async prune(): Promise<void> {
+    await this.ok(['prune', `--expire=${this.pruneExpire}`]);
   }
 
   /** Records the work tree as it is now and returns the id of the snapshot. */
   snapshot(label: string): Promise<string> {
     return this.serial(async () => {
-      await this.init();
+      // The first snapshot of a window cleans up after the earlier ones, after itself and without making it wait.
+      if (await this.init()) void this.serial(() => this.prune()).catch(() => undefined);
       await this.ok(['add', '--all', '--ignore-errors', '--', '.']);
       const tree = (await this.ok(['write-tree'])).trim();
       const head = await this.run(['rev-parse', '--verify', '--quiet', 'HEAD']);
