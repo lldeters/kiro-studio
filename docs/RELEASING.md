@@ -11,11 +11,15 @@ Workflow [`.github/workflows/release.yml`](../.github/workflows/release.yml); ei
 
 ### 1.1 Repository
 
-1. **Standard-Branch umbenennen.** Er heißt `claude/dreamy-curie-tne5sj`. Auf GitHub: *Settings → General → Default
-   branch*, Stift-Symbol, `main`. Offene Pull Requests ziehen mit um. Die Bilder und Links im README auf dem Marketplace
-   zeigen auf diesen Branch (`…/raw/HEAD/…`), er muss also den veröffentlichten Stand haben. Danach in `docs/PLAN.md`,
-   Abschnitt 8, die Zeile `git clone -b claude/dreamy-curie-tne5sj …` anpassen.
-2. **Den offenen Pull Request mergen** (Code-Review-Fixes und diese Vorbereitung), wenn die CI grün ist.
+1. **`main` zum Standard-Branch machen.** `main` gibt es schon; alle Arbeit geht von ihm aus und wird per Pull Request
+   dorthin gemergt. Auf GitHub: *Settings → General → Default branch*, die Pfeile neben dem Branch, `main` wählen,
+   *Update*. Danach kann der alte Standard-Branch `claude/dreamy-curie-tne5sj` gelöscht werden (*Branches*, Papierkorb);
+   er hat denselben Stand wie `main` vor dem ersten Merge. Die Bilder und Links im README auf dem Marketplace zeigen auf
+   den Standard-Branch (`…/raw/HEAD/…`), er muss also den veröffentlichten Stand haben; der Probelauf des Release-Workflows
+   lässt sich erst starten, wenn der Workflow dort liegt.
+2. **Den offenen Pull Request nach `main` mergen** (Code-Review-Fixes und diese Vorbereitung), wenn die CI grün ist.
+   Optional unter *Settings → Branches* eine Regel für `main` anlegen: Änderungen nur per Pull Request, und die Checks der
+   CI müssen grün sein.
 3. **Private Meldungen von Sicherheitslücken einschalten** (`SECURITY.md` verweist darauf): *Settings → Advanced
    Security* (oder *Code security*) *→ Private vulnerability reporting → Enable*.
 4. Optional: unter *Settings → Environments → release* eine Schutzregel setzen (*Required reviewers*: du). Dann wartet

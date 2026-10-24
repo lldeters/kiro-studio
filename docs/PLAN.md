@@ -225,7 +225,7 @@ Voraussetzungen: Node 20+, installierte und angemeldete Kiro CLI (`kiro-cli whoa
 hat, holt zuerst den neuen Stand: `git pull` und `npm ci`.
 
 ```bash
-git clone -b claude/dreamy-curie-tne5sj https://github.com/lldeters/kiro-studio.git && cd kiro-studio
+git clone https://github.com/lldeters/kiro-studio.git && cd kiro-studio   # Standard-Branch main
 npm ci
 npm run probe                      # voller Lauf, ein Mini-Prompt, Supervised
 ```
