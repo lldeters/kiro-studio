@@ -78,6 +78,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - The Supervised/Autopilot button showed the session but switched from the setting, so with the setting on Supervised
   and a session in Autopilot, "switch to Supervised" put the setting on Autopilot and left the session as it was. The
   button, the command and the menu now start from the session on show.
+- With the chat hidden, only the first of several questions from Kiro opened a picker; after the answer Kiro waited for
+  the next one, which only the status bar showed. The next question now opens as soon as one is answered.
 
 ### Known limits
 

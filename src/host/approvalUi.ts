@@ -7,6 +7,7 @@ import * as vscode from 'vscode';
 import type { KiroAgent } from '../acp/agent';
 import { offeredKinds, type OptionKind } from '../acp/handlers/permissions';
 import type { PendingApproval, Session } from '../acp/sessions';
+import { ApprovalQueue } from '../view/approvalQueue';
 
 interface Entry {
   session: Session;
@@ -21,8 +22,9 @@ export class ApprovalUi implements vscode.Disposable {
   private readonly changed = new vscode.EventEmitter<void>();
   readonly onDidChange = this.changed.event;
 
-  private readonly queue: Entry[] = [];
-  private open: { entry: Entry; picker: vscode.QuickPick<Choice> } | undefined;
+  /** Decides which request gets the picker; see {@link ApprovalQueue}. */
+  private readonly queue: ApprovalQueue<Entry>;
+  private picker: vscode.QuickPick<Choice> | undefined;
   private readonly unsubscribe: (() => void)[] = [];
 
   /**
@@ -34,28 +36,28 @@ export class ApprovalUi implements vscode.Disposable {
     private readonly agent: KiroAgent,
     private readonly suppress: (sessionId: string) => boolean = () => false,
   ) {
+    this.queue = new ApprovalQueue<Entry>(suppress, (entry) => this.show(entry));
     this.unsubscribe.push(
       agent.permissions.requested.on((entry) => {
-        this.queue.push(entry);
+        this.queue.add(entry);
         this.changed.fire();
-        this.showNext();
       }),
       agent.permissions.settled.on(({ approval }) => {
-        const index = this.queue.findIndex((e) => e.approval.id === approval.id);
-        if (index >= 0) this.queue.splice(index, 1);
-        if (this.open?.entry.approval.id === approval.id) this.open.picker.hide();
+        // The picker of the request that is gone closes first, so that the next one does not replace it.
+        if (this.queue.open?.approval.id === approval.id) this.closePicker();
+        this.queue.settle(approval.id);
         this.changed.fire();
       }),
     );
   }
 
   get pendingCount(): number {
-    return this.queue.length;
+    return this.queue.size;
   }
 
   /** The oldest request that waits for an answer. */
   get oldest(): { session: Session; approval: PendingApproval } | undefined {
-    return this.queue[0];
+    return this.queue.oldest;
   }
 
   /** True if the chat shows this request itself. */
@@ -65,9 +67,13 @@ export class ApprovalUi implements vscode.Disposable {
 
   /** Opens the picker for the oldest request that the chat does not show, if none is open. */
   showNext(force = false): void {
-    if (this.open) return;
-    const entry = force ? this.queue[0] : this.queue.find((e) => !this.suppress(e.session.id));
-    if (entry) this.show(entry);
+    this.queue.next(force);
+  }
+
+  private closePicker(): void {
+    const picker = this.picker;
+    this.picker = undefined;
+    picker?.dispose();
   }
 
   private show(entry: Entry): void {
@@ -80,17 +86,20 @@ export class ApprovalUi implements vscode.Disposable {
         : vscode.l10n.t('Kiro asks: {0}', approval.title);
     picker.placeholder = describe(approval, session);
     picker.items = offeredKinds(approval).map((kind) => choice(kind, approval));
-    this.open = { entry, picker };
+    this.picker = picker;
 
     picker.onDidAccept(() => {
       const selected = picker.selectedItems[0];
       if (!selected) return;
-      this.agent.permissions.answer(session.id, approval.id, selected.optionKind);
-      picker.hide();
+      // An answer settles the request, which closes this picker and opens the next one.
+      if (!this.agent.permissions.answer(session.id, approval.id, selected.optionKind)) picker.hide();
     });
     picker.onDidHide(() => {
       picker.dispose();
-      this.open = undefined;
+      // Closed by the user, not because the request was settled: it stays open, and nothing else opens by itself.
+      if (this.picker !== picker) return;
+      this.picker = undefined;
+      this.queue.dismissed(approval.id);
       this.changed.fire();
     });
     picker.show();
@@ -98,7 +107,7 @@ export class ApprovalUi implements vscode.Disposable {
 
   dispose(): void {
     for (const off of this.unsubscribe.splice(0)) off();
-    this.open?.picker.dispose();
+    this.closePicker();
     this.changed.dispose();
   }
 }
