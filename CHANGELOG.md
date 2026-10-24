@@ -98,6 +98,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   with the old items. The chat now notices from the last item it was sent that the transcript is a new one.
 - A link in an answer that could not be decoded (`%C3` alone, say) threw in the click handler, and a line number that
   was not a whole number reached the editor as an invalid range. Both are ignored now.
+- _Add MCP server_ split the command at every space, so a program or an argument with spaces in its path was broken
+  apart. Quotes now keep such a part together.
 
 ### Known limits
 

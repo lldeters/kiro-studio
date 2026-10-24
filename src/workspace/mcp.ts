@@ -51,6 +51,36 @@ export const setServerDisabled = (text: string, name: string, disabled: boolean)
 
 export const removeServer = (text: string, name: string): string => setJsonValue(text, ['mcpServers', name], undefined);
 
+/**
+ * A command line as the user types it into the input box, split into the program and its arguments. Whitespace separates
+ * them; double or single quotes keep a part with spaces together (`"C:\Program Files\node.exe"`). Backslashes are
+ * left alone, because Windows paths are full of them.
+ */
+export function splitCommandLine(line: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote: string | undefined;
+  let started = false;
+  for (const char of line) {
+    if (quote !== undefined) {
+      if (char === quote) quote = undefined;
+      else current += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      started = true;
+    } else if (/\s/.test(char)) {
+      if (started) parts.push(current);
+      current = '';
+      started = false;
+    } else {
+      current += char;
+      started = true;
+    }
+  }
+  if (started) parts.push(current);
+  return parts;
+}
+
 /** A server that starts with `command`. It is added disabled so that nothing runs before the user has looked at it. */
 export function addStdioServer(text: string, name: string, command: string, args: string[] = []): string {
   return setJsonValue(text, ['mcpServers', name], { command, args, disabled: true });

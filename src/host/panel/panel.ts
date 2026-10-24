@@ -28,6 +28,7 @@ import {
   parseMcpStatus,
   removeServer,
   setServerDisabled,
+  splitCommandLine,
   type McpRuntime,
 } from '../../workspace/mcp';
 import { SessionListModel } from '../../workspace/sessionList';
@@ -576,7 +577,7 @@ export class KiroPanel implements vscode.Disposable {
         prompt: t('Command and arguments'),
         placeHolder: 'npx -y @modelcontextprotocol/server-filesystem .',
       });
-      const [command, ...args] = (line ?? '').trim().split(/\s+/);
+      const [command, ...args] = splitCommandLine(line ?? '');
       if (!command) return;
       next = addStdioServer(text, key, command, args);
     } else {
