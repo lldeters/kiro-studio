@@ -4,6 +4,7 @@ import { checkPackage, MAX_VSIX_BYTES, readmeImageProblems } from '../../scripts
 const good = [
   'package.json',
   'README.md',
+  'CHANGELOG.md',
   'LICENSE',
   'NOTICE',
   'THIRD_PARTY_NOTICES.txt',
@@ -29,10 +30,10 @@ describe('package check', () => {
   it('names what is missing', () => {
     expect(
       checkPackage(
-        good.filter((f) => f !== 'LICENSE' && !f.includes('chunks')),
+        good.filter((f) => f !== 'LICENSE' && f !== 'CHANGELOG.md' && !f.includes('chunks')),
         1,
       ),
-    ).toEqual(['missing: LICENSE', 'missing: the lazily loaded webview chunks']);
+    ).toEqual(['missing: CHANGELOG.md', 'missing: LICENSE', 'missing: the lazily loaded webview chunks']);
   });
 
   it('refuses sources, maps, tools, secrets and dependencies', () => {
