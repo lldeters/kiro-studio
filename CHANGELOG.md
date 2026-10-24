@@ -80,6 +80,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   button, the command and the menu now start from the session on show.
 - With the chat hidden, only the first of several questions from Kiro opened a picker; after the answer Kiro waited for
   the next one, which only the status bar showed. The next question now opens as soon as one is answered.
+- Closing the window waited up to 30 s per session for `session/close` before it ended the CLI, longer than VS Code waits
+  for an extension, so a CLI that did not answer could be left running. It now waits at most a second, and only for the
+  sessions that are open on the connection.
 
 ### Known limits
 
