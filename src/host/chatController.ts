@@ -178,7 +178,7 @@ export class ChatController implements vscode.Disposable {
           await this.host.closeSession(message.id);
           return;
         case 'send':
-          await this.send(message.sessionId, message.text, message.attachments);
+          await this.send(sink, message.sessionId, message.text, message.attachments);
           return;
         case 'pickContext': {
           const attachments = await pickContext(message.kind);
@@ -365,11 +365,19 @@ export class ChatController implements vscode.Disposable {
   /** Sessions whose prompt is being put together (reading `git diff` can take a moment); a second send waits out. */
   private readonly preparing = new Set<string>();
 
-  private async send(sessionId: string, text: string, attachments: AttachmentView[]): Promise<void> {
+  /**
+   * Sends what the user wrote. The page empties its input at once; whatever keeps the message from going out (a turn
+   * that started meanwhile, a lost connection, an attachment that could not be read) gives it back, so nothing is lost.
+   */
+  private async send(sink: Sink, sessionId: string, text: string, attachments: AttachmentView[]): Promise<void> {
     const agent = this.host.agent;
     const session = agent?.store.get(sessionId);
     if (!agent || !session || (text.trim() === '' && attachments.length === 0)) return;
-    if (this.preparing.has(sessionId) || session.busy) return;
+    const giveBack = () => sink.send({ type: 'draftReturned', sessionId, text, attachments });
+    if (this.preparing.has(sessionId) || session.busy || session.status !== 'ready') {
+      giveBack();
+      return;
+    }
     this.preparing.add(sessionId);
     try {
       const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
@@ -383,11 +391,15 @@ export class ChatController implements vscode.Disposable {
       );
       for (const skipped of context.skipped)
         session.addNotice('warning', skippedMessage(skipped.reason, skipped.label));
-      // The prompt settles when the turn is over; errors become notices in the session, so only a turn that is
-      // already running throws.
-      agent
-        .prompt(sessionId, { text, blocks: context.blocks, labels: context.labels })
-        .catch((error: unknown) => session.addNotice('error', describeError(error)));
+      // The prompt settles when the turn is over; errors become notices in the session, so it throws only when the turn
+      // could not begin (one is running, the session is not connected), and then nothing was sent.
+      agent.prompt(sessionId, { text, blocks: context.blocks, labels: context.labels }).catch((error: unknown) => {
+        session.addNotice('error', describeError(error));
+        giveBack();
+      });
+    } catch (error) {
+      giveBack();
+      throw error;
     } finally {
       this.preparing.delete(sessionId);
     }
