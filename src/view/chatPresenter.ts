@@ -327,6 +327,8 @@ export function tabView(session: Session): TabView {
 export class PatchTracker {
   private itemsSent = 0;
   private lastItemSize = -1;
+  /** The id of the last item sent. When it is not in its place any more, the transcript was rebuilt (a reload). */
+  private lastItemId: number | undefined;
   private readonly tools = new Map<string, string>();
   private meta = '';
   private sentFull = false;
@@ -338,6 +340,7 @@ export class PatchTracker {
     const view = sessionView(session, this.platform);
     this.itemsSent = view.items.length;
     this.lastItemSize = sizeOf(view.items[view.items.length - 1]);
+    this.lastItemId = view.items[view.items.length - 1]?.id;
     this.tools.clear();
     const waiting = waitingToolIds(session);
     for (const tool of session.tools.values()) this.tools.set(tool.toolCallId, signature(tool, waiting));
@@ -346,9 +349,17 @@ export class PatchTracker {
     return view;
   }
 
-  /** What changed since the last call, or undefined when nothing did. Falls back to a full send when needed. */
+  /**
+   * What changed since the last call, or undefined when nothing did. Falls back to a full send when the transcript was
+   * rebuilt: it is shorter, or (a replay that refilled it between two sends) the last item sent is not in its place.
+   */
   diff(session: Session): SessionPatch | SessionView | undefined {
-    if (!this.sentFull || session.transcript.length < this.itemsSent) return this.full(session);
+    if (
+      !this.sentFull ||
+      session.transcript.length < this.itemsSent ||
+      session.transcript[this.itemsSent - 1]?.id !== this.lastItemId
+    )
+      return this.full(session);
 
     const waiting = waitingToolIds(session);
     const changedTools: ToolView[] = [];
@@ -366,6 +377,7 @@ export class PatchTracker {
     if (itemsChanged) {
       this.itemsSent = session.transcript.length;
       this.lastItemSize = sizeOf(last);
+      this.lastItemId = last?.id;
     }
 
     const metaView_ = metaView(session);

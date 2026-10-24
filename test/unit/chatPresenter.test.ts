@@ -221,6 +221,35 @@ describe('PatchTracker', () => {
   });
 });
 
+describe('a transcript that was rebuilt between two sends', () => {
+  it('is sent in full even when the replay made it as long as before', () => {
+    const s = make();
+    const tracker = new PatchTracker('posix');
+    apply(s, u.user('Question', { messageId: 'u1' }));
+    apply(s, u.agent('Answer', { messageId: 'a1' }));
+    tracker.full(s);
+    s.resetForReplay();
+    apply(s, u.user('Question', { replay: true, messageId: 'u1' }));
+    apply(s, u.agent('Answer', { replay: true, messageId: 'a1' }));
+    apply(s, u.agent('More', { replay: true, messageId: 'a2' }));
+    const result = tracker.diff(s);
+    expect(isPatch(result)).toBe(false);
+    expect(result && 'items' in result && result.items.map((i) => i.id)).toEqual(s.transcript.map((i) => i.id));
+  });
+
+  it('is still patched while it only grows', () => {
+    const s = make();
+    const tracker = new PatchTracker('posix');
+    apply(s, u.agent('Hel', { messageId: 'a1' }));
+    tracker.full(s);
+    apply(s, u.agent('lo', { messageId: 'a1' }));
+    apply(s, u.toolCall('t1'));
+    expect(isPatch(tracker.diff(s))).toBe(true);
+    apply(s, u.agent('Done', { messageId: 'a2' }));
+    expect(isPatch(tracker.diff(s))).toBe(true);
+  });
+});
+
 describe('checkpoints in the view', () => {
   const files = [{ path: 'a.ts', status: 'modified' as const, added: 2, removed: 1, binary: false, reverted: false }];
 
