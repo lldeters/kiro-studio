@@ -89,6 +89,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   for the end of the diff. It now ends at a whole line and says that it was cut off.
 - The checkpoint repository read the user's global Git configuration, so a global `core.excludesFile` left files out of
   the checkpoints, and filters or a file system monitor configured there ran for it. It now runs without it.
+- The checkpoint repository only grew: every snapshot of every window stayed reachable through the chain of commits and
+  a reflog. A window now starts a chain of its own, writes no reflog and prunes what earlier windows left that is older
+  than two days. Git is looked for once, not before every turn.
 
 ### Known limits
 

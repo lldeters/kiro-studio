@@ -115,6 +115,45 @@ describe('ShadowRepo', () => {
     expect((await repo.changes(before, after)).map((f) => f.path)).toEqual(['a.txt']); // .git itself is never tracked
   });
 
+  describe('the snapshots of earlier windows', () => {
+    const gitDir = () => path.join(root, 'shadow');
+    const has = (id: string) => {
+      try {
+        execFileSync('git', ['--git-dir', gitDir(), 'cat-file', '-e', id], { stdio: 'ignore' });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    it('are removed once nothing can use them any more', async () => {
+      const earlier = new ShadowRepo(gitDir(), ws, undefined, 'now');
+      await write('big.bin', 'first version\n');
+      const first = await earlier.snapshot('earlier window');
+      await write('big.bin', 'second version\n');
+      await earlier.snapshot('earlier window');
+
+      const window = new ShadowRepo(gitDir(), ws, undefined, 'now');
+      await write('more.txt', 'new\n');
+      const before = await window.snapshot('this window');
+      await write('more.txt', 'newer\n');
+      const after = await window.snapshot('this window');
+
+      expect(has(first)).toBe(false);
+      // What this window recorded is all there.
+      expect((await window.changes(before, after)).map((f) => f.path)).toEqual(['more.txt']);
+      expect((await window.blob(before, 'big.bin'))?.toString('utf8')).toBe('second version\n');
+    });
+
+    it('are kept while they are young, because another window may still use them', async () => {
+      const earlier = new ShadowRepo(gitDir(), ws);
+      await write('a.txt', 'one\n');
+      const first = await earlier.snapshot('earlier window');
+      await new ShadowRepo(gitDir(), ws).snapshot('this window');
+      expect(has(first)).toBe(true);
+    });
+  });
+
   it("does not let the user's global Git configuration decide what a checkpoint holds", async () => {
     const config = path.join(root, 'user-gitconfig');
     const ignore = path.join(root, 'user-ignore');

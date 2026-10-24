@@ -293,7 +293,9 @@ workspace as work tree) records the workspace without touching the user's reposi
 `before` just before the prompt is sent, `after` once it has settled and before the session goes idle, so the marker
 comes before the next message. Each is a snapshot (`git add --all`, `write-tree`, `commit-tree`); `.gitignore` and a
 fixed exclude list (`node_modules`, `dist`, `out`, `build`, `target`, `.venv`) keep generated files out; Git runs without
-the system and the user's global configuration, so neither decides what a snapshot holds. A turn that
+the system and the user's global configuration, so neither decides what a snapshot holds. Checkpoints live as long as a
+window, so the first snapshot of a window starts a new chain of commits and prunes what earlier windows left that is older
+than two days (another window may still use what is younger); no reflog keeps anything alive. A turn that
 changed files adds a checkpoint to the session: a marker in the transcript and the file list (status, +x −y) in the
 meta. "View changes" opens one file as a diff or all files in VS Code's multi-file diff editor (a list is the
 fallback); "Revert" puts files back to the `before` state, but only files that still have the `after` content: a file

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Session } from '../../src/acp/sessions';
 import { CheckpointService } from '../../src/checkpoints/service';
 import { ShadowRepo } from '../../src/checkpoints/shadowRepo';
-import type { GitRunner } from '../../src/checkpoints/git';
+import { runGit, type GitRunner } from '../../src/checkpoints/git';
 import { sessionView } from '../../src/view/chatPresenter';
 
 let root: string;
@@ -129,5 +129,21 @@ describe('checkpoint service', () => {
     expect(off.unavailable).toBe('Git was not found');
     expect(unavailable).toEqual(['Git was not found']);
     expect(session.checkpoints.size).toBe(0);
+  });
+
+  it('looks for Git once, not before every turn', async () => {
+    const calls: string[][] = [];
+    const counting: GitRunner = (args, options) => {
+      calls.push([...args]);
+      return runGit(args, options);
+    };
+    const counted = new CheckpointService(new ShadowRepo(path.join(root, 'counted'), ws, counting));
+    for (const text of ['1\n', '2\n', '3\n']) {
+      await counted.before(session);
+      await write('a.txt', text);
+      await counted.after(session);
+    }
+    expect(calls.filter((args) => args[0] === '--version')).toHaveLength(1);
+    expect(session.checkpoints.size).toBe(3);
   });
 });
