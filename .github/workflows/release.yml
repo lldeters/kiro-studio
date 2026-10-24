@@ -15,6 +15,11 @@ on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      whoami:
+        description: Print the Marketplace member ID of the Entra ID identity (to add it to the publisher)
+        type: boolean
+        default: false
 
 permissions:
   contents: write # the GitHub release
@@ -31,6 +36,9 @@ jobs:
   release:
     name: ${{ github.ref_type == 'tag' && format('Publish {0}', github.ref_name) || 'Dry run' }}
     runs-on: ubuntu-latest
+    # A fixed name for the OIDC subject (repo:lldeters/kiro-studio:environment:release), which a tag would not give;
+    # the federated credential of Entra ID and a trusted publisher of Open VSX name it.
+    environment: release
     env:
       PUBLISH: ${{ github.ref_type == 'tag' }}
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
@@ -68,12 +76,19 @@ jobs:
 
       # --skip-duplicate: a run that is repeated after a later step failed does not fail on what is already out.
       - name: Sign in to Microsoft Entra ID
-        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID != ''
+        if: (env.PUBLISH == 'true' || inputs.whoami) && env.AZURE_CLIENT_ID != ''
         uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           allow-no-subscriptions: true
+      - name: Print the Marketplace member ID of the Entra ID identity
+        if: inputs.whoami && env.AZURE_CLIENT_ID != ''
+        # 499b84ac-… is Azure DevOps, which the Marketplace belongs to.
+        run: |
+          id=$(az rest -u https://app.vssps.visualstudio.com/_apis/profile/profiles/me \
+            --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id -o tsv)
+          echo "::notice::Marketplace member ID of the identity: $id (add it to the publisher as Contributor)"
       - name: Publish to the Visual Studio Marketplace (Entra ID)
         if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID != ''
         env:
