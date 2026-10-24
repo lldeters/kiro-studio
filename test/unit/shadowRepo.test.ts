@@ -162,6 +162,34 @@ describe('ShadowRepo', () => {
       expect(await read('a.txt')).toBe('old\n');
     });
 
+    it('sees that a file with CRLF line endings is unchanged when .gitattributes normalises them', async () => {
+      // Common on Windows: `* text=auto` in the repository, CRLF in the working tree.
+      await write('.gitattributes', '* text=auto\n');
+      await write('a.txt', 'one\r\ntwo\r\n');
+      await write('nested/b.txt', 'x\r\n');
+      const before = await repo.snapshot('before');
+      await write('a.txt', 'one\r\nTWO\r\n');
+      await write('nested/b.txt', 'y\r\n');
+      const after = await repo.snapshot('after');
+      const files = await repo.changes(before, after);
+
+      const result = await repo.revert(before, after, files);
+      expect(result.conflicts).toEqual([]);
+      expect(result.restored.sort()).toEqual(['a.txt', 'nested/b.txt']);
+      expect((await read('a.txt')).replace(/\r\n/g, '\n')).toBe('one\ntwo\n');
+    });
+
+    it('still sees a change of the user in a file whose line endings are normalised', async () => {
+      await write('.gitattributes', '* text=auto\n');
+      await write('a.txt', 'one\r\n');
+      const before = await repo.snapshot('before');
+      await write('a.txt', 'kiro\r\n');
+      const after = await repo.snapshot('after');
+      const files = await repo.changes(before, after);
+      await write('a.txt', 'kiro and me\r\n');
+      expect((await repo.revert(before, after, files)).conflicts).toEqual(['a.txt']);
+    });
+
     it('does not delete an added file that the user has edited since', async () => {
       const before = await repo.snapshot('before');
       await write('new.txt', 'kiro\n');
