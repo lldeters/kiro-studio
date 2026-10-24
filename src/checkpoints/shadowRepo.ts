@@ -186,14 +186,18 @@ export class ShadowRepo {
     });
   }
 
-  /** True when the file in the work tree is not what the snapshot has (a missing file equals a missing entry). */
+  /**
+   * True when the file in the work tree is not what the snapshot has (a missing file equals a missing entry). The file is
+   * hashed with the filters `git add` applied when the snapshot was taken (line endings from `.gitattributes`, say), or a
+   * file with CRLF endings would never look unchanged.
+   */
   private async differsFrom(snapshot: string, file: string, absolute: string): Promise<boolean> {
     const expected = await this.run(['rev-parse', '--verify', '--quiet', `${snapshot}:${file}`]);
     const expectedId = expected.code === 0 ? expected.stdout.toString('utf8').trim() : undefined;
     let actualId: string | undefined;
     try {
       await fs.stat(absolute);
-      actualId = (await this.ok(['hash-object', '--no-filters', '--', absolute])).trim();
+      actualId = (await this.ok(['hash-object', `--path=${file}`, '--', absolute])).trim();
     } catch {
       actualId = undefined;
     }

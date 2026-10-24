@@ -73,6 +73,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   actions use a new session instead.
 - Starting a session while a reconnect was still waiting (the chat's **+**, say) dropped the reconnect, and the sessions
   lost with the old process stayed lost. Every start of the connection now resumes them.
+- _Revert_ took every file with CRLF line endings in a repository with `* text=auto` (usual on Windows) for one the user
+  had changed since the turn, and asked again. The file is now compared with the same line-ending rules the snapshot used.
 
 ### Known limits
 
