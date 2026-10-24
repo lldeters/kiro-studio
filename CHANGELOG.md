@@ -58,6 +58,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   for it, and Kiro starts sessions in Autopilot: with automatic approval on, every tool request was allowed although the
   setting said Supervised. Such a session now gets the autonomy it had in this window, else the one of the setting, and
   a prompt waits until it is written.
+- A repository could switch on Autopilot, and with it automatic approval (on by default), through `kiroStudio.autonomy`
+  in its `.vscode/settings.json`, and choose one of its own agents through `kiroStudio.defaultMode`. Both are now read
+  from the user settings only.
 
 ### Known limits
 

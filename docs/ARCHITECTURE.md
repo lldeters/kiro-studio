@@ -104,9 +104,12 @@ the agent is never started (`capabilities.untrustedWorkspaces: limited`, no virt
 
 ### Security decisions in code
 
-- `kiroStudio.autoAllowInAutopilot` and `kiroStudio.hooks.enabled` are `application` scoped and `kiroStudio.cliPath`
-  is `machine` scoped, so a repository cannot switch them on or point the extension at its own binary through
-  `.vscode/settings.json`.
+- `kiroStudio.autonomy`, `kiroStudio.autoAllowInAutopilot`, `kiroStudio.defaultMode` and `kiroStudio.hooks.enabled`
+  are `application` scoped and `kiroStudio.cliPath` is `machine` scoped, so a repository cannot switch on Autopilot
+  (automatic approval is on by default), pick one of its own agents for new sessions, run hooks or point the extension at
+  its own binary through `.vscode/settings.json` (`test/unit/manifest.test.ts` keeps it so).
+- A session that was loaded or forked gets the autonomy it had in this window, else the one of the setting, because Kiro
+  keeps its own value per session and starts new ones in Autopilot.
 - Kiro's file reads and writes pass a path guard (workspace folders and the session's working directory); anything
   else is refused with `-32602`. A missing file answers `-32002`, which Kiro uses as an existence check.
 - Only `http(s)` URLs from `_kiro/openExternalUrl` are opened.

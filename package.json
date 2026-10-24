@@ -52,8 +52,6 @@
       "supported": "limited",
       "description": "%capabilities.untrustedWorkspaces%",
       "restrictedConfigurations": [
-        "kiroStudio.autonomy",
-        "kiroStudio.defaultMode",
         "kiroStudio.defaultModel",
         "kiroStudio.defaultEffort"
       ]
@@ -749,6 +747,7 @@
             "%config.autonomy.autopilot%"
           ],
           "default": "supervised",
+          "scope": "application",
           "markdownDescription": "%config.autonomy%"
         },
         "kiroStudio.autoAllowInAutopilot": {
@@ -776,6 +775,7 @@
         "kiroStudio.defaultMode": {
           "type": "string",
           "default": "",
+          "scope": "application",
           "markdownDescription": "%config.defaultMode%"
         },
         "kiroStudio.defaultModel": {

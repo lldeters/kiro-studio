@@ -276,7 +276,9 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
 
 ### Voreinstellungen, die ich gewählt habe
 
-- `kiroStudio.autonomy`: **supervised** (nicht Autopilot). Neue Sessions fragen also nach.
+- `kiroStudio.autonomy`: **supervised** (nicht Autopilot). Neue Sessions fragen also nach. Nur auf Anwendungsebene: Weil
+  die automatische Freigabe vorab an ist, darf ein Repository Autopilot nicht per `.vscode/settings.json` einschalten.
+  Dasselbe gilt für `kiroStudio.defaultMode` (sonst könnte es einen eigenen Agenten wählen).
 - `kiroStudio.autoAllowInAutopilot`: **an**, wirkt aber nur im Autopilot und nur als `allow_once` (Entscheidung E1). Die Einstellung gilt
   nur auf Anwendungsebene, ein Repository kann sie nicht per `.vscode/settings.json` einschalten.
 - `kiroStudio.hooks.enabled`: **aus** (Entscheidung E4), ebenfalls nur auf Anwendungsebene.

@@ -46,4 +46,13 @@ describe('manifest', () => {
       expect(nls[command.title.replace(/%/g, '')], command.command).toBeTruthy();
     for (const id of views) expect(manifest.contributes.views['kiro-studio']?.find((v) => v.id === id)).toBeDefined();
   });
+
+  it('keeps the settings that decide what Kiro may do out of reach of a repository', () => {
+    const scope = (key: string) => (manifest.contributes.configuration.properties[key] as { scope?: string }).scope;
+    // A workspace's .vscode/settings.json must not switch on Autopilot (with automatic approval), pick an agent of the
+    // repository, run hooks or point at another program.
+    for (const key of ['autonomy', 'autoAllowInAutopilot', 'defaultMode', 'hooks.enabled'])
+      expect(scope(`kiroStudio.${key}`), key).toBe('application');
+    expect(scope('kiroStudio.cliPath')).toBe('machine');
+  });
 });
