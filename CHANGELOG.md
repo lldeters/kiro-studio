@@ -65,6 +65,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   replay ran, and came back with the time of the reload. The session now keeps them throughout; their cards come back
   after the replay (also after a failed one), and one that a turn records during the replay no longer lands in its
   middle.
+- A double click on a session in the Sessions view, or a restart while sessions were being resumed, loaded the same
+  session twice at once: the second load reset the transcript in the middle of the first replay and the conversation
+  showed up twice. A load that is running is now shared.
 
 ### Known limits
 

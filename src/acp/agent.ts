@@ -353,13 +353,38 @@ export class KiroAgent {
     }
   }
 
-  /** Loads an existing session. The session object is created first, because replayed updates arrive before the response. */
+  /** Loads of sessions that are running, with the connection they run on. */
+  private readonly loading = new Map<string, { connection: KiroConnection | undefined; promise: Promise<Session> }>();
+
+  /**
+   * Loads an existing session. A load of the same session that is already running on this connection is shared: a second
+   * one (a double click in the list, a restart during a resume) would reset the transcript in the middle of the first
+   * replay and show the conversation twice. A load that still runs on a connection that is going away is waited for.
+   */
   async loadSession(
     sessionId: string,
     cwd: string,
     options: { additionalDirectories?: string[] } = {},
   ): Promise<Session> {
     await this.start();
+    let running = this.loading.get(sessionId);
+    while (running !== undefined && running.connection !== this.connection) {
+      await running.promise.catch(() => undefined);
+      running = this.loading.get(sessionId);
+    }
+    if (running !== undefined) return running.promise;
+    const entry = { connection: this.connection, promise: this.load(sessionId, cwd, options) };
+    this.loading.set(sessionId, entry);
+    void entry.promise
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.loading.get(sessionId) === entry) this.loading.delete(sessionId);
+      });
+    return entry.promise;
+  }
+
+  /** The object is created first, because replayed updates arrive before the response. */
+  private async load(sessionId: string, cwd: string, options: { additionalDirectories?: string[] }): Promise<Session> {
     const existed = this.store.get(sessionId) !== undefined;
     const autonomy = this.wantedAutonomy(this.store.get(sessionId));
     const session = this.store.create(sessionId, { cwd });

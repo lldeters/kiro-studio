@@ -390,6 +390,39 @@ describe('load session', () => {
     expect(session.transcript[session.transcript.length - 1]?.kind).toBe('checkpoint');
   });
 
+  it('shares a load of the same session that is already running (a double click in the list)', async () => {
+    const h = make();
+    await h.agent.start();
+    const [first, second] = await Promise.all([
+      h.agent.loadSession('sess_old', '/ws'),
+      h.agent.loadSession('sess_old', '/ws'),
+    ]);
+    expect(second).toBe(first);
+    expect(h.fake.requestsOf('session/load')).toHaveLength(1);
+    expect(first.transcript.map((i) => (i.kind === 'user' || i.kind === 'assistant' ? i.text : i.kind))).toEqual([
+      'Earlier question',
+      'Earlier answer',
+    ]);
+  });
+
+  it('waits for a load on a connection that goes away, then loads the session on the new one', async () => {
+    const h = make();
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    let calls = 0;
+    h.fake.on('session/load', async () => {
+      calls++;
+      // The first connection never answers; the restart ends it.
+      if (calls === 1) await new Promise(() => undefined);
+      return sessionResult('sess_old');
+    });
+    const stuck = h.agent.loadSession('sess_old', '/ws');
+    await until(() => calls === 1, 2000, 'the first load');
+    await h.agent.restart();
+    await expect(stuck).rejects.toThrow();
+    expect(calls).toBe(2);
+    expect(session.status).toBe('ready');
+  });
+
   it('keeps the checkpoints when a reload fails, so that a later one still shows them', async () => {
     const h = make();
     const session = await h.agent.loadSession('sess_old', '/ws');
