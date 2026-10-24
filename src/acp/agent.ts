@@ -316,10 +316,41 @@ export class KiroAgent {
    * and typed into at once. A prompt sent meanwhile waits for them, so that it runs with the agent and model that were set.
    */
   applyDefaultsInBackground(session: Session): void {
-    const pending = this.applyDefaults(session)
+    void this.beforePrompts(session, () => this.applyDefaults(session));
+  }
+
+  /** Runs a configuration task that a prompt of the session waits for. */
+  private beforePrompts(session: Session, task: () => Promise<void>): Promise<void> {
+    const pending: Promise<void> = task()
       .catch((error: unknown) => this.deps.log.info(`defaults of ${session.id}: ${describeError(error)}`))
-      .finally(() => this.pendingDefaults.delete(session.id));
+      .finally(() => {
+        if (this.pendingDefaults.get(session.id) === pending) this.pendingDefaults.delete(session.id);
+      });
     this.pendingDefaults.set(session.id, pending);
+    return pending;
+  }
+
+  /**
+   * The autonomy for a session that was loaded or forked rather than created here: the one it had in this window, else
+   * the user's setting. Kiro keeps a value of its own per session (and starts new ones in Autopilot), so without this a
+   * session opened from the list could run in Autopilot, with automatic approvals, although the user chose Supervised.
+   */
+  private wantedAutonomy(previous: Session | undefined): 'on' | 'off' {
+    if (previous?.configOption('autopilot') !== undefined) return previous.isAutopilot ? 'on' : 'off';
+    return this.deps.settings.autonomy() === 'autopilot' ? 'on' : 'off';
+  }
+
+  private async applyAutonomy(session: Session, value: 'on' | 'off'): Promise<void> {
+    const option = session.configOption('autopilot');
+    if (option === undefined || option.currentValue === value || !option.values.some((v) => v.value === value)) return;
+    try {
+      await this.setConfig(session.id, 'autopilot', value);
+    } catch (error) {
+      session.addNotice(
+        'warning',
+        `Could not switch this session to ${value === 'on' ? 'Autopilot' : 'Supervised'}: ${describeError(error)}`,
+      );
+    }
   }
 
   /** Loads an existing session. The session object is created first, because replayed updates arrive before the response. */
@@ -330,6 +361,7 @@ export class KiroAgent {
   ): Promise<Session> {
     await this.start();
     const existed = this.store.get(sessionId) !== undefined;
+    const autonomy = this.wantedAutonomy(this.store.get(sessionId));
     const session = this.store.create(sessionId, { cwd });
     // Kiro replays the conversation, not our checkpoints; these are kept and put back after the replay.
     const checkpoints = [...session.checkpoints.values()];
@@ -348,6 +380,7 @@ export class KiroAgent {
       // Their place in the conversation is not known any more, so they come after it; the changes can still be viewed
       // and reverted.
       for (const { id, files } of checkpoints) session.addCheckpoint({ id, files });
+      await this.beforePrompts(session, () => this.applyAutonomy(session, autonomy));
     } catch (error) {
       // A session that never loaded must not stay behind as a tab that is "starting" for ever; one that was open before
       // is lost again, so that a later reconnect tries once more.
@@ -403,6 +436,10 @@ export class KiroAgent {
     const session = this.store.create(forkedId, { cwd });
     this.dispatcher.sessionRegistered(forkedId);
     session.applySessionResult(result);
+    // The fork works like the session it comes from, or as the user's setting says when that one is not open here.
+    await this.beforePrompts(session, () =>
+      this.applyAutonomy(session, this.wantedAutonomy(this.store.get(sessionId))),
+    );
     return session;
   }
 

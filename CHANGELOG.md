@@ -54,6 +54,10 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - After a lost connection Kiro replays the conversation but not our checkpoint cards, so _View changes_ and _Revert_ of
   earlier turns disappeared. They are kept and put back after the replay (at its end: their place is not known).
 - "Reverted one file" instead of "Reverted 1 files".
+- A session opened from the Sessions view, resumed after a lost connection or forked kept the autonomy Kiro had stored
+  for it, and Kiro starts sessions in Autopilot: with automatic approval on, every tool request was allowed although the
+  setting said Supervised. Such a session now gets the autonomy it had in this window, else the one of the setting, and
+  a prompt waits until it is written.
 
 ### Known limits
 
