@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { AttachmentView, ContextKind } from '../shared/chatProtocol';
 import { currentPlatform } from '../util/paths';
-import { formatProblems, type ContextDeps, type Problem } from '../view/promptContext';
+import { formatProblems, type ContextDeps, type GitDiff, type Problem } from '../view/promptContext';
 
 const EXCLUDE = '**/{node_modules,.git,dist,out,build,target,.venv,__pycache__}/**';
 const MAX_FILES_LISTED = 5000;
@@ -118,14 +118,21 @@ function problems(): string {
   return formatProblems(found);
 }
 
-/** `git diff` in the workspace folder. Read-only; nothing is staged or changed. */
-function gitDiff(cwd: string): Promise<string | undefined> {
+/**
+ * `git diff` in the workspace folder. Read-only; nothing is staged or changed. A diff longer than the limit ends the
+ * program; what came until then is kept, up to its last whole line, and marked as cut off.
+ */
+function gitDiff(cwd: string): Promise<GitDiff | undefined> {
   return new Promise((resolve) => {
     execFile(
       'git',
       ['diff', '--no-color', '--no-ext-diff'],
       { cwd, timeout: 15_000, maxBuffer: MAX_DIFF_BYTES, windowsHide: true },
-      (error, stdout) => resolve(error && stdout === '' ? undefined : stdout),
+      (error, stdout) => {
+        const truncated = (error as NodeJS.ErrnoException | null)?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
+        if (truncated) resolve({ text: stdout.slice(0, stdout.lastIndexOf('\n') + 1), truncated });
+        else resolve(error && stdout === '' ? undefined : { text: stdout, truncated: false });
+      },
     );
   });
 }
