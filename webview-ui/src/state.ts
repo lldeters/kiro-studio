@@ -28,7 +28,6 @@ export interface ChatState {
   setup: SetupView;
   agent: AgentView;
   capabilities: ChatCapabilities;
-  autonomySetting: 'supervised' | 'autopilot';
   /** Only the active session is kept; the host sends a session in full when it becomes active. */
   sessions: Record<string, SessionView>;
   /** Attachments the host picked for the draft; the composer takes them and clears the list. */
@@ -44,7 +43,6 @@ export const initialState: ChatState = {
   setup: 'checking',
   agent: { phase: 'stopped' },
   capabilities: { image: false, compact: false },
-  autonomySetting: 'supervised',
   sessions: {},
   picked: [],
   announcement: undefined,
@@ -83,7 +81,6 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
         setup: message.setup,
         agent: message.agent,
         capabilities: message.capabilities,
-        autonomySetting: message.autonomySetting,
         sessions: {},
       };
     case 'tabs': {

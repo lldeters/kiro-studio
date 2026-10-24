@@ -36,7 +36,7 @@ const shown = (state: ChatState) => (state.activeId === undefined ? undefined : 
 describe('host and page together', () => {
   const a = session('a', 'Alpha', 'Answer of alpha');
   const b = session('b', 'Beta', 'Answer of beta');
-  const extras = { strings: {}, autonomySetting: 'supervised' as const };
+  const extras = { strings: {} };
 
   it('shows the active session after the page has loaded', () => {
     const sync = new ChatSync('posix');

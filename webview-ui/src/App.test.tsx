@@ -24,7 +24,6 @@ const init = (extra: Partial<Extract<HostMessage, { type: 'init' }>> = {}): Host
   setup: 'ready',
   agent: { phase: 'ready' },
   capabilities: { image: false, compact: false },
-  autonomySetting: 'supervised',
   ...extra,
 });
 const receive = (...messages: HostMessage[]) =>

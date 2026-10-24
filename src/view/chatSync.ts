@@ -31,7 +31,6 @@ export interface SyncInput {
 /** What only the first message carries. */
 export interface InitExtras {
   strings: Record<string, string>;
-  autonomySetting: 'supervised' | 'autopilot';
 }
 
 const isPatch = (value: SessionPatch | SessionView): value is SessionPatch => 'sessionId' in value;
@@ -60,7 +59,6 @@ export class ChatSync {
         setup: input.setup,
         agent: input.agent,
         capabilities: input.capabilities,
-        autonomySetting: extras.autonomySetting,
       },
     ];
     messages.push(...this.sessionMessages(input.active));
