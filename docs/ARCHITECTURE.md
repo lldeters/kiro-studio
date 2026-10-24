@@ -336,7 +336,11 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
 - **Fixtures:** handwritten and Kiro-shaped (`test/support/kiro.ts`); third-party recordings are not committed.
 - **CI (`.github/workflows/ci.yml`):** typecheck, lint, format check, unit and webview tests and build on Windows,
   macOS and Linux; integration tests on VS Code 1.93.0 (the minimum) and stable; `npm run package` builds the `.vsix`
-  (host bundle, webview bundle, licences of all bundled packages) and uploads it as an artifact.
+  (host bundle, webview bundle, licences of all bundled packages) and uploads it as an artifact, and checks that version
+  and changelog are ready for a release.
+- **Release (`.github/workflows/release.yml`):** a tag `v<version>` is checked (`scripts/release-rules.ts`: tag, version,
+  dated changelog section), tested, packaged and published to the Visual Studio Marketplace, to Open VSX and as a GitHub
+  release; started by hand it is a dry run. Setup and steps in [RELEASING.md](RELEASING.md).
 
 ## Repository layout
 
