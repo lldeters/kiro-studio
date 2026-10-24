@@ -3,7 +3,7 @@ import { RequestError } from '@agentclientprotocol/sdk';
 import { ExtensionNotAdvertisedError } from '../../src/acp/errors';
 import { sleep } from '../../src/util/async';
 import { rec } from '../../src/util/json';
-import { SESSION_ID, u } from '../support/kiro';
+import { SESSION_ID, configOptions, sessionResult, u } from '../support/kiro';
 import { RpcError, type TurnScript } from '../support/fakeAgent';
 import { configWrites, createHarness, until, type Harness } from '../support/harness';
 
@@ -173,6 +173,16 @@ describe('fork and rename', () => {
       cwd: '/ws',
       mcpServers: [],
     });
+  });
+
+  it('gives a fork the autonomy of the session it comes from', async () => {
+    const h = make({ settings: { autonomy: 'supervised' } });
+    const original = await h.agent.newSession({ cwd: '/ws' });
+    expect(original.isAutopilot).toBe(false);
+    // Kiro starts the fork in Autopilot.
+    const fork = await h.agent.forkSession(original.id, '/ws');
+    expect(fork.isAutopilot).toBe(false);
+    expect(configWrites(h.fake)).toEqual(['autopilot=off', 'autopilot=off']);
   });
 
   it('renames only when the agent advertises the method', async () => {
@@ -378,6 +388,52 @@ describe('load session', () => {
     expect(markers).toHaveLength(1);
     // The replayed conversation comes first, the checkpoint after it.
     expect(session.transcript[session.transcript.length - 1]?.kind).toBe('checkpoint');
+  });
+
+  it('switches a session from the list to Supervised when that is the setting (Kiro keeps it in Autopilot)', async () => {
+    const h = make({ settings: { autonomy: 'supervised' } });
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    expect(configWrites(h.fake)).toEqual(['autopilot=off']);
+    expect(session.isAutopilot).toBe(false);
+  });
+
+  it('leaves a session from the list in Autopilot when that is the setting', async () => {
+    const h = make({ settings: { autonomy: 'autopilot' } });
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    expect(configWrites(h.fake)).toEqual([]);
+    expect(session.isAutopilot).toBe(true);
+  });
+
+  it('gives a resumed session back the autonomy it had, whatever Kiro reports after the load', async () => {
+    const h = make({ settings: { autonomy: 'autopilot' } });
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    await h.agent.setConfig(session.id, 'autopilot', 'off');
+    h.fake.on('session/load', () => sessionResult('sess_old', { autopilot: 'on' }));
+    await h.agent.loadSession('sess_old', '/ws');
+    expect(configWrites(h.fake)).toEqual(['autopilot=off', 'autopilot=off']);
+    expect(session.isAutopilot).toBe(false);
+  });
+
+  it('lets a prompt sent during the load wait until the autonomy is written', async () => {
+    const h = make({ settings: { autonomy: 'supervised' } });
+    await h.agent.start();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    h.fake.on('session/set_config_option', async (params) => {
+      await held;
+      return { configOptions: configOptions({ autopilot: params.value === 'on' ? 'on' : 'off' }) };
+    });
+    const loading = h.agent.loadSession('sess_old', '/ws');
+    await until(() => h.agent.store.get('sess_old')?.status === 'ready', 2000, 'the load response');
+    const prompt = h.agent.prompt('sess_old', 'Hello');
+    await sleep(20);
+    expect(h.fake.requestsOf('session/prompt')).toHaveLength(0);
+    release();
+    await Promise.all([loading, prompt]);
+    const order = h.fake.received
+      .map((m) => m.method)
+      .filter((m) => m === 'session/prompt' || m === 'session/set_config_option');
+    expect(order).toEqual(['session/set_config_option', 'session/prompt']);
   });
 
   it('leaves no tab behind when a session cannot be loaded', async () => {
