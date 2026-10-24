@@ -2,7 +2,9 @@
  * Checks that the release can be published (version, tag, dated changelog section) and, with `--notes`, writes the
  * changelog section of the version to a file for the GitHub release. The release workflow runs it before it publishes.
  *
- *   npx tsx scripts/check-release.ts [--tag v0.1.0] [--notes dist/release-notes.md]
+ *   npx tsx scripts/check-release.ts [--tag v0.1.0] [--notes dist/release-notes.md] [--allow-undated]
+ *
+ * `--allow-undated` is for checks before the release is prepared (CI, a dry run): the section may still be undated.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { absoluteLinks, changelogSection, releaseProblems } from './release-rules';
@@ -25,6 +27,7 @@ const problems = releaseProblems({
   publisher: manifest.publisher,
   changelog,
   ...(tag === undefined ? {} : { tag }),
+  requireDate: !process.argv.includes('--allow-undated'),
 });
 if (problems.length > 0) {
   console.error(problems.join('\n'));

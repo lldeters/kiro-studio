@@ -36,7 +36,7 @@ jobs:
       - run: npm ci
 
       - name: Check the release (version, tag, dated changelog section)
-        run: npx tsx scripts/check-release.ts ${{ github.ref_type == 'tag' && format('--tag {0}', github.ref_name) || '' }} --notes "$RUNNER_TEMP/release-notes.md"
+        run: npx tsx scripts/check-release.ts ${{ github.ref_type == 'tag' && format('--tag {0}', github.ref_name) || '--allow-undated' }} --notes "$RUNNER_TEMP/release-notes.md"
       - name: Check that the Marketplace token is there
         if: env.PUBLISH == 'true' && env.VSCE_PAT == ''
         run: |

@@ -50,6 +50,13 @@ describe('release rules', () => {
     ]);
   });
 
+  it('lets an undated section through when the release is not prepared yet (CI, a dry run)', () => {
+    expect(releaseProblems({ version: '0.2.0', publisher: 'lldeters', changelog, requireDate: false })).toEqual([]);
+    expect(releaseProblems({ version: '9.9.9', publisher: 'lldeters', changelog, requireDate: false })).toEqual([
+      'CHANGELOG.md has no section "## [9.9.9]".',
+    ]);
+  });
+
   it('makes the relative links of the notes point at the repository, and leaves the others alone', () => {
     const base = 'https://github.com/lldeters/kiro-studio/blob/v0.1.0';
     expect(absoluteLinks('See [the plan](docs/PLAN.md) and [this](./README.md#setup).', base)).toBe(
