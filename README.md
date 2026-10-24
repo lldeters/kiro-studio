@@ -52,7 +52,9 @@ real Kiro session._
 
 ## Getting started
 
-1. Install the extension and open a folder. The **Kiro Studio** icon appears in the activity bar.
+1. Install **Kiro Studio** from the Extensions view (search for "Kiro Studio"), or a `.vsix` from the
+   [releases](https://github.com/lldeters/kiro-studio/releases) with _Extensions: Install from VSIX…_, and open a folder.
+   The **Kiro Studio** icon appears in the activity bar.
 2. If the CLI is not found or you are not signed in, the view says so and offers the fix. _Kiro Studio: Open Getting Started_
    walks through it.
 3. Start a session with **+** in the chat and ask something. The first start of the CLI can take a while (up to

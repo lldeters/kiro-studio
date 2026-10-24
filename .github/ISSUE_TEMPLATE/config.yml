@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A problem of the Kiro CLI or of Kiro itself
+    url: https://kiro.dev/docs/cli/
+    about: Kiro Studio is an independent front end; the CLI and the service belong to their makers.
