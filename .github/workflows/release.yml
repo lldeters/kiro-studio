@@ -1,8 +1,15 @@
 name: Release
 
-# Pushing a tag v<major>.<minor>.<patch> publishes that version: to the Visual Studio Marketplace, to Open VSX when its
-# token is set, and as a GitHub release with the .vsix. Started by hand (Actions > Release > Run workflow) it builds and
-# checks everything, publishes nothing and keeps the .vsix as an artifact. Setup and steps: docs/RELEASING.md.
+# Pushing a tag v<major>.<minor>.<patch> publishes that version: to the Visual Studio Marketplace, to Open VSX when it is
+# set up, and as a GitHub release with the .vsix. Started by hand (Actions > Release > Run workflow) it builds and checks
+# everything, publishes nothing and keeps the .vsix as an artifact. Setup and steps: docs/RELEASING.md.
+#
+# Marketplace sign-in, the first that is set up:
+#   - Microsoft Entra ID over OIDC: repository variables AZURE_CLIENT_ID and AZURE_TENANT_ID (no secret needed);
+#   - the Marketplace's own trusted publishing (announced, not yet released): repository variable
+#     MARKETPLACE_TRUSTED = true;
+#   - a personal access token of Azure DevOps: secret VSCE_PAT (scope Marketplace > Manage).
+# Open VSX, either of: secret OVSX_PAT, or trusted publishing with the repository variable OPEN_VSX_TRUSTED = true.
 
 on:
   push:
@@ -11,6 +18,7 @@ on:
 
 permissions:
   contents: write # the GitHub release
+  id-token: write # OIDC for Entra ID and Open VSX trusted publishing
 
 concurrency:
   group: release-${{ github.ref }}
@@ -25,8 +33,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PUBLISH: ${{ github.ref_type == 'tag' }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      MARKETPLACE_TRUSTED: ${{ vars.MARKETPLACE_TRUSTED }}
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      OPEN_VSX_TRUSTED: ${{ vars.OPEN_VSX_TRUSTED }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -37,10 +49,10 @@ jobs:
 
       - name: Check the release (version, tag, dated changelog section)
         run: npx tsx scripts/check-release.ts ${{ github.ref_type == 'tag' && format('--tag {0}', github.ref_name) || '--allow-undated' }} --notes "$RUNNER_TEMP/release-notes.md"
-      - name: Check that the Marketplace token is there
-        if: env.PUBLISH == 'true' && env.VSCE_PAT == ''
+      - name: Check that the Marketplace sign-in is set up
+        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID == '' && env.MARKETPLACE_TRUSTED != 'true' && env.VSCE_PAT == ''
         run: |
-          echo "::error::The secret VSCE_PAT is not set. See docs/RELEASING.md, one-time setup."
+          echo "::error::No Marketplace sign-in: set AZURE_CLIENT_ID, MARKETPLACE_TRUSTED or VSCE_PAT. See docs/RELEASING.md."
           exit 1
 
       - run: npm run typecheck
@@ -55,15 +67,37 @@ jobs:
           if-no-files-found: error
 
       # --skip-duplicate: a run that is repeated after a later step failed does not fail on what is already out.
-      - name: Publish to the Visual Studio Marketplace
-        if: env.PUBLISH == 'true'
+      - name: Sign in to Microsoft Entra ID
+        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish to the Visual Studio Marketplace (Entra ID)
+        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID != ''
+        env:
+          VSCE_PAT: '' # vsce prefers a token to --azure-credential
+        run: npx vsce publish --packagePath dist/kiro-studio.vsix --skip-duplicate --azure-credential
+      - name: Publish to the Visual Studio Marketplace (trusted publishing)
+        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID == '' && env.MARKETPLACE_TRUSTED == 'true'
+        env:
+          VSCE_PAT: ''
+        run: npx vsce publish --packagePath dist/kiro-studio.vsix --skip-duplicate --oidc
+      - name: Publish to the Visual Studio Marketplace (token)
+        if: env.PUBLISH == 'true' && env.AZURE_CLIENT_ID == '' && env.MARKETPLACE_TRUSTED != 'true'
         run: npx vsce publish --packagePath dist/kiro-studio.vsix --skip-duplicate
-      - name: Publish to Open VSX
+
+      - name: Publish to Open VSX (token)
         if: env.PUBLISH == 'true' && env.OVSX_PAT != ''
         run: npx ovsx publish --packagePath dist/kiro-studio.vsix --skip-duplicate
+      - name: Publish to Open VSX (trusted publishing)
+        if: env.PUBLISH == 'true' && env.OVSX_PAT == '' && env.OPEN_VSX_TRUSTED == 'true'
+        run: npx ovsx publish --packagePath dist/kiro-studio.vsix --skip-duplicate --trusted-publishing
       - name: Say that Open VSX was left out
-        if: env.PUBLISH == 'true' && env.OVSX_PAT == ''
-        run: echo "::notice::OVSX_PAT is not set, so the version was not published to Open VSX."
+        if: env.PUBLISH == 'true' && env.OVSX_PAT == '' && env.OPEN_VSX_TRUSTED != 'true'
+        run: echo "::notice::Open VSX is not set up (OVSX_PAT or OPEN_VSX_TRUSTED), so the version was not published there."
+
       - name: Create the GitHub release with the .vsix
         if: env.PUBLISH == 'true'
         env:
