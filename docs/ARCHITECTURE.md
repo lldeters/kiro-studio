@@ -58,6 +58,7 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ promptContext.ts ... attachments -> ACP content blocks (links only inside the workspace)
 │   ├─ panelTrees.ts ...... the nodes of the six Kiro panel views (labels, icons, context flags, commands)
 │   ├─ specPresenter.ts ... the files of a spec -> what the spec view shows
+│   ├─ approvalQueue.ts ... which request the picker shows; the next opens when one is answered
 │   ├─ exportMarkdown.ts, chatHtml.ts, statusModel.ts, statusTree.ts, transcriptPrinter.ts
 │
 ├─ src/checkpoints/ ........ no `vscode`: git.ts (runs `git`), shadowRepo.ts (the shadow repository),
