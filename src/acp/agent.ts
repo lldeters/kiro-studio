@@ -363,8 +363,7 @@ export class KiroAgent {
     const existed = this.store.get(sessionId) !== undefined;
     const autonomy = this.wantedAutonomy(this.store.get(sessionId));
     const session = this.store.create(sessionId, { cwd });
-    // Kiro replays the conversation, not our checkpoints; these are kept and put back after the replay.
-    const checkpoints = [...session.checkpoints.values()];
+    // Kiro replays the conversation, not our checkpoints: the session keeps them and shows their cards after the replay.
     session.resetForReplay();
     session.cwd = cwd;
     this.dispatcher.sessionRegistered(sessionId);
@@ -377,15 +376,15 @@ export class KiroAgent {
           : { additionalDirectories: options.additionalDirectories }),
       });
       session.applySessionResult(result);
-      // Their place in the conversation is not known any more, so they come after it; the changes can still be viewed
-      // and reverted.
-      for (const { id, files } of checkpoints) session.addCheckpoint({ id, files });
+      session.restoreCheckpointMarkers();
       await this.beforePrompts(session, () => this.applyAutonomy(session, autonomy));
     } catch (error) {
       // A session that never loaded must not stay behind as a tab that is "starting" for ever; one that was open before
-      // is lost again, so that a later reconnect tries once more.
-      if (existed) session.markLost(`Could not load this session: ${describeError(error)}`);
-      else {
+      // is lost again, so that a later reconnect tries once more. Its checkpoints stay reachable meanwhile.
+      if (existed) {
+        session.markLost(`Could not load this session: ${describeError(error)}`);
+        session.restoreCheckpointMarkers();
+      } else {
         session.markClosed();
         this.store.delete(sessionId);
       }

@@ -255,6 +255,31 @@ describe('resetForReplay', () => {
     expect(s.approvals).toHaveLength(0);
     expect(s).toMatchObject({ status: 'creating', phase: 'idle', replayedEvents: 0 });
   });
+
+  it('keeps the checkpoints, with their times, and shows their cards after the replay in the order they were made', () => {
+    let now = 1000;
+    const s = new Session(SESSION_ID, { now: () => now });
+    const files = [{ path: 'a.ts', status: 'modified' as const, added: 1, removed: 0, binary: false, reverted: false }];
+    s.addCheckpoint({ id: '1', files });
+    now = 2000;
+    s.resetForReplay();
+    apply(s, u.user('Earlier question', { replay: true }));
+    // A turn that was running when the connection dropped records its changes while the replay arrives.
+    s.addCheckpoint({ id: '2', files });
+    apply(s, u.agent('Earlier answer', { replay: true }));
+    expect(s.transcript.map((i) => i.kind)).toEqual(['user', 'assistant']);
+    s.restoreCheckpointMarkers();
+    expect(s.transcript.map((i) => (i.kind === 'checkpoint' ? `checkpoint ${i.checkpointId}` : i.kind))).toEqual([
+      'user',
+      'assistant',
+      'checkpoint 1',
+      'checkpoint 2',
+    ]);
+    expect([...s.checkpoints.values()].map((c) => c.createdAt)).toEqual([1000, 2000]);
+    // Restoring again adds nothing twice.
+    s.restoreCheckpointMarkers();
+    expect(s.transcript.filter((i) => i.kind === 'checkpoint')).toHaveLength(2);
+  });
 });
 
 describe('config options', () => {

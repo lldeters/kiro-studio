@@ -390,6 +390,28 @@ describe('load session', () => {
     expect(session.transcript[session.transcript.length - 1]?.kind).toBe('checkpoint');
   });
 
+  it('keeps the checkpoints when a reload fails, so that a later one still shows them', async () => {
+    const h = make();
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    session.addCheckpoint({
+      id: 'c1',
+      files: [{ path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: false }],
+    });
+    const createdAt = session.checkpoints.get('c1')?.createdAt;
+    let fail = true;
+    h.fake.on('session/load', () => {
+      if (fail) throw new RpcError(-32603, 'The CLI is busy');
+      return sessionResult('sess_old');
+    });
+    await expect(h.agent.loadSession('sess_old', '/ws')).rejects.toThrow('busy');
+    // Meanwhile the card is there, so the changes can still be viewed and reverted.
+    expect(session.transcript.filter((i) => i.kind === 'checkpoint')).toHaveLength(1);
+    fail = false;
+    await h.agent.loadSession('sess_old', '/ws');
+    expect(session.checkpoints.get('c1')?.createdAt).toBe(createdAt);
+    expect(session.transcript.filter((i) => i.kind === 'checkpoint')).toHaveLength(1);
+  });
+
   it('switches a session from the list to Supervised when that is the setting (Kiro keeps it in Autopilot)', async () => {
     const h = make({ settings: { autonomy: 'supervised' } });
     const session = await h.agent.loadSession('sess_old', '/ws');

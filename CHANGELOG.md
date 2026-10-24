@@ -61,10 +61,11 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - A repository could switch on Autopilot, and with it automatic approval (on by default), through `kiroStudio.autonomy`
   in its `.vscode/settings.json`, and choose one of its own agents through `kiroStudio.defaultMode`. Both are now read
   from the user settings only.
+- The checkpoints of a resumed session were lost for good when the reload failed, could not be reverted while the
+  replay ran, and came back with the time of the reload. The session now keeps them throughout; their cards come back
+  after the replay (also after a failed one), and one that a turn records during the replay no longer lands in its
+  middle.
 
 ### Known limits
 
 - Not yet tried against a real Kiro CLI beyond probe runs; see the assumptions in [docs/PLAN.md](docs/PLAN.md).
-- When the connection to the CLI is lost and a session is resumed, Kiro replays the conversation but not Kiro Studio's
-  checkpoint cards: _View changes_ and _Revert_ of earlier turns are gone from the chat (the snapshots stay in the
-  separate repository).

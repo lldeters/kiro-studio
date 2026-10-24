@@ -179,7 +179,9 @@ is still being probed)*.
 
 A crashed process is restarted with exponential backoff. After `initialize`, sessions that were open are
 re-opened with `session/load` (client-side MCP servers sent again). A turn that was running is marked as
-interrupted; it is not replayed automatically.
+interrupted; it is not replayed automatically. Kiro replays the conversation but not our checkpoints: the session keeps
+them throughout (they can be viewed and reverted while the replay runs, and after a load that failed) and shows their
+cards after the replay, oldest first, because their place in the conversation is not known.
 
 ## The chat webview
 

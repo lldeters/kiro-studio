@@ -260,10 +260,13 @@ describe('checkpoints in the view', () => {
     expect(isPatch(patch) && patch.meta?.checkpoints).toHaveLength(1);
   });
 
-  it('forgets checkpoints when a session is loaded again', () => {
+  it('keeps the checkpoints when a session is loaded again; their cards come back after the replay', () => {
     const s = make();
     s.addCheckpoint({ id: '1', files });
     s.resetForReplay();
-    expect(s.checkpoints.size).toBe(0);
+    expect(sessionView(s, 'posix')).toMatchObject({ items: [], checkpoints: [{ id: '1', files }] });
+    apply(s, u.agent('Replayed answer', { replay: true }));
+    s.restoreCheckpointMarkers();
+    expect(sessionView(s, 'posix').items.map((i) => i.kind)).toEqual(['assistant', 'checkpoint']);
   });
 });
