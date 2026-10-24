@@ -189,6 +189,8 @@ export class Session {
   private nextApprovalId = 1;
   /** True from Kiro's `turn_start` of the live turn until the turn ends. */
   turnStarted = false;
+  /** Between {@link resetForReplay} and {@link restoreCheckpointMarkers}: Kiro is replaying the conversation. */
+  private replaying = false;
   private turnStartWaiters: Deferred<boolean>[] = [];
   private readonly now: () => number;
 
@@ -527,12 +529,13 @@ export class Session {
 
   /**
    * Forgets what was recorded so far. Used before a lost session is loaded again: `session/load` replays the whole
-   * conversation, which would otherwise show up twice.
+   * conversation, which would otherwise show up twice. The checkpoints are ours and Kiro does not replay them, so they
+   * are kept (they can be viewed and reverted all the time); {@link restoreCheckpointMarkers} gives them their cards back.
    */
   resetForReplay(): void {
     this.transcript.length = 0;
     this.tools.clear();
-    this.checkpoints.clear();
+    this.replaying = true;
     this.approvals.length = 0;
     this.autoApprovals.length = 0;
     this.plan = undefined;
@@ -551,12 +554,33 @@ export class Session {
     this.changes.emit('status');
   }
 
-  /** Records what a turn changed. Shown in the transcript at the end of the turn. */
+  /**
+   * Records what a turn changed. Shown in the transcript at the end of the turn; while the conversation is being replayed
+   * the card waits for {@link restoreCheckpointMarkers}, so that it does not land in the middle of the replay.
+   */
   addCheckpoint(info: Omit<CheckpointInfo, 'createdAt'>): void {
     this.checkpoints.set(info.id, { ...info, createdAt: this.now() });
-    this.transcript.push({ kind: 'checkpoint', id: this.nextItemId++, checkpointId: info.id });
-    this.changes.emit('transcript');
+    if (!this.replaying) {
+      this.transcript.push({ kind: 'checkpoint', id: this.nextItemId++, checkpointId: info.id });
+      this.changes.emit('transcript');
+    }
     this.changes.emit('checkpoints');
+  }
+
+  /**
+   * After a replay: a card for every checkpoint that has none, oldest first. Their place in the conversation is not known
+   * any more, so they come after it.
+   */
+  restoreCheckpointMarkers(): void {
+    this.replaying = false;
+    const shown = new Set(this.transcript.flatMap((item) => (item.kind === 'checkpoint' ? [item.checkpointId] : [])));
+    let added = false;
+    for (const checkpoint of this.checkpoints.values()) {
+      if (shown.has(checkpoint.id)) continue;
+      this.transcript.push({ kind: 'checkpoint', id: this.nextItemId++, checkpointId: checkpoint.id });
+      added = true;
+    }
+    if (added) this.changes.emit('transcript');
   }
 
   markReverted(checkpointId: string, paths: readonly string[]): void {
