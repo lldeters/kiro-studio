@@ -10,6 +10,7 @@ import {
   parseMcpStatus,
   removeServer,
   setServerDisabled,
+  splitCommandLine,
 } from '../../src/workspace/mcp';
 import type { DirEntry, FileReader } from '../../src/workspace/reader';
 import { parseSteering, readSteering, steeringTemplate } from '../../src/workspace/steering';
@@ -252,6 +253,24 @@ describe('mcp config', () => {
       },
     ]);
     expect(parseMcpConfig(removeServer(added, 'docs')).servers.map((s) => s.name)).toEqual(['files', 'git']);
+  });
+
+  it('splits a command line, keeping quoted parts with spaces together', () => {
+    expect(splitCommandLine('  npx -y @modelcontextprotocol/server-filesystem .  ')).toEqual([
+      'npx',
+      '-y',
+      '@modelcontextprotocol/server-filesystem',
+      '.',
+    ]);
+    expect(splitCommandLine('"C:\\Program Files\\nodejs\\node.exe" server.js --root \'My Documents\'')).toEqual([
+      'C:\\Program Files\\nodejs\\node.exe',
+      'server.js',
+      '--root',
+      'My Documents',
+    ]);
+    expect(splitCommandLine('tool --name=""')).toEqual(['tool', '--name=']);
+    expect(splitCommandLine('tool ""')).toEqual(['tool', '']);
+    expect(splitCommandLine('   ')).toEqual([]);
   });
 
   it('follows the indentation of the file', () => {
