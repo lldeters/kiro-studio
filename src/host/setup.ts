@@ -4,6 +4,7 @@
  */
 import * as vscode from 'vscode';
 import { checkSetup, nodeCliEnvironment, type CliEnvironment, type SetupState } from '../kiro/cli';
+import { coalescing } from '../util/async';
 import type { UiState } from '../view/statusModel';
 import type { Settings } from './settings';
 
@@ -15,7 +16,6 @@ export class SetupController implements vscode.Disposable {
 
   private current: SetupState | undefined;
   private ui: UiState = 'checking';
-  private checking: Promise<void> | undefined;
 
   constructor(
     private readonly settings: Settings,
@@ -37,13 +37,11 @@ export class SetupController implements vscode.Disposable {
     return s && (s.kind === 'ready' || s.kind === 'notSignedIn') ? s.path : undefined;
   }
 
-  /** Checks again. Calls made while a check runs share its result. */
-  check(): Promise<void> {
-    this.checking ??= this.run().finally(() => {
-      this.checking = undefined;
-    });
-    return this.checking;
-  }
+  /**
+   * Checks again. Calls made while a check runs share its result, and it is checked once more after it: a check that
+   * began before the CLI path was changed must not have the last word.
+   */
+  readonly check: () => Promise<void> = coalescing(() => this.run());
 
   private async run(): Promise<void> {
     if (!vscode.workspace.isTrusted) {

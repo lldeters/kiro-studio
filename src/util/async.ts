@@ -8,6 +8,32 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * Runs `task` one at a time. A call while it runs shares that run and has it run once more when it is done, so that what
+ * the caller waits for started after its call (a setting that changed meanwhile is seen). Calls in between are merged.
+ */
+export function coalescing(task: () => Promise<void>): () => Promise<void> {
+  let running: Promise<void> | undefined;
+  let again = false;
+  return () => {
+    if (running) {
+      again = true;
+      return running;
+    }
+    running = (async () => {
+      try {
+        do {
+          again = false;
+          await task();
+        } while (again);
+      } finally {
+        running = undefined;
+      }
+    })();
+    return running;
+  };
+}
+
 export interface Deferred<T> {
   promise: Promise<T>;
   resolve(value: T): void;
