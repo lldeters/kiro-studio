@@ -80,10 +80,17 @@ export class ShadowRepo {
     return next;
   }
 
+  /**
+   * Every command runs without the user's global configuration, which would otherwise decide what a checkpoint holds
+   * (`core.excludesFile` leaves files out, `filter.*` rewrites them, `core.fsmonitor` starts a daemon for this repository).
+   * The file named does not exist, which Git reads as an empty configuration (Git 2.32 and later).
+   */
+  private get options() {
+    return { cwd: this.workTree, env: { GIT_CONFIG_GLOBAL: path.join(this.gitDir, 'no-global-config') } };
+  }
+
   private run(args: string[]) {
-    return this.git(['--git-dir', this.gitDir, '--work-tree', this.workTree, ...CONFIG, ...args], {
-      cwd: this.workTree,
-    });
+    return this.git(['--git-dir', this.gitDir, '--work-tree', this.workTree, ...CONFIG, ...args], this.options);
   }
 
   private async ok(args: string[]): Promise<string> {
@@ -101,7 +108,7 @@ export class ShadowRepo {
   private async init(): Promise<void> {
     if (this.initialised) return;
     await fs.mkdir(this.gitDir, { recursive: true });
-    const created = await this.git(['init', '--quiet', '--bare', '--template=', this.gitDir], { cwd: this.workTree });
+    const created = await this.git(['init', '--quiet', '--bare', '--template=', this.gitDir], this.options);
     if (created.code !== 0) throw new Error(`git init failed: ${created.stderr.trim()}`);
     await fs.mkdir(path.join(this.gitDir, 'info'), { recursive: true });
     await fs.writeFile(path.join(this.gitDir, 'info', 'exclude'), `${EXCLUDE.join('\n')}\n`);

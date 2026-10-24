@@ -11,6 +11,8 @@ export interface GitOptions {
   timeoutMs?: number;
   /** Larger than the default 1 MB of `execFile`; a diff of a big change is long. */
   maxBuffer?: number;
+  /** Added to the environment of the program. */
+  env?: Record<string, string>;
 }
 
 export type GitRunner = (args: readonly string[], options: GitOptions) => Promise<GitResult>;
@@ -27,8 +29,8 @@ export const runGit: GitRunner = (args, options) =>
         maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
         encoding: 'buffer',
         windowsHide: true,
-        // The user's own configuration must not change what a checkpoint is.
-        env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C' },
+        // The system's configuration must not change what a checkpoint is; the caller can leave out the user's as well.
+        env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', LC_ALL: 'C', ...options.env },
       },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : typeof error.code === 'number' ? error.code : -1;
