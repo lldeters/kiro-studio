@@ -115,6 +115,24 @@ describe('ShadowRepo', () => {
     expect((await repo.changes(before, after)).map((f) => f.path)).toEqual(['a.txt']); // .git itself is never tracked
   });
 
+  it("does not let the user's global Git configuration decide what a checkpoint holds", async () => {
+    const config = path.join(root, 'user-gitconfig');
+    const ignore = path.join(root, 'user-ignore');
+    await fs.writeFile(ignore, '*.secret\n');
+    await fs.writeFile(config, `[core]\n\texcludesFile = ${ignore.replace(/\\/g, '/')}\n`);
+    const saved = process.env.GIT_CONFIG_GLOBAL;
+    process.env.GIT_CONFIG_GLOBAL = config;
+    try {
+      const before = await repo.snapshot('before');
+      await write('keys.secret', 'changed by Kiro\n');
+      const after = await repo.snapshot('after');
+      expect((await repo.changes(before, after)).map((f) => f.path)).toEqual(['keys.secret']);
+    } finally {
+      if (saved === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+      else process.env.GIT_CONFIG_GLOBAL = saved;
+    }
+  });
+
   describe('revert', () => {
     it('puts modified, deleted and added files back', async () => {
       await write('mod.txt', 'old\n');
