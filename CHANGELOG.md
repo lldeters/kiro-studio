@@ -96,6 +96,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   A check that is asked for while one runs now runs once more after it.
 - A replay that rebuilt a session's transcript to at least its old length between two updates of the chat left the page
   with the old items. The chat now notices from the last item it was sent that the transcript is a new one.
+- A link in an answer that could not be decoded (`%C3` alone, say) threw in the click handler, and a line number that
+  was not a whole number reached the editor as an invalid range. Both are ignored now.
 
 ### Known limits
 

@@ -89,6 +89,21 @@ describe('markdown', () => {
     expect(outbox).toEqual([{ type: 'openFile', path: 'src/parser.ts', line: 7 }]);
   });
 
+  it('ignores a link that cannot be decoded instead of failing in the click handler', () => {
+    // %C3 alone is no UTF-8: decodeURIComponent throws on it.
+    render(<Markdown text={'[notes](notes%C3.md)'} />);
+    const errors: unknown[] = [];
+    const onError = (event: ErrorEvent) => errors.push(event.error);
+    window.addEventListener('error', onError);
+    try {
+      fireEvent.click(screen.getByText('notes'));
+    } finally {
+      window.removeEventListener('error', onError);
+    }
+    expect(errors).toEqual([]);
+    expect(outbox).toEqual([]);
+  });
+
   it('shows code in a block with its language and a copy button, and copies through the host', () => {
     const { container } = render(<Markdown text={'```ts\nconst a = 1;\n```'} />);
     expect(container.querySelector('.code-lang')?.textContent).toBe('typescript');

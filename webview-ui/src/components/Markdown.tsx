@@ -23,6 +23,15 @@ function textOf(node: ReactNode): string {
   return '';
 }
 
+/** A link with a stray `%` cannot be decoded (`decodeURIComponent` throws); it is taken as it is. */
+function decoded(text: string): string {
+  try {
+    return decodeURIComponent(text);
+  } catch {
+    return text;
+  }
+}
+
 function link(href: string | undefined, children: ReactNode): ReactNode {
   if (href === undefined) return children;
   const external = /^(https?:|mailto:)/i.test(href);
@@ -35,9 +44,7 @@ function link(href: string | undefined, children: ReactNode): ReactNode {
           post({ type: 'openLink', url: href });
           return;
         }
-        const reference = parseFileReference(
-          decodeURIComponent(href.replace(/^file:\/\//, '').replace(/#L(\d+)$/, ':$1')),
-        );
+        const reference = parseFileReference(decoded(href.replace(/^file:\/\//, '').replace(/#L(\d+)$/, ':$1')));
         if (reference) post({ type: 'openFile', ...reference });
       }}
     >
