@@ -72,6 +72,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run package
+      # Version and changelog are ready for a release (only the date is set when it is prepared).
+      - run: npm run release:check -- --allow-undated
       - uses: actions/upload-artifact@v4
         with:
           name: kiro-studio-vsix

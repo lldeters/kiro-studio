@@ -50,10 +50,12 @@ export interface ReleaseInput {
   changelog: string;
   /** The Git tag the release is built from, if any (`v0.1.0`). */
   tag?: string;
+  /** False for a check before the release is prepared (CI, a dry run): the section may still be undated. */
+  requireDate?: boolean;
 }
 
 /** Everything that stands in the way of publishing; empty when the release can go out. */
-export function releaseProblems({ version, publisher, changelog, tag }: ReleaseInput): string[] {
+export function releaseProblems({ version, publisher, changelog, tag, requireDate = true }: ReleaseInput): string[] {
   const problems: string[] = [];
   // The Marketplace takes major.minor.patch only; a pre-release is published with --pre-release instead.
   if (!/^\d+\.\d+\.\d+$/.test(version))
@@ -64,7 +66,7 @@ export function releaseProblems({ version, publisher, changelog, tag }: ReleaseI
   const section = changelogSection(changelog, version);
   if (section === undefined) problems.push(`CHANGELOG.md has no section "## [${version}]".`);
   else {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(section.date))
+    if (requireDate && !/^\d{4}-\d{2}-\d{2}$/.test(section.date))
       problems.push(
         `The changelog section of ${version} is dated "${section.date || '(nothing)'}"; set the release date (YYYY-MM-DD).`,
       );
