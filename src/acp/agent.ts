@@ -90,6 +90,8 @@ const notReady: Record<Exclude<SessionStatus, 'ready'>, string> = {
   lost: 'This session is not connected to the Kiro CLI; it comes back when the connection does. Nothing was sent.',
   closed: 'This session was closed. Nothing was sent.',
 };
+/** How long shutting down waits for `session/close` before the process is ended. */
+const CLOSE_WAIT_MS = 1000;
 /** A safety limit for `session/list`: 20 pages are far more sessions than anyone browses. */
 const MAX_LIST_PAGES = 20;
 
@@ -286,7 +288,14 @@ export class KiroAgent {
     const connection = this.connection;
     this.connection = undefined;
     if (connection?.state === 'ready') {
-      await Promise.all(this.store.all().map((s) => connection.closeSession(s.id).catch(() => undefined)));
+      // Kiro answers at once. A CLI that does not must not hold up ending the process: VS Code gives an extension only a
+      // few seconds to stop, and a CLI that is not ended by then is left running.
+      const open = this.store.all().filter((s) => s.status === 'ready' || s.status === 'creating');
+      await withTimeout(
+        Promise.all(open.map((s) => connection.closeSession(s.id).catch(() => undefined))),
+        CLOSE_WAIT_MS,
+        'closing the sessions',
+      ).catch((error: unknown) => this.deps.log.info(describeError(error)));
     }
     await connection?.dispose();
     for (const session of this.store.all()) session.markClosed();

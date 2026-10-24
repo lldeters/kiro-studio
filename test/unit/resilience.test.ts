@@ -166,6 +166,28 @@ describe('shutting down', () => {
     expect(h.lines.some((l) => l.includes('did not exit within 40 ms'))).toBe(true);
   });
 
+  it('does not let a session/close that is never answered hold up ending the process', async () => {
+    const h = make({ fake: { ignoreEndOfInput: true }, shutdownGraceMs: 40 });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.on('session/close', () => new Promise(() => undefined));
+    const started = Date.now();
+    await h.agent.dispose();
+    // The extension timeout of the harness is 2 s; ending must not wait for it.
+    expect(Date.now() - started).toBeLessThan(1700);
+    expect(h.fake.killed).toEqual({ tree: true });
+  });
+
+  it('closes only the sessions that are open on this connection', async () => {
+    const h = make();
+    const open = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const lost = h.agent.store.create('sess_lost', { cwd: '/ws' });
+    lost.markLost('gone');
+    await h.agent.dispose();
+    expect(h.fake.requestsOf('session/close').map((m) => (m.params as { sessionId: string }).sessionId)).toEqual([
+      open.id,
+    ]);
+  });
+
   it('does not kill a process that exits by itself', async () => {
     const h = make();
     await h.agent.start();
