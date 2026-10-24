@@ -16,7 +16,7 @@ import { describeError, isConnectionClosed } from './errors';
 import { FsHandler, type FileSystemPort, type WriteGate } from './handlers/fs';
 import type { PromptInput } from './prompt';
 import { PermissionBroker } from './handlers/permissions';
-import { type Session, SessionStore, type TurnOutcome } from './sessions';
+import { type Session, type SessionStatus, SessionStore, type TurnOutcome } from './sessions';
 import { parseConfigOptions } from './types';
 import type { TransportFactory } from './transport';
 
@@ -83,6 +83,13 @@ export interface SessionSummary {
 }
 
 const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000, 16_000, 30_000];
+
+/** Why a prompt cannot go to a session that is not ready. */
+const notReady: Record<Exclude<SessionStatus, 'ready'>, string> = {
+  creating: 'This session is still being opened. Nothing was sent.',
+  lost: 'This session is not connected to the Kiro CLI; it comes back when the connection does. Nothing was sent.',
+  closed: 'This session was closed. Nothing was sent.',
+};
 /** A safety limit for `session/list`: 20 pages are far more sessions than anyone browses. */
 const MAX_LIST_PAGES = 20;
 
@@ -498,6 +505,8 @@ export class KiroAgent {
   async prompt(sessionId: string, input: string | PromptInput): Promise<TurnOutcome> {
     const session = this.requireSession(sessionId);
     if (session.busy) throw new Error('A turn is already running in this session');
+    // Sent anyway, the prompt would end without an answer and without a word: the user would wait for nothing.
+    if (session.status !== 'ready') throw new Error(notReady[session.status]);
     const { text, blocks = [], labels = [] } = typeof input === 'string' ? { text: input } : input;
     session.beginTurn(text, labels);
     // Only when something is pending: an extra await would move the turn's first steps by a tick.
@@ -514,8 +523,9 @@ export class KiroAgent {
       const { stopReason } = await this.ready.prompt(sessionId, [{ type: 'text', text }, ...blocks]);
       outcome = { stopReason };
     } catch (error) {
-      // When the process died, the loss handler already told the session; do not report it a second time.
-      const lost = isConnectionClosed(error) || session.status === 'lost';
+      // When the process died, the loss handler already told the session; do not report it a second time. (The status
+      // was "ready" when the turn began and may have changed since.)
+      const lost = isConnectionClosed(error) || (session.status as SessionStatus) === 'lost';
       outcome = lost ? {} : { error: describeError(error) };
     }
     // The turn counts as running until its changes are recorded, so that the checkpoint comes before the next message.

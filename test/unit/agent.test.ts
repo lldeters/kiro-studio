@@ -246,6 +246,39 @@ describe('prompt', () => {
     await expect(h.agent.prompt(session.id, 'two')).rejects.toThrow('already running');
     await first;
   });
+
+  it('refuses a prompt for a session that lost its connection, instead of ending the turn without a word', async () => {
+    let hooks = 0;
+    const count = () => {
+      hooks++;
+      return Promise.resolve();
+    };
+    const h = make({ turnHooks: { before: count, after: count } });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const before = session.transcript.length;
+    session.markLost('The connection to the Kiro CLI was lost.');
+    await expect(h.agent.prompt(session.id, 'Please fix the bug')).rejects.toThrow('not connected');
+    expect(session.transcript).toHaveLength(before);
+    expect(session.busy).toBe(false);
+    expect(hooks).toBe(0);
+    expect(h.fake.requestsOf('session/prompt')).toHaveLength(0);
+  });
+
+  it('refuses a prompt for a session that is still being opened', async () => {
+    const h = make();
+    await h.agent.start();
+    let answer: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (answer = resolve));
+    h.fake.on('session/load', async () => {
+      await held;
+      return sessionResult('sess_old');
+    });
+    const loading = h.agent.loadSession('sess_old', '/ws');
+    await until(() => h.agent.store.get('sess_old') !== undefined, 2000, 'the session object');
+    await expect(h.agent.prompt('sess_old', 'hi')).rejects.toThrow('still being opened');
+    answer();
+    await loading;
+  });
 });
 
 describe('cancel', () => {

@@ -68,6 +68,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - A double click on a session in the Sessions view, or a restart while sessions were being resumed, loaded the same
   session twice at once: the second load reset the transcript in the middle of the first replay and the conversation
   showed up twice. A load that is running is now shared.
+- A prompt to a session that had lost its connection (from _Start task_, the spec view or _Generate steering_) showed
+  the question and then nothing, not even an error. Such a prompt is refused with a message, and the spec and steering
+  actions use a new session instead.
 
 ### Known limits
 

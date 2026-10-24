@@ -33,7 +33,8 @@ export class DebugChat implements vscode.Disposable {
   }
 
   async sendPrompt(): Promise<void> {
-    const session = this.host.activeSession ?? (await this.newSession());
+    const active = this.host.activeSession;
+    const session = active?.status === 'ready' ? active : await this.newSession();
     const agent = this.host.agent;
     if (!session || !agent) return;
     const text = await vscode.window.showInputBox({
