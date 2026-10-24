@@ -27,7 +27,12 @@ beforeEach(async () => {
   await fs.mkdir(ws);
   repo = new ShadowRepo(path.join(root, 'shadow'), ws);
 });
-afterEach(() => fs.rm(root, { recursive: true, force: true }));
+// The clean-up after a window's first snapshot runs in the background, with the work tree as its folder; on Windows the
+// folder cannot be removed while it runs.
+afterEach(async () => {
+  await repo.idle();
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
 
 describe('ShadowRepo', () => {
   it('reports that git is available', async () => {
@@ -138,6 +143,7 @@ describe('ShadowRepo', () => {
       const before = await window.snapshot('this window');
       await write('more.txt', 'newer\n');
       const after = await window.snapshot('this window');
+      await Promise.all([earlier.idle(), window.idle()]);
 
       expect(has(first)).toBe(false);
       // What this window recorded is all there.
@@ -149,7 +155,9 @@ describe('ShadowRepo', () => {
       const earlier = new ShadowRepo(gitDir(), ws);
       await write('a.txt', 'one\n');
       const first = await earlier.snapshot('earlier window');
-      await new ShadowRepo(gitDir(), ws).snapshot('this window');
+      const window = new ShadowRepo(gitDir(), ws);
+      await window.snapshot('this window');
+      await Promise.all([earlier.idle(), window.idle()]);
       expect(has(first)).toBe(true);
     });
   });

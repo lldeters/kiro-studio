@@ -81,6 +81,11 @@ export class ShadowRepo {
     private readonly pruneExpire = '2.days.ago',
   ) {}
 
+  /** Resolves when every operation queued so far is done, the clean-up in the background included. */
+  idle(): Promise<void> {
+    return this.chain.then(() => undefined);
+  }
+
   /** Operations run one after another: two `git add` on one index would fight over its lock. */
   private serial<T>(task: () => Promise<T>): Promise<T> {
     const next = this.chain.then(task, task);

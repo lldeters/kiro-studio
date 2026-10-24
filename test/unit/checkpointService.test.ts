@@ -10,6 +10,7 @@ import { sessionView } from '../../src/view/chatPresenter';
 
 let root: string;
 let ws: string;
+let shadow: ShadowRepo;
 let service: CheckpointService;
 let session: Session;
 const unavailable: string[] = [];
@@ -22,12 +23,15 @@ beforeEach(async () => {
   ws = path.join(root, 'ws');
   await fs.mkdir(ws);
   unavailable.length = 0;
-  service = new CheckpointService(new ShadowRepo(path.join(root, 'shadow'), ws), undefined, (reason) =>
-    unavailable.push(reason),
-  );
+  shadow = new ShadowRepo(path.join(root, 'shadow'), ws);
+  service = new CheckpointService(shadow, undefined, (reason) => unavailable.push(reason));
   session = new Session('s1', { cwd: ws });
 });
-afterEach(() => fs.rm(root, { recursive: true, force: true }));
+// The repository cleans up in the background after its first snapshot; on Windows its folder is busy until then.
+afterEach(async () => {
+  await shadow.idle();
+  await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+});
 
 async function turn(change: () => Promise<void>): Promise<void> {
   await service.before(session);
@@ -137,12 +141,14 @@ describe('checkpoint service', () => {
       calls.push([...args]);
       return runGit(args, options);
     };
-    const counted = new CheckpointService(new ShadowRepo(path.join(root, 'counted'), ws, counting));
+    const countedRepo = new ShadowRepo(path.join(root, 'counted'), ws, counting);
+    const counted = new CheckpointService(countedRepo);
     for (const text of ['1\n', '2\n', '3\n']) {
       await counted.before(session);
       await write('a.txt', text);
       await counted.after(session);
     }
+    await countedRepo.idle();
     expect(calls.filter((args) => args[0] === '--version')).toHaveLength(1);
     expect(session.checkpoints.size).toBe(3);
   });
