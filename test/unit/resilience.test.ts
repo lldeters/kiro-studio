@@ -119,6 +119,18 @@ describe('losing the process', () => {
     expect(h.fake.requestsOf('session/load')).toHaveLength(1);
   });
 
+  it('resumes the lost sessions when something else starts the connection while a reconnect waits', async () => {
+    const h = make({ backoffMs: [60_000] });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.crash();
+    await until(() => h.agent.state.phase === 'reconnecting', 2000, 'the reconnect to be scheduled');
+    // For example "New session" in the chat: it starts the connection at once and the scheduled attempt is dropped.
+    const second = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(second.status).toBe('ready');
+    await until(() => session.status === 'ready', 3000, 'the lost session to be resumed');
+    expect(h.fake.requestsOf('session/load')).toHaveLength(1);
+  });
+
   it('does not restart after it was disposed', async () => {
     const h = make({ backoffMs: [200] });
     await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
