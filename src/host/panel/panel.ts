@@ -502,7 +502,9 @@ export class KiroPanel implements vscode.Disposable {
     );
     if (answer !== confirm) return;
     const { host } = this.deps;
-    const session = host.activeSession ?? (await host.newSession());
+    // A session that lost its connection or is still opening cannot take the prompt.
+    const active = host.activeSession;
+    const session = active?.status === 'ready' ? active : await host.newSession();
     await vscode.commands.executeCommand('kiroStudio.chat.focus');
     if (session.busy) {
       void vscode.window.showInformationMessage(t('Kiro is still working on a turn.'));

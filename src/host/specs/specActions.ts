@@ -162,12 +162,14 @@ export class SpecActions {
   // -------------------------------------------------------------------------------------------------------------
 
   /**
-   * Sends the prompt in the active session, or in a new one when asked to or when there is none. A session that is
-   * in the middle of a turn is not interrupted: the user chooses to wait or to use a new session.
+   * Sends the prompt in the active session, or in a new one when asked to, when there is none or when the active one
+   * cannot take it (lost its connection, still opening). A session that is in the middle of a turn is not interrupted:
+   * the user chooses to wait or to use a new session.
    */
   private async ask(prompt: string, options: { mode?: string; fresh?: boolean } = {}): Promise<void> {
     const { host } = this;
     let session: Session | undefined = options.fresh === true ? undefined : host.activeSession;
+    if (session?.status !== 'ready') session = undefined;
     if (session?.busy) {
       const fresh = t('Use a new session');
       if ((await vscode.window.showInformationMessage(t('Kiro is still working on a turn.'), fresh)) !== fresh) return;
