@@ -1,0 +1,77 @@
+name: Release
+
+# Pushing a tag v<major>.<minor>.<patch> publishes that version: to the Visual Studio Marketplace, to Open VSX when its
+# token is set, and as a GitHub release with the .vsix. Started by hand (Actions > Release > Run workflow) it builds and
+# checks everything, publishes nothing and keeps the .vsix as an artifact. Setup and steps: docs/RELEASING.md.
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # the GitHub release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  release:
+    name: ${{ github.ref_type == 'tag' && format('Publish {0}', github.ref_name) || 'Dry run' }}
+    runs-on: ubuntu-latest
+    env:
+      PUBLISH: ${{ github.ref_type == 'tag' }}
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      - name: Check the release (version, tag, dated changelog section)
+        run: npx tsx scripts/check-release.ts ${{ github.ref_type == 'tag' && format('--tag {0}', github.ref_name) || '' }} --notes "$RUNNER_TEMP/release-notes.md"
+      - name: Check that the Marketplace token is there
+        if: env.PUBLISH == 'true' && env.VSCE_PAT == ''
+        run: |
+          echo "::error::The secret VSCE_PAT is not set. See docs/RELEASING.md, one-time setup."
+          exit 1
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Build and check the package
+        run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kiro-studio-vsix
+          path: dist/kiro-studio.vsix
+          if-no-files-found: error
+
+      # --skip-duplicate: a run that is repeated after a later step failed does not fail on what is already out.
+      - name: Publish to the Visual Studio Marketplace
+        if: env.PUBLISH == 'true'
+        run: npx vsce publish --packagePath dist/kiro-studio.vsix --skip-duplicate
+      - name: Publish to Open VSX
+        if: env.PUBLISH == 'true' && env.OVSX_PAT != ''
+        run: npx ovsx publish --packagePath dist/kiro-studio.vsix --skip-duplicate
+      - name: Say that Open VSX was left out
+        if: env.PUBLISH == 'true' && env.OVSX_PAT == ''
+        run: echo "::notice::OVSX_PAT is not set, so the version was not published to Open VSX."
+      - name: Create the GitHub release with the .vsix
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/kiro-studio.vsix --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/kiro-studio.vsix --verify-tag \
+              --title "Kiro Studio $GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
