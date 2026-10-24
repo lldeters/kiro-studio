@@ -42,7 +42,6 @@ const init: HostMessage = {
   setup: 'ready',
   agent: { phase: 'ready' },
   capabilities: { image: true, compact: true },
-  autonomySetting: 'autopilot',
 };
 
 const run = (messages: HostMessage[], start: ChatState = initialState) => messages.reduce(reduce, start);
@@ -50,7 +49,7 @@ const run = (messages: HostMessage[], start: ChatState = initialState) => messag
 describe('chat state', () => {
   it('takes the first state from init', () => {
     const state = run([init]);
-    expect(state).toMatchObject({ ready: true, activeId: 's1', setup: 'ready', autonomySetting: 'autopilot' });
+    expect(state).toMatchObject({ ready: true, activeId: 's1', setup: 'ready' });
     expect(state.strings).toEqual({ Send: 'Senden' });
     expect(state.capabilities.image).toBe(true);
   });

@@ -24,7 +24,6 @@ function init(sessions: Session[], overrides: { setup?: SetupView; phase?: 'star
     setup: overrides.setup ?? 'ready',
     agent: { phase: overrides.phase ?? 'ready' },
     capabilities: { image: true, compact: true },
-    autonomySetting: 'supervised',
   };
 }
 

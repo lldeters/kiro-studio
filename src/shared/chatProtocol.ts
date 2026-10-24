@@ -181,7 +181,6 @@ export type HostMessage =
       setup: SetupView;
       agent: AgentView;
       capabilities: ChatCapabilities;
-      autonomySetting: 'supervised' | 'autopilot';
     }
   | { type: 'tabs'; tabs: TabView[]; activeId?: string }
   | { type: 'status'; setup: SetupView; agent: AgentView; capabilities: ChatCapabilities }

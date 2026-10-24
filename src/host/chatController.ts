@@ -25,7 +25,6 @@ import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
 import type { DiffProvider } from './diffProvider';
 import type { SetupController } from './setup';
-import type { Settings } from './settings';
 
 const FLUSH_MS = 30;
 
@@ -51,7 +50,6 @@ export class ChatController implements vscode.Disposable {
   constructor(
     private readonly host: AgentHost,
     private readonly setup: SetupController,
-    private readonly settings: Settings,
     private readonly diffs: DiffProvider,
     private readonly log?: { info(text: string): void },
   ) {
@@ -136,7 +134,6 @@ export class ChatController implements vscode.Disposable {
     this.deliver(sink, () =>
       sink.sync.init(this.input(), {
         strings: Object.fromEntries(UI_MESSAGES.map((message) => [message, vscode.l10n.t(message)])),
-        autonomySetting: this.settings.autonomy(),
       }),
     );
   }

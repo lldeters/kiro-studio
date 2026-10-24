@@ -63,7 +63,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   host = agentHost;
   const debug = new DebugChat(agentHost);
   const diffs = new DiffProvider();
-  const chat = new ChatController(agentHost, setup, settings, diffs, protocol.log);
+  const chat = new ChatController(agentHost, setup, diffs, protocol.log);
   const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
   const specs = new SpecsFeature({
     host: agentHost,
