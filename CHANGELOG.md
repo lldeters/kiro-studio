@@ -71,6 +71,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - A prompt to a session that had lost its connection (from _Start task_, the spec view or _Generate steering_) showed
   the question and then nothing, not even an error. Such a prompt is refused with a message, and the spec and steering
   actions use a new session instead.
+- Starting a session while a reconnect was still waiting (the chat's **+**, say) dropped the reconnect, and the sessions
+  lost with the old process stayed lost. Every start of the connection now resumes them.
 
 ### Known limits
 

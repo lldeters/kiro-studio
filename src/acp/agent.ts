@@ -103,6 +103,8 @@ export class KiroAgent {
   private connection: KiroConnection | undefined;
   private startPromise: Promise<void> | undefined;
   private reconnectTimer: NodeJS.Timeout | undefined;
+  /** The resume of lost sessions that the last successful start began; it never rejects. */
+  private resuming: Promise<void> = Promise.resolve();
   private stableTimer: NodeJS.Timeout | undefined;
   private attempt = 0;
   private disposed = false;
@@ -193,6 +195,9 @@ export class KiroAgent {
       connection.closed.on((info) => this.onClosed(connection, info));
       this.setStatus({ phase: 'ready', capabilities });
       this.armStableTimer();
+      // Whatever started the connection (a reconnect, a restart, or a new session while a reconnect was still waiting),
+      // the sessions lost with the old process come back. Not awaited here: a new session must not wait for replays.
+      this.resuming = this.resumeLostSessions();
     } catch (error) {
       this.setStatus({ phase: 'failed', message: describeError(error) });
       throw error;
@@ -210,7 +215,7 @@ export class KiroAgent {
       if (session.status !== 'closed') session.markLost('Restarting the connection.');
     if (old) await old.dispose();
     await this.start();
-    await this.resumeLostSessions();
+    await this.resuming;
   }
 
   private onClosed(connection: KiroConnection, info: ConnectionClosed): void {
@@ -243,7 +248,7 @@ export class KiroAgent {
     if (this.disposed) return;
     try {
       await this.start();
-      await this.resumeLostSessions();
+      await this.resuming;
     } catch (error) {
       this.deps.log.info(`reconnect failed: ${errorMessage(error)}`);
       this.scheduleReconnect(reason);
@@ -262,7 +267,9 @@ export class KiroAgent {
 
   /** Loads every session that was lost with the old process. Kiro replays the conversation, flagged as replay. */
   private async resumeLostSessions(): Promise<void> {
-    for (const session of this.store.all().filter((s) => s.status === 'lost')) {
+    for (const session of this.store.all()) {
+      // Checked for each one in turn: the user may have opened one of them from the list meanwhile.
+      if (session.status !== 'lost') continue;
       try {
         await this.loadSession(session.id, session.cwd ?? this.deps.workspaceRoots()[0] ?? '');
       } catch (error) {
