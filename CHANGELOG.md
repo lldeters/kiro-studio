@@ -83,6 +83,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - Closing the window waited up to 30 s per session for `session/close` before it ended the CLI, longer than VS Code waits
   for an extension, so a CLI that did not answer could be left running. It now waits at most a second, and only for the
   sessions that are open on the connection.
+- A message that the host did not send (a turn had just started, the connection was lost, an attachment could not be
+  read) was gone: the input had already been emptied. It now comes back into the input.
 
 ### Known limits
 

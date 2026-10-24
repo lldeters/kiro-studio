@@ -198,6 +198,24 @@ describe('composer', () => {
     expect(useChat.getState().drafts).toMatchObject({ s1: { text: 'first' }, s2: { text: 'second' } });
   });
 
+  it('gets back a message the host could not send, before what was typed since', () => {
+    render(<Composer session={session()} />);
+    type('fix the build');
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    expect(box().value).toBe('');
+    type('and the tests');
+    act(() =>
+      useChat.getState().receive({
+        type: 'draftReturned',
+        sessionId: 's1',
+        text: 'fix the build',
+        attachments: [{ kind: 'problems' }],
+      }),
+    );
+    expect(box().value).toBe('fix the build\nand the tests');
+    expect(screen.getByText('Problems')).toBeTruthy();
+  });
+
   it('forgets the drafts of sessions that are gone', () => {
     useChat.setState({ drafts: { s1: { text: 'a', attachments: [] }, gone: { text: 'b', attachments: [] } } });
     act(() =>

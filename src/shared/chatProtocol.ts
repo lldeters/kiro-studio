@@ -188,7 +188,9 @@ export type HostMessage =
   | { type: 'session'; session: SessionView }
   | { type: 'patch'; patch: SessionPatch }
   /** The answer to `pickContext`; the webview adds these to the draft. */
-  | { type: 'contextPicked'; attachments: AttachmentView[] };
+  | { type: 'contextPicked'; attachments: AttachmentView[] }
+  /** A `send` that was not sent (the session was busy or not connected, an attachment failed): back into the draft. */
+  | { type: 'draftReturned'; sessionId: string; text: string; attachments: AttachmentView[] };
 
 /** Commands the webview may ask the host to run. Anything else is ignored. */
 export const WEBVIEW_COMMANDS = [

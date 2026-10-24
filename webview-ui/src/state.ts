@@ -109,5 +109,8 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
     }
     case 'contextPicked':
       return { ...state, picked: [...state.picked, ...message.attachments] };
+    case 'draftReturned':
+      // The drafts are the store's (see store.ts).
+      return state;
   }
 }

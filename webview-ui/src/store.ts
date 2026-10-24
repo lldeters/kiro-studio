@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AttachmentView, HostMessage } from '../../src/shared/chatProtocol';
+import { MAX_ATTACHMENTS, type AttachmentView, type HostMessage } from '../../src/shared/chatProtocol';
 import { initialState, reduce, type ChatState } from './state';
 import { loadState, saveState } from './vscode';
 
@@ -33,11 +33,27 @@ function restoreDrafts(): Record<string, Draft> {
   return result;
 }
 
+/**
+ * Puts a message the host did not send back into its session's draft. What the user has typed since stays, after it, so
+ * that nothing is lost either way.
+ */
+function returnDraft(
+  drafts: Record<string, Draft>,
+  returned: { sessionId: string; text: string; attachments: AttachmentView[] },
+): Record<string, Draft> {
+  const current = drafts[returned.sessionId] ?? EMPTY_DRAFT;
+  const text = [returned.text, current.text].filter((part) => part !== '').join('\n');
+  const known = new Set(returned.attachments.map((a) => JSON.stringify(a)));
+  const attachments = [...returned.attachments, ...current.attachments.filter((a) => !known.has(JSON.stringify(a)))];
+  return { ...drafts, [returned.sessionId]: { text, attachments: attachments.slice(0, MAX_ATTACHMENTS) } };
+}
+
 export const useChat = create<ChatStore>((set, get) => ({
   ...initialState,
   drafts: restoreDrafts(),
   receive: (message) =>
     set((state) => {
+      if (message.type === 'draftReturned') return { drafts: returnDraft(state.drafts, message) };
       const next = reduce(state, message);
       if (message.type !== 'tabs' && message.type !== 'init') return next;
       // A draft of a session that no longer exists is dropped.
