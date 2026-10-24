@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Session } from '../../src/acp/sessions';
 import { parseSessionNotification } from '../../src/acp/types';
 import {
+  currentAutonomy,
   optionLabel,
   plainText,
   spokenStatus,
@@ -124,6 +125,22 @@ describe('what a screen reader says for the status bar', () => {
     );
     expect(spokenStatus({ text: 'Kiro', tooltip: 'One\nTwo' })).toBe('Kiro. One. Two');
     expect(spokenStatus({ text: '$(check) Kiro', tooltip: '' })).toBe('Kiro');
+  });
+});
+
+describe('currentAutonomy', () => {
+  it('is the one of the session on show, which the toolbar shows, even when the setting says otherwise', () => {
+    // Setting Supervised, a session from the list in Autopilot: "switch" must go to Supervised, not to Autopilot.
+    expect(currentAutonomy(session({ autopilot: 'on' }), 'supervised')).toBe('autopilot');
+    expect(currentAutonomy(session({ autopilot: 'off' }), 'autopilot')).toBe('supervised');
+  });
+
+  it('is the setting without a session, or for one that is not connected or has no such option', () => {
+    expect(currentAutonomy(undefined, 'autopilot')).toBe('autopilot');
+    const lost = session({ autopilot: 'on' });
+    lost.markLost('gone');
+    expect(currentAutonomy(lost, 'supervised')).toBe('supervised');
+    expect(currentAutonomy(new Session(SESSION_ID), 'supervised')).toBe('supervised');
   });
 });
 
