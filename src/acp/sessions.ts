@@ -4,7 +4,7 @@
  * Events come from the dispatcher (`session/update`), results of our own requests, and the turn lifecycle
  * (prompt sent, prompt settled, cancel requested). Nothing here knows about VS Code, so it is tested directly.
  */
-import { Emitter } from '../util/emitter';
+import { Emitter, type Unsubscribe } from '../util/emitter';
 import { deferred, type Deferred } from '../util/async';
 import { arr, kiroMeta, opt, rec, str, type JsonObject } from '../util/json';
 import {
@@ -676,6 +676,33 @@ export class SessionStore {
 
   all(): Session[] {
     return [...this.sessions.values()];
+  }
+
+  /**
+   * Calls `listener` when a session is added or removed and on every change of a session in the store. A removed session
+   * is let go, so that it and its transcript are not kept alive by the listener.
+   */
+  watch(listener: () => void): Unsubscribe {
+    const watched = new Map<Session, Unsubscribe>();
+    const follow = (session: Session): void => {
+      watched.set(session, session.changes.on(listener));
+    };
+    for (const session of this.sessions.values()) follow(session);
+    const offAdded = this.added.on((session) => {
+      follow(session);
+      listener();
+    });
+    const offRemoved = this.removed.on((session) => {
+      watched.get(session)?.();
+      watched.delete(session);
+      listener();
+    });
+    return () => {
+      offAdded();
+      offRemoved();
+      for (const off of watched.values()) off();
+      watched.clear();
+    };
   }
 }
 
