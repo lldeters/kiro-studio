@@ -299,7 +299,8 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
 
 - **Chat-Ansicht** (Webview, React/Vite) in der Seitenleiste und als Editor-Tab; Sitzungen als Tabs; Streaming mit
   Markdown (GFM, kein rohes HTML), Code-Highlighting (Shiki, JS-Engine, lazy), Mermaid (lazy, erst wenn der Text ruht),
-  einklappbares „Thinking“, Tool-Karten (Icon je `kind`, Datei, `+x −y`, Status, Eingabe/Ausgabe, Diff), Plan,
+  „Thinking“ (aufgeklappt, solange es streamt, danach zugeklappt), „Kiro denkt nach …“ solange ein Durchlauf noch
+  nichts zeigt, Tool-Karten (Icon je `kind`, Datei, `+x −y`, Status, Eingabe/Ausgabe, Diff), Plan,
   virtualisierte Liste, die nur mitläuft, wenn man unten ist. Helles und dunkles Theme geprüft (Screenshots per
   `npm run preview`).
 - **Freigaben im Chat** mit genau den angebotenen Optionen, Diff-Vorschau bei Schreibzugriffen, „Immer“-Optionen mit

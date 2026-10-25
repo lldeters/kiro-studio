@@ -200,6 +200,11 @@ text has been still, `react-virtuoso` for the list. The list follows new text on
 this is decided by the reader's own scrolling, so diagrams or highlighted code that grow after being drawn do not lose
 the position. Theme, fonts and spacing come from `--vscode-*` variables and Codicons (one exception, see Themes).
 
+While a turn runs and shows nothing (nothing since the prompt, or a tool has finished and the next step has not begun;
+`webview-ui/src/thinking.ts`), the list ends in a row "Kiro is thinking…". It is a row of the list, so the list follows
+it. Reasoning (`agent_thought_chunk`) is open while it streams, with its newest lines in view, and closes when Kiro moves
+on, unless the reader opened or closed it. The recordings of the CLI contain no reasoning so far, so this is unverified.
+
 The input is a rounded box like the chat of VS Code: the context chips, the text, and a row with `+` (context), agent,
 model and effort (native selects that look like quiet buttons) and Send, which turns into Stop while a turn runs. Under
 the box a line shows Supervised/Autopilot, how full the context is, the credits of the last turn, compact and export;
