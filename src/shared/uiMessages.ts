@@ -96,7 +96,7 @@ export const UI_MESSAGES = [
   'Waiting for your answer',
   'One file',
   '{0} files',
-  'View the changes of the last turn',
+  'View the latest changes by Kiro',
   // Spec view
   'Requirements',
   'Bugfix',

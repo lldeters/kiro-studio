@@ -15,7 +15,7 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   `/` commands, `#` context, images, answers to Kiro's questions in the chat, a protocol log with redaction. "Kiro is
   thinking…" while a turn shows nothing yet; reasoning is open while it streams and closes when Kiro moves on. The input is
   a rounded box with agent, model and effort pickers and a purple send button; below it Supervised/Autopilot,
-  the context fill and the credits of the last turn; above it a chip with the last turn's changes.
+  the context fill and the credits of the last turn; above it a chip with Kiro's latest changes.
 - **Checkpoints** in a separate Git repository with _View changes_ and _Revert_ (a changed file is only reverted after
   a second confirmation); session export to Markdown.
 - **Kiro panel:** sessions, specs, steering, hooks, MCP servers and agents, read from `.kiro` and `~/.kiro`, with actions;
