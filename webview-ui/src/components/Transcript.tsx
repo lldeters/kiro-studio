@@ -133,17 +133,19 @@ function Thinking() {
 }
 
 /**
- * Kiro's reasoning. Open while it streams, so it can be read as it comes, following its end; closed once Kiro has
- * moved on, unless the reader opened or closed it.
+ * Kiro's reasoning. Open while it streams, so it can be read as it comes, following its end while the reader is there;
+ * closed once Kiro has moved on, unless the reader opened or closed it.
  */
 function Thought({ text, streaming }: { text: string; streaming: boolean }) {
   const t = useT();
   const [chosen, setChosen] = useState<boolean>();
   const open = chosen ?? streaming;
   const body = useRef<HTMLDivElement>(null);
+  // Whether the reader is at the end of the reasoning; scrolling up to read stops the following, as in the list.
+  const stick = useRef(true);
   useEffect(() => {
     const element = body.current;
-    if (streaming && element) element.scrollTop = element.scrollHeight;
+    if (streaming && element && stick.current) element.scrollTop = element.scrollHeight;
   }, [text, streaming]);
   return (
     <details className={`message thought${streaming ? ' streaming' : ''}`} open={open}>
@@ -163,7 +165,14 @@ function Thought({ text, streaming }: { text: string; streaming: boolean }) {
           t('Thought process')
         )}
       </summary>
-      <div className="thought-body" ref={body}>
+      <div
+        className="thought-body"
+        ref={body}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          stick.current = element.scrollHeight - element.scrollTop - element.clientHeight < 16;
+        }}
+      >
         <Markdown text={text} streaming={streaming} />
       </div>
     </details>
