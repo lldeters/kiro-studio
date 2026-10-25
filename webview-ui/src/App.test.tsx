@@ -155,6 +155,42 @@ describe('chat app', () => {
     expect((await screen.findByText('Looking at the build')).closest('details')?.open).toBe(false);
   });
 
+  it('follows the end of streaming reasoning only while the reader is there', async () => {
+    render(<App />);
+    const items = [item(1, 'user', 'Why?'), item(2, 'thought', 'Step 1')];
+    receive(init(), { type: 'session', session: session({ phase: 'running', items }) });
+    const body = (await screen.findByText('Step 1')).closest('.thought-body') as HTMLElement;
+    // The test DOM has no layout: a box of 100 px showing 500 px of text.
+    let top = 0;
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, get: () => 500 });
+    Object.defineProperty(body, 'clientHeight', { configurable: true, get: () => 100 });
+    Object.defineProperty(body, 'scrollTop', {
+      configurable: true,
+      get: () => top,
+      set: (value: number) => {
+        top = value;
+      },
+    });
+    const grow = async (text: string) => {
+      receive({
+        type: 'patch',
+        patch: { sessionId: 's1', itemsFrom: 1, items: [item(2, 'thought', text)], tools: [] },
+      });
+      await screen.findByText(text);
+    };
+
+    await grow('Step 1, step 2');
+    expect(top).toBe(500);
+    top = 120; // the reader scrolls up to read
+    fireEvent.scroll(body);
+    await grow('Step 1, step 2, step 3');
+    expect(top).toBe(120);
+    top = 400; // and back to the end
+    fireEvent.scroll(body);
+    await grow('Step 1, step 2, step 3, step 4');
+    expect(top).toBe(500);
+  });
+
   it('switches, closes and opens sessions through the tabs', () => {
     render(<App />);
     receive(
