@@ -139,9 +139,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
       return agentHost.activeSession?.busy ?? false;
     },
     get activeMode() {
-      const session = agentHost.activeSession;
-      const mode = session?.configValue('mode');
-      return typeof mode === 'string' ? mode : session?.modes.currentModeId;
+      return agentHost.activeSession?.currentMode;
     },
     get openSpecViews() {
       return specs.views.openCount;

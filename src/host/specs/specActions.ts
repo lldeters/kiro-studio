@@ -190,7 +190,7 @@ export class SpecActions {
 
   /** Switches the session to the agent of the workflow, or says that this CLI does not have it. */
   private async useMode(session: Session, mode: string): Promise<void> {
-    if ((session.configValue('mode') ?? session.modes.currentModeId) === mode) return;
+    if (session.currentMode === mode) return;
     if (!session.modes.available.some((m) => m.id === mode)) {
       session.addNotice(
         'warning',

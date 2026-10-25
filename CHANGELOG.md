@@ -107,6 +107,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
 - `#git diff` sent only what was not staged, so after `git add` it said there was nothing. It now sends everything not
   committed (`git diff HEAD`; in a repository without a commit the staged and the unstaged changes) and names the new
   files git does not track yet.
+- After switching the agent in the chat or in the Agents view, that view went on marking the old agent as in use: it
+  read a value Kiro does not necessarily update. It now follows the agent option, like the chat and the status bar.
 
 ### Known limits
 
