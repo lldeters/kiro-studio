@@ -199,11 +199,7 @@ export class AgentHost implements vscode.Disposable {
       },
       agent.status.on(() => this.notify()),
       agent.broadcasts.on((event) => this.broadcasts.fire(event)),
-      agent.store.added.on((session) => {
-        this.subscriptions.push(session.changes.on(() => this.notify()));
-        this.notify();
-      }),
-      agent.store.removed.on(() => this.notify()),
+      agent.store.watch(() => this.notify()),
     );
     this.notify();
     return agent;

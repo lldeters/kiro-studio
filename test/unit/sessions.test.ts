@@ -393,6 +393,28 @@ describe('SessionStore', () => {
     expect(store.get('s1')).toBeUndefined();
     expect({ added, removed }).toEqual({ added: ['s1'], removed: ['s1'] });
   });
+
+  it('watches every session, and lets a removed one go so that it is not kept alive', () => {
+    const store = new SessionStore();
+    const before = store.create('before');
+    let calls = 0;
+    const stop = store.watch(() => calls++);
+    const later = store.create('later');
+    expect(calls).toBe(1);
+    before.addNotice('info', 'a');
+    later.addNotice('info', 'b');
+    expect(calls).toBe(3);
+
+    store.delete('later');
+    expect(calls).toBe(4);
+    expect(later.changes.size).toBe(0);
+    later.addNotice('info', 'c');
+    expect(calls).toBe(4);
+
+    stop();
+    expect(before.changes.size).toBe(0);
+    expect(store.added.size + store.removed.size).toBe(0);
+  });
 });
 
 describe('approvalDetails', () => {
