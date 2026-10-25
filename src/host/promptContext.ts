@@ -3,7 +3,13 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { AttachmentView, ContextKind } from '../shared/chatProtocol';
 import { currentPlatform } from '../util/paths';
-import { formatProblems, uncommittedChanges, type ContextDeps, type Problem } from '../view/promptContext';
+import {
+  currentFileOf,
+  formatProblems,
+  uncommittedChanges,
+  type ContextDeps,
+  type Problem,
+} from '../view/promptContext';
 import { gitCommand } from '../workspace/gitCommand';
 
 const EXCLUDE = '**/{node_modules,.git,dist,out,build,target,.venv,__pycache__}/**';
@@ -37,13 +43,29 @@ async function pickFolder(): Promise<AttachmentView[]> {
   return (picked ?? []).map((uri) => ({ kind: 'folder', path: uri.fsPath }));
 }
 
+/** The file editor used last; see {@link currentFileOf}. */
+let lastFile: string | undefined;
+
+/** Remembers the file editor used last, for `#current` from a chat in an editor tab. Called once at activation. */
+export function trackCurrentFile(): vscode.Disposable {
+  const remember = (editor: vscode.TextEditor | undefined): void => {
+    if (editor?.document.uri.scheme === 'file') lastFile = editor.document.uri.fsPath;
+  };
+  remember(vscode.window.activeTextEditor);
+  return vscode.window.onDidChangeActiveTextEditor(remember);
+}
+
 function currentFile(): AttachmentView[] {
-  const uri = vscode.window.activeTextEditor?.document.uri;
-  if (uri?.scheme !== 'file') {
+  const active = vscode.window.activeTextEditor?.document.uri;
+  const open = vscode.window.tabGroups.all.flatMap((group) =>
+    group.tabs.flatMap((tab) => (tab.input instanceof vscode.TabInputText ? [tab.input.uri.fsPath] : [])),
+  );
+  const file = currentFileOf(active?.scheme === 'file' ? active.fsPath : undefined, lastFile, open);
+  if (file === undefined) {
     void vscode.window.showInformationMessage(vscode.l10n.t('There is no open file to attach.'));
     return [];
   }
-  return [{ kind: 'file', path: uri.fsPath }];
+  return [{ kind: 'file', path: file }];
 }
 
 async function pickSteering(): Promise<AttachmentView[]> {

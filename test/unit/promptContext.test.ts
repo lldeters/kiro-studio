@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  currentFileOf,
   formatProblems,
   resolveAttachments,
   uncommittedChanges,
@@ -182,6 +183,15 @@ describe('uncommittedChanges', () => {
 
   it('is undefined outside a repository', async () => {
     expect(await uncommittedChanges(fake({}).git)).toBeUndefined();
+  });
+});
+
+describe('currentFileOf', () => {
+  it('takes the active editor, and the file used last while the chat tab has the focus and it is still open', () => {
+    expect(currentFileOf('/ws/a.ts', '/ws/b.ts', ['/ws/a.ts', '/ws/b.ts'])).toBe('/ws/a.ts');
+    expect(currentFileOf(undefined, '/ws/b.ts', ['/ws/a.ts', '/ws/b.ts'])).toBe('/ws/b.ts');
+    expect(currentFileOf(undefined, '/ws/b.ts', ['/ws/a.ts'])).toBeUndefined();
+    expect(currentFileOf(undefined, undefined, ['/ws/a.ts'])).toBeUndefined();
   });
 });
 

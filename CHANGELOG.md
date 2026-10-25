@@ -109,6 +109,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   files git does not track yet.
 - After switching the agent in the chat or in the Agents view, that view went on marking the old agent as in use: it
   read a value Kiro does not necessarily update. It now follows the agent option, like the chat and the status bar.
+- `#current` in a chat opened as an editor tab always said there was no open file, because VS Code has no active text
+  editor while that tab has the focus. It now takes the file editor used last, as long as it is still open.
 
 ### Known limits
 

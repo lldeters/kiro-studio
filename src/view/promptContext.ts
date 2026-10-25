@@ -150,6 +150,19 @@ export async function resolveAttachments(
   return result;
 }
 
+/**
+ * The file `#current` means: the one in the active editor. When the chat is an editor tab and has the focus, VS Code has
+ * no active text editor; then it is the file editor used last, as long as it is still open.
+ */
+export function currentFileOf(
+  active: string | undefined,
+  last: string | undefined,
+  open: readonly string[],
+): string | undefined {
+  if (active !== undefined) return active;
+  return last !== undefined && open.includes(last) ? last : undefined;
+}
+
 export interface Problem {
   file: string;
   /** 1-based. */
