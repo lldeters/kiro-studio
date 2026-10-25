@@ -20,6 +20,7 @@ export interface HarnessOptions {
   transport?: (fake: FakeAgent) => TransportFactory;
   writeGate?: WriteGate;
   turnHooks?: AgentDeps['turnHooks'];
+  translate?: AgentDeps['translate'];
 }
 
 export interface MutableSettings {
@@ -79,6 +80,7 @@ export function createHarness(options: HarnessOptions = {}) {
     platform: 'posix',
     ...(options.writeGate === undefined ? {} : { writeGate: options.writeGate }),
     ...(options.turnHooks === undefined ? {} : { turnHooks: options.turnHooks }),
+    ...(options.translate === undefined ? {} : { translate: options.translate }),
     backoffMs: options.backoffMs ?? [5, 5, 5],
     stableAfterMs: 1000,
     cancelHoldMs: options.cancelHoldMs ?? 300,

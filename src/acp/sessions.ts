@@ -7,6 +7,7 @@
 import { Emitter, type Unsubscribe } from '../util/emitter';
 import { deferred, type Deferred } from '../util/async';
 import { arr, kiroMeta, opt, rec, str, type JsonObject } from '../util/json';
+import { identityTranslate, type Translate } from '../util/translate';
 import {
   parseConfigOptions,
   type AvailableCommand,
@@ -159,6 +160,8 @@ export interface TurnOutcome {
 export interface SessionOptions {
   cwd?: string;
   now?: () => number;
+  /** For the notices the session writes itself; English without it. */
+  translate?: Translate;
 }
 
 export class Session {
@@ -193,11 +196,13 @@ export class Session {
   private replaying = false;
   private turnStartWaiters: Deferred<boolean>[] = [];
   private readonly now: () => number;
+  private readonly t: Translate;
 
   constructor(id: string, options: SessionOptions = {}) {
     this.id = id;
     this.cwd = options.cwd;
     this.now = options.now ?? Date.now;
+    this.t = options.translate ?? identityTranslate;
   }
 
   // -------------------------------------------------------------------------------------------------------------
@@ -455,7 +460,7 @@ export class Session {
         if (!replay && this.phase === 'awaitingApproval') this.setPhase('running');
         break;
       case 'display_error':
-        this.addNotice('error', info.message ?? 'Kiro reported an error.');
+        this.addNotice('error', info.message ?? this.t('Kiro reported an error.'));
         break;
       case 'focus_update':
       case 'user_message_id_assigned':
@@ -638,10 +643,8 @@ export class Session {
 
   recordAutoApproval(entry: Omit<AutoApproval, 'at'>): void {
     this.autoApprovals.push({ ...entry, at: this.now() });
-    this.addNotice(
-      'info',
-      `Automatically allowed once (Autopilot): ${entry.title}${entry.resource === undefined ? '' : ` ${entry.resource}`}`,
-    );
+    const what = entry.resource === undefined ? entry.title : `${entry.title} ${entry.resource}`;
+    this.addNotice('info', this.t('Automatically allowed once (Autopilot): {0}', what));
   }
 }
 
@@ -654,6 +657,9 @@ export class SessionStore {
   readonly added = new Emitter<Session>();
   readonly removed = new Emitter<Session>();
 
+  /** `translate` goes to every session it creates, for the notices they write. */
+  constructor(private readonly translate?: Translate) {}
+
   get(sessionId: string): Session | undefined {
     return this.sessions.get(sessionId);
   }
@@ -661,7 +667,10 @@ export class SessionStore {
   create(sessionId: string, options: SessionOptions = {}): Session {
     const existing = this.sessions.get(sessionId);
     if (existing) return existing;
-    const session = new Session(sessionId, options);
+    const session = new Session(sessionId, {
+      ...(this.translate === undefined ? {} : { translate: this.translate }),
+      ...options,
+    });
     this.sessions.set(sessionId, session);
     this.added.emit(session);
     return session;

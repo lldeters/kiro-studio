@@ -9,6 +9,7 @@ import { Emitter } from '../util/emitter';
 import { arr, errorMessage, opt, rec, str } from '../util/json';
 import type { ProtocolLog } from '../util/log';
 import { currentPlatform, type PlatformKind } from '../util/paths';
+import { identityTranslate, type Translate } from '../util/translate';
 import type { Capabilities } from './capabilities';
 import { KiroConnection, type ClientFeatures, type ConnectionClosed } from './connection';
 import { Dispatcher, type BroadcastEvent } from './dispatcher';
@@ -70,6 +71,8 @@ export interface AgentDeps {
     timeouts?: { transport?: number; initialize?: number; session?: number; extension?: number };
     shutdownGraceMs?: number;
   };
+  /** For what the agent and its sessions tell the user (notices, errors, the connection state); English without it. */
+  translate?: Translate;
 }
 
 export interface SessionSummary {
@@ -85,18 +88,25 @@ export interface SessionSummary {
 const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000, 16_000, 30_000];
 
 /** Why a prompt cannot go to a session that is not ready. */
-const notReady: Record<Exclude<SessionStatus, 'ready'>, string> = {
-  creating: 'This session is still being opened. Nothing was sent.',
-  lost: 'This session is not connected to the Kiro CLI; it comes back when the connection does. Nothing was sent.',
-  closed: 'This session was closed. Nothing was sent.',
-};
+function notReady(t: Translate, status: Exclude<SessionStatus, 'ready'>): string {
+  switch (status) {
+    case 'creating':
+      return t('This session is still being opened. Nothing was sent.');
+    case 'lost':
+      return t(
+        'This session is not connected to the Kiro CLI; it comes back when the connection does. Nothing was sent.',
+      );
+    case 'closed':
+      return t('This session was closed. Nothing was sent.');
+  }
+}
 /** How long shutting down waits for `session/close` before the process is ended. */
 const CLOSE_WAIT_MS = 1000;
 /** A safety limit for `session/list`: 20 pages are far more sessions than anyone browses. */
 const MAX_LIST_PAGES = 20;
 
 export class KiroAgent {
-  readonly store = new SessionStore();
+  readonly store: SessionStore;
   readonly dispatcher: Dispatcher;
   readonly permissions: PermissionBroker;
   readonly status = new Emitter<AgentStatus>();
@@ -112,8 +122,11 @@ export class KiroAgent {
   private disposed = false;
   private readonly fsHandler: FsHandler;
   private readonly platform: PlatformKind;
+  private readonly t: Translate;
 
   constructor(private readonly deps: AgentDeps) {
+    this.t = deps.translate ?? identityTranslate;
+    this.store = new SessionStore(deps.translate);
     this.platform = deps.platform ?? currentPlatform();
     this.dispatcher = new Dispatcher({ store: this.store, log: deps.log });
     this.permissions = new PermissionBroker({
@@ -214,7 +227,7 @@ export class KiroAgent {
     this.connection = undefined;
     this.permissions.cancelAll();
     for (const session of this.store.all())
-      if (session.status !== 'closed') session.markLost('Restarting the connection.');
+      if (session.status !== 'closed') session.markLost(this.t('Restarting the connection.'));
     if (old) await old.dispose();
     await this.start();
     await this.resuming;
@@ -226,8 +239,8 @@ export class KiroAgent {
     clearTimeout(this.stableTimer);
     const exit = info.exit;
     const why = exit
-      ? `The Kiro CLI stopped (code ${String(exit.code)}, signal ${String(exit.signal)}).`
-      : 'The connection to the Kiro CLI was lost.';
+      ? this.t('The Kiro CLI stopped (code {0}, signal {1}).', String(exit.code), String(exit.signal))
+      : this.t('The connection to the Kiro CLI was lost.');
     this.deps.log.info(why);
     this.permissions.cancelAll();
     for (const session of this.store.all()) if (session.status !== 'closed') session.markLost(why);
@@ -237,7 +250,8 @@ export class KiroAgent {
   private scheduleReconnect(reason: string): void {
     const delays = this.deps.backoffMs ?? DEFAULT_BACKOFF;
     if (this.attempt >= delays.length) {
-      this.setStatus({ phase: 'failed', message: `${reason} It did not come back after ${delays.length} attempts.` });
+      const message = this.t('{0} It did not come back after {1} attempts.', reason, delays.length);
+      this.setStatus({ phase: 'failed', message });
       return;
     }
     const retryInMs = delays[this.attempt] ?? 30_000;
@@ -275,7 +289,7 @@ export class KiroAgent {
       try {
         await this.loadSession(session.id, session.cwd ?? this.deps.workspaceRoots()[0] ?? '');
       } catch (error) {
-        session.addNotice('error', `Could not restore this session: ${describeError(error)}`);
+        session.addNotice('error', this.t('Could not restore this session: {0}', describeError(error)));
       }
     }
   }
@@ -369,9 +383,12 @@ export class KiroAgent {
     try {
       await this.setConfig(session.id, 'autopilot', value);
     } catch (error) {
+      const reason = describeError(error);
       session.addNotice(
         'warning',
-        `Could not switch this session to ${value === 'on' ? 'Autopilot' : 'Supervised'}: ${describeError(error)}`,
+        value === 'on'
+          ? this.t('Could not switch this session to Autopilot: {0}', reason)
+          : this.t('Could not switch this session to Supervised: {0}', reason),
       );
     }
   }
@@ -430,7 +447,7 @@ export class KiroAgent {
       // A session that never loaded must not stay behind as a tab that is "starting" for ever; one that was open before
       // is lost again, so that a later reconnect tries once more. Its checkpoints stay reachable meanwhile.
       if (existed) {
-        session.markLost(`Could not load this session: ${describeError(error)}`);
+        session.markLost(this.t('Could not load this session: {0}', describeError(error)));
         session.restoreCheckpointMarkers();
       } else {
         session.markClosed();
@@ -520,9 +537,9 @@ export class KiroAgent {
   /** Sends one prompt and resolves when the turn is over. Errors become notices in the session, not exceptions. */
   async prompt(sessionId: string, input: string | PromptInput): Promise<TurnOutcome> {
     const session = this.requireSession(sessionId);
-    if (session.busy) throw new Error('A turn is already running in this session');
+    if (session.busy) throw new Error(this.t('A turn is already running in this session.'));
     // Sent anyway, the prompt would end without an answer and without a word: the user would wait for nothing.
-    if (session.status !== 'ready') throw new Error(notReady[session.status]);
+    if (session.status !== 'ready') throw new Error(notReady(this.t, session.status));
     const { text, blocks = [], labels = [] } = typeof input === 'string' ? { text: input } : input;
     session.beginTurn(text, labels);
     // Only when something is pending: an extra await would move the turn's first steps by a tick.
@@ -615,13 +632,16 @@ export class KiroAgent {
       if (waitMs > 0) await waitForOption(session, id, waitMs);
       const option = session.configOption(id);
       if (!option?.values.some((v) => v.value === value)) {
-        session.addNotice('warning', `Kiro does not offer ${id} "${value}", so the default was not applied.`);
+        session.addNotice(
+          'warning',
+          this.t('Kiro does not offer {0} "{1}", so the default was not applied.', id, value),
+        );
         continue;
       }
       try {
         await this.setConfig(session.id, id, value);
       } catch (error) {
-        session.addNotice('warning', `Could not set ${id} to "${value}": ${describeError(error)}`);
+        session.addNotice('warning', this.t('Could not set {0} to "{1}": {2}', id, value, describeError(error)));
       }
     }
   }

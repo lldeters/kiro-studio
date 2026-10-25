@@ -119,6 +119,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   signed out. A check that runs out of time now says so, with _Check again_.
 - Credits were written with a decimal point in every language ("0.42 Credits" in German). They follow the language of
   the window now.
+- What the connection layer tells the user was English in every language: "Automatically allowed once (Autopilot)", a
+  default that could not be applied, a lost or restarted connection, a session that could not be loaded or is not ready.
+  It is translated now.
 
 ### Known limits
 
