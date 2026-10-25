@@ -44,6 +44,17 @@ describe('composerMenu', () => {
     expect(item).toMatchObject({ insert: '/agent ', detail: 'Switch agent (<name>)' });
   });
 
+  it('matches commands in any case but inserts them as Kiro names them', () => {
+    const named: CommandView[] = [
+      { name: 'API-Guidelines', description: 'Steering' },
+      { name: '/Review', description: '' },
+    ];
+    expect(computeMenu('/api', 4, named, identityT)?.items).toMatchObject([
+      { label: '/API-Guidelines', insert: '/API-Guidelines ' },
+    ]);
+    expect(computeMenu('/rev', 4, named, identityT)?.items).toMatchObject([{ label: '/Review', insert: '/Review ' }]);
+  });
+
   it('does not open for a slash in the middle, after a space, or without a match', () => {
     expect(computeMenu('see /help', 9, commands, identityT)).toBeUndefined();
     expect(computeMenu('/agent x', 8, commands, identityT)).toBeUndefined();
