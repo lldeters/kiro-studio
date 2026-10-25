@@ -104,6 +104,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   apart. Quotes now keep such a part together.
 - The package left out this changelog, so the Marketplace would have shown no Changelog tab. It is in the package now,
   and the package check insists on it.
+- `#git diff` sent only what was not staged, so after `git add` it said there was nothing. It now sends everything not
+  committed (`git diff HEAD`; in a repository without a commit the staged and the unstaged changes) and names the new
+  files git does not track yet.
 
 ### Known limits
 

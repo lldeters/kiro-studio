@@ -1,14 +1,13 @@
 /** The VS Code side of attachments: pickers for what to attach, and the readers `resolveAttachments` needs. */
-import { execFile } from 'node:child_process';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import type { AttachmentView, ContextKind } from '../shared/chatProtocol';
 import { currentPlatform } from '../util/paths';
-import { formatProblems, type ContextDeps, type GitDiff, type Problem } from '../view/promptContext';
+import { formatProblems, uncommittedChanges, type ContextDeps, type Problem } from '../view/promptContext';
+import { gitCommand } from '../workspace/gitCommand';
 
 const EXCLUDE = '**/{node_modules,.git,dist,out,build,target,.venv,__pycache__}/**';
 const MAX_FILES_LISTED = 5000;
-const MAX_DIFF_BYTES = 300_000;
 
 function workspaceRoot(): vscode.Uri | undefined {
   return vscode.workspace.workspaceFolders?.[0]?.uri;
@@ -118,25 +117,6 @@ function problems(): string {
   return formatProblems(found);
 }
 
-/**
- * `git diff` in the workspace folder. Read-only; nothing is staged or changed. A diff longer than the limit ends the
- * program; what came until then is kept, up to its last whole line, and marked as cut off.
- */
-function gitDiff(cwd: string): Promise<GitDiff | undefined> {
-  return new Promise((resolve) => {
-    execFile(
-      'git',
-      ['diff', '--no-color', '--no-ext-diff'],
-      { cwd, timeout: 15_000, maxBuffer: MAX_DIFF_BYTES, windowsHide: true },
-      (error, stdout) => {
-        const truncated = (error as NodeJS.ErrnoException | null)?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER';
-        if (truncated) resolve({ text: stdout.slice(0, stdout.lastIndexOf('\n') + 1), truncated });
-        else resolve(error && stdout === '' ? undefined : { text: stdout, truncated: false });
-      },
-    );
-  });
-}
-
 export function contextDeps(args: {
   roots: readonly string[];
   base: string | undefined;
@@ -156,7 +136,7 @@ export function contextDeps(args: {
         return false;
       }
     },
-    gitDiff: () => (cwd === undefined ? Promise.resolve(undefined) : gitDiff(cwd)),
+    gitDiff: () => (cwd === undefined ? Promise.resolve(undefined) : uncommittedChanges(gitCommand(cwd))),
     problems: () => Promise.resolve(problems()),
   };
 }
