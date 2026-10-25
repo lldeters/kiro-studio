@@ -113,6 +113,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   editor while that tab has the focus. It now takes the file editor used last, as long as it is still open.
 - With twelve attachments, `#problems` or `#git diff` added a thirteenth; the host refused the message without a word and
   the text was gone from the input. A draft never holds more than twelve now.
+- A `/` command was inserted in lower case (`/api-guidelines` for a steering file `API-Guidelines`), which Kiro may not
+  know. It is inserted as Kiro names it; matching still ignores case.
 
 ### Known limits
 

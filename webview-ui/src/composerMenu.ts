@@ -23,7 +23,10 @@ export interface Menu {
   items: MenuItem[];
 }
 
-const norm = (text: string): string => text.toLowerCase().replace(/^\//, '');
+/** A command name without its slash, as Kiro wrote it: what is inserted must be what Kiro knows. */
+const bare = (text: string): string => text.replace(/^\//, '');
+/** For matching only, which ignores case. */
+const norm = (text: string): string => bare(text).toLowerCase();
 
 export function hashItems(t: T): (MenuItem & { keys: string })[] {
   return [
@@ -84,8 +87,8 @@ export function computeMenu(text: string, caret: number, commands: readonly Comm
     const starts = matches.filter((c) => norm(c.name).startsWith(query));
     const items = [...starts, ...matches.filter((c) => !starts.includes(c))].map((c): MenuItem => ({
       id: c.name,
-      label: `/${norm(c.name)}`,
-      insert: `/${norm(c.name)} `,
+      label: `/${bare(c.name)}`,
+      insert: `/${bare(c.name)} `,
       ...(c.description ? { detail: c.hint ? `${c.description} (${c.hint})` : c.description } : {}),
     }));
     return items.length === 0 ? undefined : { kind: 'slash', start: 0, end: caret, items };
