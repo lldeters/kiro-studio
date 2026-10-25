@@ -4,14 +4,11 @@
  */
 import type { AgentPhase } from '../acp/agent';
 import type { Session, TurnPhase } from '../acp/sessions';
+import { identityTranslate, type Translate } from '../util/translate';
+
+export { identityTranslate, type Translate };
 
 export type UiState = 'checking' | 'untrusted' | 'cliMissing' | 'tooOld' | 'notSignedIn' | 'error' | 'ready';
-
-/** Translates and formats a message. `{0}` placeholders are filled from the arguments. */
-export type Translate = (message: string, ...args: (string | number)[]) => string;
-
-export const identityTranslate: Translate = (message, ...args) =>
-  message.replace(/\{(\d+)\}/g, (_m, index: string) => String(args[Number(index)] ?? ''));
 
 export interface StatusInput {
   ui: UiState;

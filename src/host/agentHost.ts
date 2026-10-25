@@ -185,6 +185,7 @@ export class AgentHost implements vscode.Disposable {
         await vscode.env.openExternal(vscode.Uri.parse(url));
       },
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },
+      translate: (message, ...args) => vscode.l10n.t(message, ...args),
       turnHooks: {
         before: async (session) => void (await this.checkpointsFor(session)?.before(session)),
         after: async (session) => void (await this.checkpointsFor(session)?.after(session)),

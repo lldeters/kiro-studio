@@ -122,6 +122,29 @@ describe('new session', () => {
     expect(configWrites(h.fake)).toEqual(['autopilot=off']);
   });
 
+  it('words what it tells the user in the language it is given, and its sessions do too', async () => {
+    const german: Record<string, string> = {
+      'Kiro does not offer {0} "{1}", so the default was not applied.': 'Kiro bietet für {0} kein „{1}“ an.',
+      'A turn is already running in this session.': 'In dieser Sitzung läuft schon ein Durchlauf.',
+      'Automatically allowed once (Autopilot): {0}': 'Automatisch einmal erlaubt (Autopilot): {0}',
+    };
+    const h = make({
+      settings: { model: 'no-such-model' },
+      translate: (message, ...args) =>
+        (german[message] ?? message).replace(/\{(\d+)\}/g, (_m, i: string) => String(args[Number(i)])),
+    });
+    const session = await h.agent.newSession({ cwd: '/ws' });
+    expect(
+      session.transcript.some(
+        (i) => i.kind === 'notice' && i.text === 'Kiro bietet für model kein „no-such-model“ an.',
+      ),
+    ).toBe(true);
+    session.recordAutoApproval({ title: 'Read File', resource: 'a.ts', optionId: 'allow' });
+    expect(session.transcript.at(-1)).toMatchObject({ text: 'Automatisch einmal erlaubt (Autopilot): Read File a.ts' });
+    session.beginTurn('busy');
+    await expect(h.agent.prompt(session.id, 'again')).rejects.toThrow('In dieser Sitzung läuft schon ein Durchlauf.');
+  });
+
   it('lists sessions', async () => {
     const h = make();
     await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
