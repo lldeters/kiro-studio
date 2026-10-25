@@ -39,24 +39,23 @@ export function Composer({ session }: { session: SessionView }) {
   const menu = useMemo(() => computeMenu(text, caret, session.commands, t), [text, caret, session.commands, t]);
   const menuOpen = menu !== undefined && dismissedAt !== `${text}|${caret}` && session.status === 'ready';
 
-  const update = (next: Partial<typeof draft>) => setDraft(session.id, { ...draft, ...next });
+  // The host refuses a message with more attachments than that (and the text would be gone), so a draft never has more.
+  const update = (next: Partial<typeof draft>) =>
+    setDraft(session.id, {
+      ...draft,
+      ...next,
+      attachments: (next.attachments ?? draft.attachments).slice(0, MAX_ATTACHMENTS),
+    });
   const addAttachments = (added: AttachmentView[]) => {
     if (added.length === 0) return;
     const known = new Set(attachments.map((a) => JSON.stringify(a)));
-    const fresh = added.filter((a) => !known.has(JSON.stringify(a)));
-    update({ attachments: [...attachments, ...fresh].slice(0, MAX_ATTACHMENTS) });
+    update({ attachments: [...attachments, ...added.filter((a) => !known.has(JSON.stringify(a)))] });
   };
 
   // What the host picked (files, folders...) joins the draft of the session on screen.
   useEffect(() => {
-    if (picked.length > 0) {
-      const taken = takePicked();
-      const known = new Set(attachments.map((a) => JSON.stringify(a)));
-      update({
-        attachments: [...attachments, ...taken.filter((a) => !known.has(JSON.stringify(a)))].slice(0, MAX_ATTACHMENTS),
-      });
-    }
-    // `update` and `attachments` change with every keystroke; only a new pick matters here
+    if (picked.length > 0) addAttachments(takePicked());
+    // `addAttachments` changes with every keystroke; only a new pick matters here
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [picked]);
 
