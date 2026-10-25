@@ -48,7 +48,16 @@ export function nodeCliEnvironment(): CliEnvironment {
           [...args],
           { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
           (error, stdout, stderr) => {
-            const code = error ? ((error as NodeJS.ErrnoException).code ?? 1) : 0;
+            // A program stopped at the timeout has no exit code; it is told apart from one that failed.
+            const failure = error as { code?: unknown; killed?: boolean } | null;
+            const code =
+              failure === null
+                ? 0
+                : typeof failure.code === 'string' || typeof failure.code === 'number'
+                  ? failure.code
+                  : failure.killed === true
+                    ? 'ETIMEDOUT'
+                    : 1;
             resolve({ exitCode: code, stdout: String(stdout), stderr: String(stderr) });
           },
         );
@@ -213,6 +222,12 @@ export async function checkSetup(configuredPath: string | undefined, env: CliEnv
     }
     const version = parseVersion(versionResult.stdout);
     const withVersion = version === undefined ? {} : { version };
+
+    // A CLI that is slow to start the first time is neither old nor signed out; it is checked again later.
+    const slow = [versionResult, helpResult, whoamiResult].some((result) => result.exitCode === 'ETIMEDOUT');
+    if (slow) {
+      return { kind: 'error', path: cli.path, message: `${cli.path} did not answer in time. Check again in a moment.` };
+    }
 
     // An old CLI has no `acp` command or no V3 engine. Capabilities decide later; this only gives an early hint.
     if (helpResult.exitCode !== 0 || !supportsV3(helpResult.stdout)) {

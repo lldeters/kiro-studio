@@ -115,6 +115,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   the text was gone from the input. A draft never holds more than twelve now.
 - A `/` command was inserted in lower case (`/api-guidelines` for a steering file `API-Guidelines`), which Kiro may not
   know. It is inserted as Kiro names it; matching still ignores case.
+- A CLI that was slow to answer the first check (a cold start can take many seconds) was reported as too old, or as
+  signed out. A check that runs out of time now says so, with _Check again_.
 
 ### Known limits
 
