@@ -3,6 +3,7 @@ import {
   checkSetup,
   knownInstallLocations,
   locateCli,
+  nodeCliEnvironment,
   parseVersion,
   parseWhoami,
   supportsV3,
@@ -180,6 +181,27 @@ describe('checkSetup', () => {
       exec: (c, a) => (a[0] === 'whoami' ? { exitCode: 0, stdout: 'Not logged in', stderr: '' } : healthy(c, a)),
     });
     expect((await checkSetup('', noJson.env)).kind).toBe('notSignedIn');
+  });
+
+  it('reports a CLI that did not answer in time as an error, not as old or signed out', async () => {
+    for (const slow of ['acp', 'whoami']) {
+      const f = fake({
+        ...installed,
+        exec: (c, a) => (a[0] === slow ? { exitCode: 'ETIMEDOUT', stdout: '', stderr: '' } : healthy(c, a)),
+      });
+      expect(await checkSetup('', f.env), slow).toMatchObject({
+        kind: 'error',
+        path: '/usr/bin/kiro-cli',
+        message: expect.stringContaining('did not answer in time') as string,
+      });
+    }
+  });
+
+  it('tells a program stopped at the timeout from one that failed (real processes)', async () => {
+    const env = nodeCliEnvironment();
+    expect((await env.exec(process.execPath, ['-e', 'setTimeout(() => {}, 10000)'], 300)).exitCode).toBe('ETIMEDOUT');
+    expect((await env.exec(process.execPath, ['-e', 'process.exit(3)'], 10_000)).exitCode).toBe(3);
+    expect((await env.exec(process.execPath, ['-e', ''], 10_000)).exitCode).toBe(0);
   });
 
   it('reports an error when the program cannot be launched', async () => {
