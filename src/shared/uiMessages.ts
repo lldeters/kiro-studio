@@ -73,6 +73,8 @@ export const UI_MESSAGES = [
   'Supervised: Kiro asks before it changes files. Click to switch to Autopilot.',
   'Context used: {0}%',
   'Compact the context',
+  '{0} credits',
+  'Credits used by the last turn',
   // Context menu and attachments
   'Files from the workspace',
   'A folder',
@@ -90,6 +92,9 @@ export const UI_MESSAGES = [
   'Enter sends, Shift+Enter adds a line, Esc stops.',
   'Stopping…',
   'Waiting for your answer',
+  'One file',
+  '{0} files',
+  'View the changes of the last turn',
   // Spec view
   'Requirements',
   'Bugfix',

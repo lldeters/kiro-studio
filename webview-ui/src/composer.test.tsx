@@ -251,6 +251,51 @@ describe('composer', () => {
     expect(screen.getByRole('listbox')).toBeTruthy();
   });
 
+  it('has the agent picker in the box', () => {
+    const mode = {
+      id: 'mode',
+      name: 'Mode',
+      category: 'mode',
+      current: 'vibe',
+      values: [{ value: 'vibe', name: 'Vibe' }],
+    };
+    render(<Composer session={session({ config: [mode] })} />);
+    expect(screen.getByRole('combobox', { name: 'Agent' })).toBeTruthy();
+  });
+
+  it('turns Send into Stop while a turn runs, and says when it is stopping', () => {
+    const { rerender } = render(<Composer session={session({ phase: 'running' })} />);
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(outbox).toEqual([{ type: 'cancel', sessionId: 's1' }]);
+    rerender(<Composer session={session({ phase: 'cancelling' })} />);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stopping…' }).disabled).toBe(true);
+  });
+
+  it('shows what the last turn changed and still stands, and opens those changes', () => {
+    const file = (path: string, added: number, removed: number, reverted = false) => ({
+      path,
+      status: 'modified' as const,
+      added,
+      removed,
+      binary: false,
+      reverted,
+    });
+    const checkpoints = [
+      { id: 'c1', files: [file('old.ts', 9, 9)] },
+      { id: 'c2', files: [file('a.ts', 3, 1), file('b.ts', 24, 0), file('gone.ts', 0, 8, true)] },
+    ];
+    const { rerender } = render(<Composer session={session({ checkpoints })} />);
+    const chip = screen.getByRole('button', { name: 'View the changes of the last turn: 2 files, +27 −1' });
+    fireEvent.click(chip);
+    expect(outbox).toEqual([{ type: 'viewChanges', sessionId: 's1', checkpointId: 'c2' }]);
+
+    rerender(<Composer session={session({ checkpoints: [{ id: 'c3', files: [file('a.ts', 1, 0)] }] })} />);
+    expect(screen.getByRole('button', { name: /^View the changes of the last turn: One file/ })).toBeTruthy();
+    rerender(<Composer session={session({ checkpoints: [{ id: 'c4', files: [file('a.ts', 1, 0, true)] }] })} />);
+    expect(screen.queryByRole('button', { name: /View the changes/ })).toBeNull();
+  });
+
   it('starts from an empty draft', () => {
     expect(EMPTY_DRAFT).toEqual({ text: '', attachments: [] });
   });

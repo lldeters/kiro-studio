@@ -1,4 +1,26 @@
-/* Colours, fonts and spacing come from the VS Code theme variables only, so every theme works. */
+/*
+ * Colours, fonts and spacing come from the VS Code theme variables, so every theme works. The one exception is the
+ * purple accent of the input box (its focus ring and the send button), which gives the chat Kiro's colour; the
+ * high-contrast themes replace it with their own colours.
+ */
+:root {
+  /* White text on it has a contrast of 5.7:1. */
+  --kiro-accent: #7c3aed;
+  --kiro-accent-hover: #6d28d9;
+  --kiro-accent-foreground: #ffffff;
+  /* A line or a small mark on the background: lighter on dark themes, so that it stands out. */
+  --kiro-ring: #a78bfa;
+}
+body.vscode-light {
+  --kiro-ring: #7c3aed;
+}
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+  --kiro-accent: var(--vscode-button-background);
+  --kiro-accent-hover: var(--vscode-button-hoverBackground);
+  --kiro-accent-foreground: var(--vscode-button-foreground);
+  --kiro-ring: var(--vscode-focusBorder);
+}
 * {
   box-sizing: border-box;
 }
@@ -246,39 +268,180 @@ button.secondary:hover:not(:disabled) {
   border-color: var(--vscode-errorForeground);
   color: var(--vscode-errorForeground);
 }
-/* Composer */
+/* Composer: a rounded box with the context chips, the text and a row with context, agent, model, effort and send */
 .composer-wrap {
   flex: none;
-  position: relative;
-  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+  padding: 6px 8px 0;
+}
+.composer-above {
+  display: flex;
+  margin-bottom: 4px;
+}
+.changes {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, transparent));
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.88em;
+  white-space: nowrap;
+}
+.changes:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.changes .stat {
+  font-family: var(--vscode-editor-font-family, monospace);
 }
 .composer {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 8px;
-}
-.composer .attach {
-  height: 26px;
-  flex: none;
-}
-.composer textarea {
-  flex: 1;
-  min-width: 0;
-  resize: none;
-  padding: 5px 8px;
-  max-height: 200px;
+  position: relative;
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
-  border: 1px solid var(--vscode-input-border, transparent);
-  border-radius: 2px;
+  border: 1px solid var(--vscode-input-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
+  border-radius: 8px;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.composer:focus-within {
+  border-color: var(--kiro-ring);
+  box-shadow:
+    0 0 0 1px var(--kiro-ring),
+    0 0 14px -4px var(--kiro-accent);
+}
+.composer.disabled {
+  opacity: 0.6;
+}
+.composer textarea {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  resize: none;
+  padding: 9px 10px 3px;
+  background: transparent;
+  color: inherit;
+  border: 0;
 }
 .composer textarea::placeholder {
   color: var(--vscode-input-placeholderForeground);
 }
-.composer textarea:focus {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: -1px;
+/* The box shows the focus. */
+.composer textarea:focus-visible {
+  outline: none;
+}
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 4px;
+}
+.composer-actions .attach {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+}
+.pickers {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
+  min-width: 2.5em;
+  color: var(--vscode-descriptionForeground);
+}
+.picker:hover {
+  color: var(--vscode-foreground);
+}
+.picker:has(select:disabled) {
+  opacity: 0.5;
+  color: var(--vscode-descriptionForeground);
+}
+.picker > .codicon {
+  position: absolute;
+  left: 5px;
+  font-size: 14px;
+  pointer-events: none;
+}
+.picker select {
+  appearance: none;
+  field-sizing: content;
+  min-width: 0;
+  max-width: 100%;
+  height: 24px;
+  padding: 0 6px 0 23px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.92em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  cursor: pointer;
+}
+.picker select:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+.picker select:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.picker select option {
+  background: var(--vscode-dropdown-background, var(--vscode-input-background));
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+}
+/* The effort belongs to the model: smaller, after a divider. */
+.picker.plain::before {
+  content: '';
+  flex: none;
+  width: 1px;
+  height: 14px;
+  margin: 0 3px 0 2px;
+  background: var(--vscode-widget-border, var(--vscode-panel-border, currentColor));
+}
+.picker.plain select {
+  padding-left: 5px;
+  font-size: 0.85em;
+}
+.send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--kiro-accent);
+  color: var(--kiro-accent-foreground);
+}
+.send:hover:not(:disabled) {
+  background: var(--kiro-accent-hover);
+}
+.send:disabled {
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+}
+.send.stop {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+.send.stop:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
 }
 
 /* Rows and Markdown */
@@ -626,69 +789,70 @@ div.disclosure-toggle {
   margin-top: 8px;
 }
 
-/* Toolbar */
+/* The line under the input box */
 .toolbar {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px 0;
-  font-size: 0.92em;
+  gap: 2px;
+  min-width: 0;
+  padding: 3px 8px 5px;
+  font-size: 0.88em;
+  color: var(--vscode-descriptionForeground);
 }
 .toolbar-spacer {
   flex: 1;
 }
-.autonomy {
+.status-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, currentColor));
-  border-radius: 10px;
-  background: transparent;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
-.autonomy.autopilot {
-  border-color: var(--vscode-editorWarning-foreground);
+button.status-item {
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+button.status-item:hover:not(:disabled) {
+  background: var(--vscode-toolbar-hoverBackground);
+  color: var(--vscode-foreground);
+}
+.autonomy.autopilot,
+button.autonomy.autopilot:hover:not(:disabled) {
   color: var(--vscode-editorWarning-foreground);
 }
-.autonomy:hover:not(:disabled) {
-  background: var(--vscode-toolbar-hoverBackground);
+.toolbar .icon-button {
+  height: 20px;
+  line-height: 18px;
+  padding: 0 4px;
+  color: inherit;
 }
-.toolbar-select {
-  max-width: 130px;
-  padding: 1px 4px;
-  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
-  background: var(--vscode-dropdown-background, var(--vscode-input-background));
-  border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
-  border-radius: 2px;
-  font: inherit;
+.toolbar .icon-button:hover:not(:disabled) {
+  color: var(--vscode-foreground);
 }
-.context {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--vscode-descriptionForeground);
-}
-.context-bar {
-  display: inline-block;
-  width: 44px;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--vscode-scrollbarSlider-background, rgba(128, 128, 128, 0.4));
-  position: relative;
-  overflow: hidden;
-}
-.context-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--vscode-progressBar-background);
+/* How full the context is, as a ring that fills clockwise. */
+.context-ring {
+  --ring: var(--kiro-ring);
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring) var(--fill), color-mix(in srgb, currentColor 30%, transparent) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
 }
 .context.warn {
   color: var(--vscode-editorWarning-foreground);
 }
 .context.danger {
   color: var(--vscode-errorForeground);
+}
+.context.warn .context-ring,
+.context.danger .context-ring {
+  --ring: currentColor;
 }
 
 /* Attachments and the pop-up lists */
@@ -737,10 +901,10 @@ div.disclosure-toggle {
 }
 .suggest {
   position: absolute;
-  left: 8px;
-  right: 8px;
+  left: 0;
+  right: 0;
   bottom: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   max-height: 220px;
   overflow-y: auto;
   z-index: 5;
@@ -1035,8 +1199,8 @@ body[data-view='spec'] {
     .spec-badge,
     .table-wrap,
     .notice,
-    .toolbar-select,
-    .context-bar
+    .changes,
+    .send
   ) {
   outline: 1px solid var(--vscode-contrastBorder);
   outline-offset: -1px;
@@ -1057,4 +1221,8 @@ body[data-view='spec'] {
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) :focus-visible {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: 0;
+}
+/* The input box draws the focus of its text itself. */
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) .composer textarea:focus-visible {
+  outline: none;
 }

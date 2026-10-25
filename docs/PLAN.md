@@ -304,8 +304,10 @@ der Leitung, vor dem SDK-Parsing), `stderr.log`. Der Ordner `probe-logs/` ist vo
   `npm run preview`).
 - **Freigaben im Chat** mit genau den angebotenen Optionen, Diff-Vorschau bei Schreibzugriffen, „Immer“-Optionen mit
   Hinweis auf die dauerhafte Regel; der QuickPick bleibt zu, solange der Chat sichtbar ist.
-- **Toolbar:** Supervised/Autopilot, Agent, Modell, Effort, Kontext-Füllstand, „Kontext komprimieren“ (nur wenn
-  `_kiro/session/compact` angekündigt ist), Export als Markdown.
+- **Eingabe-Box und Zeile darunter** (nach dem Vorbild des VS-Code-Chats, mit lila Akzent): in der Box Kontext (`+`),
+  Agent, Modell, Effort und Senden/Stopp; darunter Supervised/Autopilot, Kontext-Füllstand, Credits des letzten
+  Durchlaufs, „Kontext komprimieren“ (nur wenn `_kiro/session/compact` angekündigt ist), Export als Markdown; darüber ein
+  Chip mit den Änderungen des letzten Durchlaufs.
 - **Eingabe:** Enter/Shift+Enter/Esc, `/`-Befehle aus `available_commands_update`, `#file`, `#folder`, `#current`,
   `#problems`, `#git diff`, `#steering`, `#spec`, Bilder per Einfügen oder Ablegen (nur wenn die CLI sie annimmt),
   Dateien aus dem Explorer per Ablegen; Entwürfe pro Sitzung, auch nach dem Ausblenden der Ansicht.

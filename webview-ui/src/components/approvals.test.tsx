@@ -6,6 +6,7 @@ import { initialState } from '../state';
 import { useChat } from '../store';
 import { outbox } from '../vscode';
 import { ApprovalDock } from './ApprovalDock';
+import { Pickers } from './Pickers';
 import { Toolbar } from './Toolbar';
 
 const meta: SessionMeta = { status: 'ready', phase: 'idle', autopilot: false, approvals: [], config: [], commands: [] };
@@ -130,7 +131,7 @@ const select = (id: string, category: string, current: string, values: string[])
   values: values.map((value) => ({ value, name: value.toUpperCase() })),
 });
 
-describe('toolbar', () => {
+describe('pickers', () => {
   const config = [
     select('mode', 'mode', 'vibe', ['vibe', 'spec']),
     select('model', 'model', 'auto', ['auto', 'opus']),
@@ -139,21 +140,37 @@ describe('toolbar', () => {
   ];
 
   it('offers agent and model, not the autopilot or unrelated options', () => {
-    render(<Toolbar session={session({ config })} />);
+    render(<Pickers session={session({ config })} />);
     expect(screen.getAllByRole('combobox').map((c) => c.getAttribute('aria-label'))).toEqual(['Agent', 'Model']);
   });
 
+  it('offers the effort after the model when the CLI has it, and names the current values', () => {
+    const withEffort = [...config, select('effortLevel', 'thought_level', 'medium', ['low', 'medium', 'high'])];
+    render(<Pickers session={session({ config: withEffort })} />);
+    expect(screen.getAllByRole('combobox').map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Agent',
+      'Model',
+      'Effort',
+    ]);
+    expect(screen.getByRole('combobox', { name: 'Model' }).getAttribute('title')).toBe('Model: AUTO');
+    expect(screen.getByRole('combobox', { name: 'Effort' }).getAttribute('title')).toBe('Effort: MEDIUM');
+  });
+
   it('writes the chosen value', () => {
-    render(<Toolbar session={session({ config })} />);
+    render(<Pickers session={session({ config })} />);
     fireEvent.change(screen.getByRole('combobox', { name: 'Model' }), { target: { value: 'opus' } });
     expect(outbox).toEqual([{ type: 'setConfig', sessionId: 's1', configId: 'model', value: 'opus' }]);
   });
 
-  it('cannot change options while a turn runs', () => {
-    render(<Toolbar session={session({ config, phase: 'running' })} />);
+  it('cannot change options while a turn runs or the session is lost', () => {
+    const { rerender } = render(<Pickers session={session({ config, phase: 'running' })} />);
+    for (const box of screen.getAllByRole('combobox')) expect((box as HTMLSelectElement).disabled).toBe(true);
+    rerender(<Pickers session={session({ config, status: 'lost' })} />);
     for (const box of screen.getAllByRole('combobox')) expect((box as HTMLSelectElement).disabled).toBe(true);
   });
+});
 
+describe('toolbar', () => {
   it('shows the autonomy and toggles it through the command', () => {
     const { rerender } = render(<Toolbar session={session()} />);
     fireEvent.click(screen.getByRole('button', { name: /Supervised/ }));
@@ -181,8 +198,15 @@ describe('toolbar', () => {
     expect(outbox).toEqual([{ type: 'compact', sessionId: 's1' }]);
   });
 
+  it('shows the credits of the last turn once there are some', () => {
+    const { rerender } = render(<Toolbar session={session()} />);
+    expect(screen.queryByText(/credits/)).toBeNull();
+    rerender(<Toolbar session={session({ lastTurn: { credits: 0.4217 } })} />);
+    expect(screen.getByTitle('Credits used by the last turn').textContent).toBe('0.42 credits');
+  });
+
   it('is disabled for a lost session', () => {
-    render(<Toolbar session={session({ config, status: 'lost' })} />);
+    render(<Toolbar session={session({ status: 'lost' })} />);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Supervised/ }).disabled).toBe(true);
   });
 });

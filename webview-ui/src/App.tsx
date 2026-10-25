@@ -29,8 +29,8 @@ export function App() {
           <Transcript key={session.id} session={session} />
           {session.plan && <PlanPanel plan={session.plan} />}
           <ApprovalDock session={session} />
-          <Toolbar session={session} />
           <Composer session={session} />
+          <Toolbar session={session} />
         </>
       ) : (
         setup === 'ready' &&
