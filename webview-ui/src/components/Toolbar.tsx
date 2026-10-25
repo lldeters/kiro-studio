@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { SessionView } from '../../../src/shared/chatProtocol';
+import { formatCredits } from '../../../src/shared/format';
 import { useT } from '../i18n';
 import { useChat } from '../store';
 import { post } from '../vscode';
@@ -47,7 +48,7 @@ export function Toolbar({ session }: { session: SessionView }) {
       )}
       {credits !== undefined && (
         <span className="status-item credits" title={t('Credits used by the last turn')}>
-          {t('{0} credits', credits.toFixed(2))}
+          {t('{0} credits', formatCredits(credits, document.documentElement.lang || undefined))}
         </span>
       )}
       <span className="toolbar-spacer" />
