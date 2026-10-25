@@ -32,6 +32,7 @@ const FORBIDDEN: [RegExp, string][] = [
   [/\.(ts|tsx)$/, 'TypeScript source'],
   [/^(tsconfig|vite\.config|vitest\.config|eslint\.config|esbuild)\b/, 'build configuration'],
   [/^package-lock\.json$/, 'the lock file'],
+  [/^resources\/logo\./, "the logo's original (the package carries resources/icon.png)"],
 ];
 
 /** The largest `.vsix` that is still reasonable for an extension of this kind. */
