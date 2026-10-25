@@ -15,6 +15,7 @@ import { computeMenu, type MenuItem } from '../composerMenu';
 import { useT } from '../i18n';
 import { EMPTY_DRAFT, useChat } from '../store';
 import { post } from '../vscode';
+import { Pickers } from './Pickers';
 import { SuggestMenu } from './SuggestMenu';
 
 export function Composer({ session }: { session: SessionView }) {
@@ -142,56 +143,43 @@ export function Composer({ session }: { session: SessionView }) {
     addAttachments(droppedPaths(event.dataTransfer).map((path) => ({ kind: 'file', path })));
   };
 
+  const usable = session.status === 'ready';
+  const stopping = session.phase === 'cancelling';
+
   return (
     <div className="composer-wrap" onDragOver={(event) => event.preventDefault()} onDrop={onDrop}>
-      {menuOpen && menu && (
-        <SuggestMenu
-          id={menuId}
-          items={menu.items}
-          selected={Math.min(selected, menu.items.length - 1)}
-          onChoose={choose}
-        />
-      )}
-      {attachments.length > 0 && (
-        <div className="chips">
-          {attachments.map((attachment, index) => (
-            <span className="chip" key={index} title={'path' in attachment ? attachment.path : undefined}>
-              {attachment.kind === 'image' ? (
-                <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt="" className="chip-thumb" />
-              ) : (
-                <span className={`codicon codicon-${chipIcon(attachment)}`} aria-hidden="true" />
-              )}
-              <span className="chip-label">{attachmentLabel(attachment)}</span>
-              <button
-                className="icon-button"
-                aria-label={t('Remove {0}', attachmentLabel(attachment))}
-                title={t('Remove {0}', attachmentLabel(attachment))}
-                onClick={() => update({ attachments: attachments.filter((_, i) => i !== index) })}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="composer">
-        <button
-          className="icon-button attach"
-          title={t('Add context (#)')}
-          aria-label={t('Add context (#)')}
-          disabled={session.status !== 'ready'}
-          onClick={() => {
-            const withHash = text === '' || /\s$/.test(text) ? `${text}#` : `${text} #`;
-            update({ text: withHash });
-            setCaret(withHash.length);
-            requestAnimationFrame(() => {
-              area.current?.focus();
-              area.current?.setSelectionRange(withHash.length, withHash.length);
-            });
-          }}
-        >
-          <span className="codicon codicon-add" aria-hidden="true" />
-        </button>
+      <LastChanges session={session} />
+      <div className={`composer${usable ? '' : ' disabled'}`}>
+        {menuOpen && menu && (
+          <SuggestMenu
+            id={menuId}
+            items={menu.items}
+            selected={Math.min(selected, menu.items.length - 1)}
+            onChoose={choose}
+          />
+        )}
+        {attachments.length > 0 && (
+          <div className="chips">
+            {attachments.map((attachment, index) => (
+              <span className="chip" key={index} title={'path' in attachment ? attachment.path : undefined}>
+                {attachment.kind === 'image' ? (
+                  <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt="" className="chip-thumb" />
+                ) : (
+                  <span className={`codicon codicon-${chipIcon(attachment)}`} aria-hidden="true" />
+                )}
+                <span className="chip-label">{attachmentLabel(attachment)}</span>
+                <button
+                  className="icon-button"
+                  aria-label={t('Remove {0}', attachmentLabel(attachment))}
+                  title={t('Remove {0}', attachmentLabel(attachment))}
+                  onClick={() => update({ attachments: attachments.filter((_, i) => i !== index) })}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <textarea
           ref={area}
           value={text}
@@ -202,7 +190,7 @@ export function Composer({ session }: { session: SessionView }) {
           aria-autocomplete="list"
           placeholder={t('Ask Kiro…')}
           title={t('Enter sends, Shift+Enter adds a line, Esc stops.')}
-          disabled={session.status !== 'ready'}
+          disabled={!usable}
           onChange={(event) => {
             update({ text: event.target.value });
             setCaret(event.target.selectionStart);
@@ -212,16 +200,73 @@ export function Composer({ session }: { session: SessionView }) {
           onKeyDown={onKeyDown}
           onPaste={onPaste}
         />
-        {busy ? (
-          <button className="secondary" onClick={cancel} disabled={session.phase === 'cancelling'}>
-            {session.phase === 'cancelling' ? t('Stopping…') : t('Stop')}
+        <div className="composer-actions">
+          <button
+            className="icon-button attach"
+            title={t('Add context (#)')}
+            aria-label={t('Add context (#)')}
+            disabled={!usable}
+            onClick={() => {
+              const withHash = text === '' || /\s$/.test(text) ? `${text}#` : `${text} #`;
+              update({ text: withHash });
+              setCaret(withHash.length);
+              requestAnimationFrame(() => {
+                area.current?.focus();
+                area.current?.setSelectionRange(withHash.length, withHash.length);
+              });
+            }}
+          >
+            <span className="codicon codicon-add" aria-hidden="true" />
           </button>
-        ) : (
-          <button className="primary" onClick={send} disabled={!canSend}>
-            {t('Send')}
-          </button>
-        )}
+          <Pickers session={session} />
+          {busy ? (
+            <button
+              className="send stop"
+              aria-label={stopping ? t('Stopping…') : t('Stop')}
+              title={stopping ? t('Stopping…') : t('Stop')}
+              onClick={cancel}
+              disabled={stopping}
+            >
+              <span
+                className={`codicon ${stopping ? 'codicon-loading codicon-modifier-spin' : 'codicon-debug-stop'}`}
+                aria-hidden="true"
+              />
+            </button>
+          ) : (
+            <button className="send" aria-label={t('Send')} title={t('Send')} onClick={send} disabled={!canSend}>
+              <span className="codicon codicon-arrow-up" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** What the last turn changed and is still there, as a chip above the box; it opens all the changes. */
+function LastChanges({ session }: { session: SessionView }) {
+  const t = useT();
+  const checkpoints = session.checkpoints ?? [];
+  const checkpoint = checkpoints[checkpoints.length - 1];
+  const open = checkpoint?.files.filter((file) => !file.reverted) ?? [];
+  if (!checkpoint || open.length === 0) return null;
+  const added = open.reduce((n, file) => n + file.added, 0);
+  const removed = open.reduce((n, file) => n + file.removed, 0);
+  const files = open.length === 1 ? t('One file') : t('{0} files', open.length);
+  return (
+    <div className="composer-above">
+      <button
+        className="changes"
+        title={t('View the changes of the last turn')}
+        aria-label={`${t('View the changes of the last turn')}: ${files}, +${added} −${removed}`}
+        onClick={() => post({ type: 'viewChanges', sessionId: session.id, checkpointId: checkpoint.id })}
+      >
+        <span className="codicon codicon-diff-multiple" aria-hidden="true" />
+        {files}
+        <span className="stat">
+          <span className="added">+{added}</span> <span className="removed">−{removed}</span>
+        </span>
+      </button>
     </div>
   );
 }

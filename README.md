@@ -24,7 +24,9 @@ real Kiro session._
 
 - **Chat** in the sidebar or an editor tab, with sessions as tabs. Streaming Markdown, highlighted code, Mermaid diagrams,
   tool calls as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
-  `git diff`, steering files, specs), pasted or dropped images, and agent, model, effort and Supervised/Autopilot in a toolbar.
+  `git diff`, steering files, specs) and pasted or dropped images. Agent, model and effort are picked in the input box;
+  Supervised/Autopilot, the context fill and the credits of the last turn sit below it, and a chip above it opens what
+  the last turn changed.
 - **Questions from Kiro** are answered in the chat with exactly the options Kiro offered, with the change shown. In
   Autopilot, Kiro Studio allows each request once for you (see [Safety](#privacy-and-safety)); Supervised always asks.
 - **Checkpoints:** every turn that changes files leaves a card with _View changes_ and _Revert_, backed by a separate

@@ -198,12 +198,19 @@ Rendering: `react-markdown` with `remark-gfm` (no raw HTML), Shiki with the Java
 languages and themes load lazily as chunks), lazily loaded Mermaid in `strict` mode that draws only when the streaming
 text has been still, `react-virtuoso` for the list. The list follows new text only while the reader is at the bottom;
 this is decided by the reader's own scrolling, so diagrams or highlighted code that grow after being drawn do not lose
-the position. Theme, fonts and spacing come only from `--vscode-*` variables and Codicons.
+the position. Theme, fonts and spacing come from `--vscode-*` variables and Codicons (one exception, see Themes).
+
+The input is a rounded box like the chat of VS Code: the context chips, the text, and a row with `+` (context), agent,
+model and effort (native selects that look like quiet buttons) and Send, which turns into Stop while a turn runs. Under
+the box a line shows Supervised/Autopilot, how full the context is, the credits of the last turn, compact and export;
+above it a chip shows what the last turn changed and opens those changes.
 
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
 
-Themes: colours, fonts and spacing come only from `--vscode-*` variables, so every theme works. The high-contrast
+Themes: colours, fonts and spacing come from `--vscode-*` variables, so every theme works. The one exception is a
+purple accent for the focus ring of the input box, its send button and the context ring (`--kiro-*` in `styles.css`);
+the high-contrast themes replace it with their focus and button colours. The high-contrast
 themes (the body class `vscode-high-contrast[-light]`) get outlines from `--vscode-contrastBorder` around what other
 themes tell apart by colour, dashed `contrastActiveBorder` outlines for what is hovered or selected, underlined links
 and a thicker focus ring; VS Code defines those variables only there. Shiki and Mermaid follow the light/dark kind of the
@@ -316,7 +323,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
   export, message validation, and a coverage test that every runtime message, webview message and manifest string has a
   German translation. `spawnTransport` is tested with a real process tree on POSIX.
 - **Webview (Vitest with jsdom, `webview-ui/src/**/*.test.tsx`):** the reducer, the app in every setup and connection
-  state, Markdown, code blocks, tool cards, diffs, approvals, toolbar, composer (menus, keyboard, chips, drafts, drops),
+  state, Markdown, code blocks, tool cards, diffs, approvals, pickers, the line under the input, composer (menus,
+  keyboard, chips, drafts, drops, Send and Stop, the chip with the last changes),
   checkpoint cards, the spec view (tabs with the keyboard, review, starting tasks), the announcements for screen readers,
   the block-wise Markdown and the highlight cache, and axe-core over all of them.
 - **Fake CLI:** `test/integration/fixtures/fake-kiro.cjs` stands in for `kiro-cli` (scenarios `ready`, `signedout`,

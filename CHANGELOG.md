@@ -12,8 +12,9 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   a menu; getting-started walkthrough (English and German); one `kiro-cli acp` process per window with restart and resume;
   the whole process tree is ended on exit; off in untrusted workspaces.
 - **Chat:** sessions as tabs, streaming Markdown, highlighted code, Mermaid diagrams, tool cards with diffs, the plan,
-  `/` commands, `#` context, images, agent/model/effort and Supervised/Autopilot in a toolbar, answers to Kiro's questions
-  in the chat, a protocol log with redaction.
+  `/` commands, `#` context, images, answers to Kiro's questions in the chat, a protocol log with redaction. The input is
+  a rounded box with agent, model and effort pickers and a purple send button; below it Supervised/Autopilot,
+  the context fill and the credits of the last turn; above it a chip with the last turn's changes.
 - **Checkpoints** in a separate Git repository with _View changes_ and _Revert_ (a changed file is only reverted after
   a second confirmation); session export to Markdown.
 - **Kiro panel:** sessions, specs, steering, hooks, MCP servers and agents, read from `.kiro` and `~/.kiro`, with actions;

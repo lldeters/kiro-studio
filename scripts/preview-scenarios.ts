@@ -158,7 +158,7 @@ function idle(): HostMessage[] {
   const session = new Session('sess_preview_c', { cwd: '/ws' });
   session.applySessionResult({
     sessionId: session.id,
-    configOptions: configOptions({ autopilot: 'on', model: 'auto' }),
+    configOptions: configOptions({ autopilot: 'on', model: 'claude-opus-5.5', effort: 'medium' }),
   });
   session.title = 'Ask something';
   feed(
@@ -179,7 +179,7 @@ function idle(): HostMessage[] {
     u.contextUsage(23),
   );
   session.beginTurn('What does this project do?', ['README.md']);
-  feed(session, u.agent('It is a VS Code extension.', { messageId: 'x' }));
+  feed(session, u.agent('It is a VS Code extension.', { messageId: 'x' }), u.turnCompletion(0.42));
   session.endTurn({ stopReason: 'end_turn' });
   return [init([session]), { type: 'session', session: new PatchTracker('posix').full(session) }];
 }
