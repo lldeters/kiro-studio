@@ -242,7 +242,10 @@ export function Composer({ session }: { session: SessionView }) {
   );
 }
 
-/** What the last turn changed and is still there, as a chip above the box; it opens all the changes. */
+/**
+ * What the last turn that changed files changed and is still there, as a chip above the box; it opens all the changes.
+ * Turns without changes leave no checkpoint, so it can be some turns back.
+ */
 function LastChanges({ session }: { session: SessionView }) {
   const t = useT();
   const checkpoints = session.checkpoints ?? [];
@@ -256,8 +259,8 @@ function LastChanges({ session }: { session: SessionView }) {
     <div className="composer-above">
       <button
         className="changes"
-        title={t('View the changes of the last turn')}
-        aria-label={`${t('View the changes of the last turn')}: ${files}, +${added} −${removed}`}
+        title={t('View the latest changes by Kiro')}
+        aria-label={`${t('View the latest changes by Kiro')}: ${files}, +${added} −${removed}`}
         onClick={() => post({ type: 'viewChanges', sessionId: session.id, checkpointId: checkpoint.id })}
       >
         <span className="codicon codicon-diff-multiple" aria-hidden="true" />

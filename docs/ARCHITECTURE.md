@@ -208,7 +208,8 @@ on, unless the reader opened or closed it. The recordings of the CLI contain no 
 The input is a rounded box like the chat of VS Code: the context chips, the text, and a row with `+` (context), agent,
 model and effort (native selects that look like quiet buttons) and Send, which turns into Stop while a turn runs. Under
 the box a line shows Supervised/Autopilot, how full the context is, the credits of the last turn, compact and export;
-above it a chip shows what the last turn changed and opens those changes.
+above it a chip shows what the last turn with changes changed (turns without changes leave no checkpoint) and opens
+those changes.
 
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.

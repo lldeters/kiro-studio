@@ -284,7 +284,7 @@ describe('composer', () => {
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stopping…' }).disabled).toBe(true);
   });
 
-  it('shows what the last turn changed and still stands, and opens those changes', () => {
+  it('shows the latest changes by Kiro that still stand, and opens them', () => {
     const file = (path: string, added: number, removed: number, reverted = false) => ({
       path,
       status: 'modified' as const,
@@ -298,12 +298,12 @@ describe('composer', () => {
       { id: 'c2', files: [file('a.ts', 3, 1), file('b.ts', 24, 0), file('gone.ts', 0, 8, true)] },
     ];
     const { rerender } = render(<Composer session={session({ checkpoints })} />);
-    const chip = screen.getByRole('button', { name: 'View the changes of the last turn: 2 files, +27 −1' });
+    const chip = screen.getByRole('button', { name: 'View the latest changes by Kiro: 2 files, +27 −1' });
     fireEvent.click(chip);
     expect(outbox).toEqual([{ type: 'viewChanges', sessionId: 's1', checkpointId: 'c2' }]);
 
     rerender(<Composer session={session({ checkpoints: [{ id: 'c3', files: [file('a.ts', 1, 0)] }] })} />);
-    expect(screen.getByRole('button', { name: /^View the changes of the last turn: One file/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^View the latest changes by Kiro: One file/ })).toBeTruthy();
     rerender(<Composer session={session({ checkpoints: [{ id: 'c4', files: [file('a.ts', 1, 0, true)] }] })} />);
     expect(screen.queryByRole('button', { name: /View the changes/ })).toBeNull();
   });
