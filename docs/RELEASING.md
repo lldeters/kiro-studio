@@ -97,23 +97,27 @@ Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
 
 **Chat und Freigaben**
 
-- [ ] Neue Sitzung (**+**), ein kleiner Auftrag („Lege hello.txt mit einem Gruß an“). Die Antwort streamt, die Toolbar zeigt
-      Agent, Modell und **Supervised**.
+- [ ] Neue Sitzung (**+**), ein kleiner Auftrag („Lege hello.txt mit einem Gruß an“). Bis etwas kommt, steht im Chat
+      „Kiro denkt nach …“; dann streamt die Antwort. In der Eingabebox stehen Agent und Modell, darunter **Supervised**.
+- [ ] Ein Modell mit Aufwand wählen (Aufwand *high*) und etwas Kniffliges fragen. Wenn Kiro Denkschritte sendet, erscheinen
+      sie aufgeklappt unter „Denkt nach …“ und klappen nach der Antwort zu „Gedankengang“ zu. Kommen keine, sendet die
+      CLI sie nicht (`agent_thought_chunk` war in keiner Aufzeichnung); das bitte melden.
 - [ ] Die Freigabe-Frage zeigt den Diff; *Allow once* → die Karte „Kiro hat eine Datei geändert“ erscheint.
 - [ ] *Änderungen ansehen* öffnet den Diff, *Zurücknehmen* fragt und entfernt die Datei wieder.
 - [ ] Eine Datei mit Windows-Zeilenenden (CRLF) von Kiro ändern lassen und zurücknehmen: kein Hinweis „seit dem Turn
       geändert“ (Fix aus dem Review).
-- [ ] Toolbar auf **Autopilot**, Auftrag geben: keine Frage, im Chat steht „Automatically allowed once“.
-- [ ] Zurück auf Supervised; die Toolbar und *Kiro Studio: Switch Between Supervised and Autopilot* schalten immer in
-      die angezeigte Richtung.
+- [ ] Unter der Eingabebox auf **Autopilot** schalten, Auftrag geben: keine Frage, im Chat steht „Automatically allowed
+      once“.
+- [ ] Zurück auf Supervised; der Knopf unter der Box und *Kiro Studio: Switch Between Supervised and Autopilot* schalten
+      immer in die angezeigte Richtung.
 - [ ] Chat ausblenden, während Kiro zwei Dinge fragt: Nach der ersten Antwort im Auswahlfenster öffnet sich die zweite Frage
       von selbst (Fix aus dem Review).
 - [ ] `#` und `/` in der Eingabe, ein Bild einfügen, `#git diff` anhängen.
 
 **Sitzungen und Verbindung**
 
-- [ ] In *Sitzungen* eine frühere Sitzung öffnen: die Unterhaltung erscheint einmal (auch bei Doppelklick), die Toolbar
-      zeigt **Supervised**, auch wenn die Sitzung früher in Autopilot lief (Fix aus dem Review).
+- [ ] In *Sitzungen* eine frühere Sitzung öffnen: die Unterhaltung erscheint einmal (auch bei Doppelklick), unter der
+      Eingabebox steht **Supervised**, auch wenn die Sitzung früher in Autopilot lief (Fix aus dem Review).
 - [ ] *Kiro Studio: Restart Agent Connection*: die Sitzungen kommen zurück, die Checkpoint-Karten auch.
 - [ ] Im Task-Manager den `kiro-cli`-Prozess beenden: der Chat sagt, dass die Verbindung weg ist, und stellt sie wieder her.
 - [ ] VS Code schließen: danach läuft kein `kiro-cli` mehr (Task-Manager). Annahme A3.

@@ -1,7 +1,8 @@
-import { memo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import type { CheckpointView, ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
+import { waitingForOutput } from '../thinking';
 import { CheckpointCard } from './CheckpointCard';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
@@ -10,11 +11,20 @@ import { ToolCard } from './ToolCard';
 const testProps =
   import.meta.env.MODE === 'test' ? ({ initialItemCount: 1000, initialTopMostItemIndex: 0 } as const) : {};
 
+/** The last row while Kiro works without showing anything yet. A row of the list, so that the list follows it. */
+const THINKING = { id: -1, kind: 'thinking' } as const;
+type Row = ItemView | typeof THINKING;
+
 export function Transcript({ session }: { session: SessionView }) {
   const tools = new Map(session.tools.map((tool) => [tool.toolCallId, tool]));
   const checkpoints = new Map((session.checkpoints ?? []).map((checkpoint) => [checkpoint.id, checkpoint]));
   const busy = session.phase !== 'idle';
   const lastId = session.items[session.items.length - 1]?.id;
+  const thinking = waitingForOutput(session);
+  const rows = useMemo<Row[]>(
+    () => (thinking ? [...session.items, THINKING] : session.items),
+    [session.items, thinking],
+  );
   const list = useRef<VirtuosoHandle>(null);
   // Whether the reader is at the bottom. Only the reader's own scrolling changes it, so a diagram or highlighted code
   // that makes the list taller after it was drawn does not lose the position.
@@ -34,22 +44,28 @@ export function Transcript({ session }: { session: SessionView }) {
         }}
         style={{ height: '100%' }}
         initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
-        data={session.items}
+        data={rows}
         computeItemKey={(_index, item) => item.id}
         // Follow new text only while the reader is at the bottom; scrolling up stops it.
         followOutput={() => (stick.current ? 'auto' : false)}
         increaseViewportBy={600}
-        itemContent={(_index, item) => (
-          <div className={`row${item.subtaskId ? ' subtask' : ''}`}>
-            <Item
-              item={item}
-              tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)}
-              streaming={busy && item.id === lastId}
-              sessionId={session.id}
-              checkpoint={item.checkpointId === undefined ? undefined : checkpoints.get(item.checkpointId)}
-            />
-          </div>
-        )}
+        itemContent={(_index, item) =>
+          item.kind === 'thinking' ? (
+            <div className="row">
+              <Thinking />
+            </div>
+          ) : (
+            <div className={`row${item.subtaskId ? ' subtask' : ''}`}>
+              <Item
+                item={item}
+                tool={item.toolCallId === undefined ? undefined : tools.get(item.toolCallId)}
+                streaming={busy && item.id === lastId}
+                sessionId={session.id}
+                checkpoint={item.checkpointId === undefined ? undefined : checkpoints.get(item.checkpointId)}
+              />
+            </div>
+          )
+        }
         {...testProps}
       />
     </div>
@@ -95,14 +111,7 @@ const Item = memo(function Item({
         </div>
       );
     case 'thought':
-      return (
-        <details className="message thought">
-          <summary>
-            {streaming && <span className="spinner small" aria-hidden="true" />} {t('Thinking')}
-          </summary>
-          <Markdown text={item.text} streaming={streaming} />
-        </details>
-      );
+      return <Thought text={item.text} streaming={streaming} />;
     case 'notice':
       return <div className={`notice ${item.level ?? 'info'}`}>{item.text}</div>;
     case 'tool':
@@ -111,3 +120,52 @@ const Item = memo(function Item({
       return checkpoint ? <CheckpointCard checkpoint={checkpoint} sessionId={sessionId} /> : null;
   }
 });
+
+/** "Kiro is thinking…", shimmering in the accent colour. Not a live region: the end of the turn is announced. */
+function Thinking() {
+  const t = useT();
+  return (
+    <div className="thinking">
+      <span className="codicon codicon-sparkle thinking-icon" aria-hidden="true" />
+      <span className="shimmer">{t('Kiro is thinking…')}</span>
+    </div>
+  );
+}
+
+/**
+ * Kiro's reasoning. Open while it streams, so it can be read as it comes, following its end; closed once Kiro has
+ * moved on, unless the reader opened or closed it.
+ */
+function Thought({ text, streaming }: { text: string; streaming: boolean }) {
+  const t = useT();
+  const [chosen, setChosen] = useState<boolean>();
+  const open = chosen ?? streaming;
+  const body = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = body.current;
+    if (streaming && element) element.scrollTop = element.scrollHeight;
+  }, [text, streaming]);
+  return (
+    <details className={`message thought${streaming ? ' streaming' : ''}`} open={open}>
+      <summary
+        onClick={(event) => {
+          // The state decides, so that the end of the streaming can close it.
+          event.preventDefault();
+          setChosen(!open);
+        }}
+      >
+        {streaming ? (
+          <>
+            <span className="codicon codicon-sparkle thinking-icon" aria-hidden="true" />
+            <span className="shimmer">{t('Thinking…')}</span>
+          </>
+        ) : (
+          t('Thought process')
+        )}
+      </summary>
+      <div className="thought-body" ref={body}>
+        <Markdown text={text} streaming={streaming} />
+      </div>
+    </details>
+  );
+}

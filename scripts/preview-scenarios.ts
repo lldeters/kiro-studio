@@ -214,6 +214,50 @@ function streaming(): Step[] {
   return steps;
 }
 
+/** A turn that has started and shows nothing yet: "Kiro is thinking…". */
+function waiting(): Step[] {
+  const session = new Session('sess_preview_w', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'auto' }),
+  });
+  session.title = 'Waiting';
+  session.beginTurn('Why does the build fail on Windows?');
+  return [init([session]), { type: 'session', session: new PatchTracker('posix').full(session) }];
+}
+
+/** Reasoning that arrives in pieces, then the answer: the reasoning is open while it streams and closes after. */
+function reasoning(): Step[] {
+  const session = new Session('sess_preview_r', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'claude-opus-5.5', effort: 'high' }),
+  });
+  session.title = 'Reasoning';
+  session.beginTurn('Why does the build fail on Windows?');
+  const tracker = new PatchTracker('posix');
+  const steps: Step[] = [init([session]), { type: 'session', session: tracker.full(session) }, 600];
+  const thoughts = [
+    'The user says the build fails on Windows only. ',
+    'That points at paths or line endings rather than the code itself. ',
+    'The build script joins paths with a slash, which Node accepts on Windows, ',
+    'but the copy step calls `cp`, which does not exist in cmd.exe. ',
+    'I should check `scripts/build.mjs` for shell commands and look at how the CI runs it. ',
+    'If the CI uses bash on Windows, that would explain why it passes there and fails locally.',
+  ];
+  for (const piece of thoughts) {
+    feed(session, u.thought(piece));
+    const change = tracker.diff(session);
+    if (change && 'sessionId' in change) steps.push({ type: 'patch', patch: change }, 250);
+  }
+  if (process.env['PREVIEW_ANSWER'] === '1') {
+    feed(session, u.agent('The copy step calls `cp`, which cmd.exe does not have.', { messageId: 'a' }));
+    const change = tracker.diff(session);
+    if (change && 'sessionId' in change) steps.push({ type: 'patch', patch: change });
+  }
+  return steps;
+}
+
 const REQUIREMENTS = `# Requirements Document
 
 ## Introduction
@@ -320,6 +364,8 @@ export const SCENARIOS: Record<string, Step[]> = {
   spec: specScenario(),
   conversation: conversation(),
   streaming: streaming(),
+  waiting: waiting(),
+  reasoning: reasoning(),
   idle: idle(),
   empty: [init([])],
   connecting: [init([], { phase: 'starting' })],

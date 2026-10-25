@@ -34,7 +34,9 @@ export const UI_MESSAGES = [
   // Transcript
   'You',
   'Kiro',
-  'Thinking',
+  'Kiro is thinking…',
+  'Thinking…',
+  'Thought process',
   'Working…',
   'Done',
   'Failed',

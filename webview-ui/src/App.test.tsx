@@ -104,6 +104,57 @@ describe('chat app', () => {
     expect(await screen.findByText('Hello')).toBeTruthy();
   });
 
+  it('says that Kiro is thinking until the turn shows something', async () => {
+    render(<App />);
+    receive(init(), { type: 'session', session: session({ phase: 'running', items: [item(1, 'user', 'Why?')] }) });
+    expect(screen.getByText('Kiro is thinking…')).toBeTruthy();
+    receive({
+      type: 'patch',
+      patch: { sessionId: 's1', itemsFrom: 1, items: [item(2, 'assistant', 'Because')], tools: [] },
+    });
+    expect(await screen.findByText('Because')).toBeTruthy();
+    expect(screen.queryByText('Kiro is thinking…')).toBeNull();
+  });
+
+  it('does not say that Kiro is thinking without a turn', () => {
+    render(<App />);
+    receive(init(), { type: 'session', session: session({ items: [item(1, 'user', 'Why?')] }) });
+    expect(screen.queryByText('Kiro is thinking…')).toBeNull();
+  });
+
+  it('shows the reasoning while it streams and folds it away when Kiro moves on', async () => {
+    render(<App />);
+    const thought = item(2, 'thought', 'Looking at the build');
+    receive(init(), {
+      type: 'session',
+      session: session({ phase: 'running', items: [item(1, 'user', 'Why?'), thought] }),
+    });
+    const details = async () => (await screen.findByText('Looking at the build')).closest('details');
+    expect((await details())?.open).toBe(true);
+    expect(screen.getByText('Thinking…')).toBeTruthy();
+
+    receive({
+      type: 'patch',
+      patch: { sessionId: 's1', itemsFrom: 2, items: [item(3, 'assistant', 'It is cp')], tools: [] },
+    });
+    await screen.findByText('It is cp');
+    expect((await details())?.open).toBe(false);
+    fireEvent.click(screen.getByText('Thought process'));
+    expect((await details())?.open).toBe(true);
+  });
+
+  it('keeps the reasoning closed while it streams once the reader closed it', async () => {
+    render(<App />);
+    const items = [item(1, 'user', 'Why?'), item(2, 'thought', 'Looking')];
+    receive(init(), { type: 'session', session: session({ phase: 'running', items }) });
+    fireEvent.click(screen.getByText('Thinking…'));
+    receive({
+      type: 'patch',
+      patch: { sessionId: 's1', itemsFrom: 1, items: [item(2, 'thought', 'Looking at the build')], tools: [] },
+    });
+    expect((await screen.findByText('Looking at the build')).closest('details')?.open).toBe(false);
+  });
+
   it('switches, closes and opens sessions through the tabs', () => {
     render(<App />);
     receive(

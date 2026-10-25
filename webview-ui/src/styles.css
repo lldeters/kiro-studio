@@ -593,10 +593,72 @@ button.secondary:hover:not(:disabled) {
   font-size: 0.9em;
   user-select: none;
 }
+.thought summary .thinking-icon {
+  margin: 0 4px 0 2px;
+  vertical-align: -2px;
+  font-size: 13px;
+}
 .thought .markdown {
   margin-top: 4px;
   color: var(--vscode-descriptionForeground);
   font-style: italic;
+}
+.thought-body {
+  margin-left: 4px;
+  padding-left: 10px;
+  border-left: 2px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+/* While it streams, the reasoning keeps to a few lines and follows its end; the older lines fade out at the top. */
+.thought.streaming .thought-body {
+  max-height: 9.5em;
+  overflow-y: auto;
+  border-left-color: var(--kiro-ring);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 2.5em);
+}
+/* "Kiro is thinking…" while a turn shows nothing yet */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+.thinking-icon {
+  color: var(--kiro-ring);
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+.shimmer {
+  color: transparent;
+  background: linear-gradient(
+      90deg,
+      var(--vscode-descriptionForeground) 0 35%,
+      var(--kiro-ring) 50%,
+      var(--vscode-descriptionForeground) 65% 100%
+    )
+    0 0 / 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 2.2s linear infinite;
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes thinking-pulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-icon {
+    animation: none;
+  }
+  .shimmer {
+    animation: none;
+    background: none;
+    color: var(--vscode-descriptionForeground);
+  }
 }
 .tool {
   padding: 0;
@@ -1221,6 +1283,11 @@ body[data-view='spec'] {
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) :focus-visible {
   outline: 2px solid var(--vscode-focusBorder);
   outline-offset: 0;
+}
+/* Plain text instead of a colour sweep. */
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) .shimmer {
+  background: none;
+  color: var(--vscode-foreground);
 }
 /* The input box draws the focus of its text itself. */
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) .composer textarea:focus-visible {
