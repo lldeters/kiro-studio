@@ -198,11 +198,16 @@ describe('toolbar', () => {
     expect(outbox).toEqual([{ type: 'compact', sessionId: 's1' }]);
   });
 
-  it('shows the credits of the last turn once there are some', () => {
+  it('shows the credits of the last turn once there are some, as the window language writes numbers', () => {
+    document.documentElement.lang = 'en';
     const { rerender } = render(<Toolbar session={session()} />);
     expect(screen.queryByText(/credits/)).toBeNull();
     rerender(<Toolbar session={session({ lastTurn: { credits: 0.4217 } })} />);
     expect(screen.getByTitle('Credits used by the last turn').textContent).toBe('0.42 credits');
+    document.documentElement.lang = 'de';
+    rerender(<Toolbar session={session({ lastTurn: { credits: 0.4218 } })} />);
+    expect(screen.getByTitle('Credits used by the last turn').textContent).toBe('0,42 credits');
+    document.documentElement.lang = '';
   });
 
   it('is disabled for a lost session', () => {

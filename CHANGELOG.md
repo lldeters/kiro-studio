@@ -117,6 +117,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   know. It is inserted as Kiro names it; matching still ignores case.
 - A CLI that was slow to answer the first check (a cold start can take many seconds) was reported as too old, or as
   signed out. A check that runs out of time now says so, with _Check again_.
+- Credits were written with a decimal point in every language ("0.42 Credits" in German). They follow the language of
+  the window now.
 
 ### Known limits
 

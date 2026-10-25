@@ -55,6 +55,7 @@ export class StatusView implements vscode.TreeDataProvider<TreeNode>, vscode.Dis
         autonomySetting: this.settings.autonomy(),
         sessions: agent?.store.all() ?? [],
         ...(this.host.activeSession === undefined ? {} : { activeSessionId: this.host.activeSession.id }),
+        locale: vscode.env.language,
       },
       (message, ...args) => vscode.l10n.t(message, ...args),
     );

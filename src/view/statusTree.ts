@@ -2,6 +2,7 @@
 import type { AgentPhase } from '../acp/agent';
 import type { Session } from '../acp/sessions';
 import type { Account } from '../kiro/cli';
+import { formatCredits } from '../shared/format';
 import { identityTranslate, optionLabel, type Translate } from './statusModel';
 
 export interface TreeNode {
@@ -21,6 +22,8 @@ export interface StatusTreeInput {
   autonomySetting: 'supervised' | 'autopilot';
   sessions: Session[];
   activeSessionId?: string;
+  /** The window's language, for numbers. */
+  locale?: string;
 }
 
 const PHASE_TEXT = (t: Translate, phase: AgentPhase, attempt?: number): string => {
@@ -86,13 +89,15 @@ export function statusTree(input: StatusTreeInput, t: Translate = identityTransl
       label: t('Sessions'),
       description: String(input.sessions.length),
       icon: 'comment-discussion',
-      children: input.sessions.map((session) => sessionNode(session, session.id === input.activeSessionId, t)),
+      children: input.sessions.map((session) =>
+        sessionNode(session, session.id === input.activeSessionId, t, input.locale),
+      ),
     });
   }
   return nodes;
 }
 
-function sessionNode(session: Session, active: boolean, t: Translate): TreeNode {
+function sessionNode(session: Session, active: boolean, t: Translate, locale: string | undefined): TreeNode {
   const children: TreeNode[] = [];
   const mode = optionLabel(session, 'mode');
   const model = optionLabel(session, 'model');
@@ -111,7 +116,7 @@ function sessionNode(session: Session, active: boolean, t: Translate): TreeNode 
     children.push({
       id: `${session.id}/credits`,
       label: t('Last turn'),
-      description: t('{0} credits', session.lastTurn.credits.toFixed(2)),
+      description: t('{0} credits', formatCredits(session.lastTurn.credits, locale)),
       icon: 'credit-card',
     });
   }

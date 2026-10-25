@@ -10,6 +10,7 @@ import {
   type StatusInput,
   type UiState,
 } from '../../src/view/statusModel';
+import { formatCredits } from '../../src/shared/format';
 import { statusTree } from '../../src/view/statusTree';
 import { SESSION_ID, sessionResult, u, update } from '../support/kiro';
 
@@ -180,6 +181,7 @@ describe('statusTree', () => {
       autonomySetting: 'autopilot',
       sessions: [s],
       activeSessionId: SESSION_ID,
+      locale: 'en',
     });
     const sessions = nodes.find((n) => n.id === 'sessions');
     expect(sessions?.description).toBe('1');
@@ -191,6 +193,17 @@ describe('statusTree', () => {
       ['Last turn', '0.10 credits'],
     ]);
     expect(nodes.find((n) => n.id === 'autonomy')).toMatchObject({ description: 'Autopilot', icon: 'rocket' });
+
+    const german = statusTree({ autonomySetting: 'autopilot', sessions: [s], locale: 'de' });
+    const credits = german.find((n) => n.id === 'sessions')?.children?.[0]?.children?.at(-1);
+    expect(credits?.description).toBe('0,10 credits');
+  });
+
+  it('formats credits in the language of the window, and survives a tag it does not know', () => {
+    expect(formatCredits(0.4217, 'en')).toBe('0.42');
+    expect(formatCredits(0.4217, 'de')).toBe('0,42');
+    expect(formatCredits(12, 'de')).toBe('12,00');
+    expect(() => formatCredits(1, 'not a language tag')).not.toThrow();
   });
 
   it('marks a lost session and a failed connection', () => {
