@@ -111,6 +111,8 @@ First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).
   read a value Kiro does not necessarily update. It now follows the agent option, like the chat and the status bar.
 - `#current` in a chat opened as an editor tab always said there was no open file, because VS Code has no active text
   editor while that tab has the focus. It now takes the file editor used last, as long as it is still open.
+- With twelve attachments, `#problems` or `#git diff` added a thirteenth; the host refused the message without a word and
+  the text was gone from the input. A draft never holds more than twelve now.
 
 ### Known limits
 

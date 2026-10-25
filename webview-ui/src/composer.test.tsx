@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CommandView, SessionMeta, SessionView } from '../../src/shared/chatProtocol';
+import { MAX_ATTACHMENTS, parseWebviewMessage } from '../../src/shared/chatProtocol';
 import { droppedPaths, fileUriToPath } from './attachments';
 import { Composer } from './components/Composer';
 import { computeMenu } from './composerMenu';
@@ -294,6 +295,27 @@ describe('composer', () => {
     expect(screen.getByRole('button', { name: /^View the changes of the last turn: One file/ })).toBeTruthy();
     rerender(<Composer session={session({ checkpoints: [{ id: 'c4', files: [file('a.ts', 1, 0, true)] }] })} />);
     expect(screen.queryByRole('button', { name: /View the changes/ })).toBeNull();
+  });
+
+  it('never holds more attachments than the host accepts, so a message is not refused and lost', () => {
+    const files = Array.from({ length: MAX_ATTACHMENTS }, (_, i) => ({ kind: 'file' as const, path: `/ws/f${i}.ts` }));
+    useChat.setState({ drafts: { s1: { text: '', attachments: files } } });
+    render(<Composer session={session()} />);
+    type('fix #prob');
+    fireEvent.mouseDown(screen.getByRole('option', { name: /#problems/ }));
+    expect(useChat.getState().drafts.s1?.attachments).toHaveLength(MAX_ATTACHMENTS);
+    act(() =>
+      useChat.getState().receive({ type: 'contextPicked', attachments: [{ kind: 'folder', path: '/ws/docs' }] }),
+    );
+    expect(useChat.getState().drafts.s1?.attachments).toHaveLength(MAX_ATTACHMENTS);
+
+    type('fix #prob');
+    fireEvent.mouseDown(screen.getByRole('option', { name: /#problems/ }));
+    fireEvent.change(box(), { target: { value: 'fix it', selectionStart: 6 } });
+    fireEvent.keyDown(box(), { key: 'Enter' });
+    const sent = outbox.find((message) => message.type === 'send');
+    expect(sent && 'attachments' in sent ? sent.attachments : []).toHaveLength(MAX_ATTACHMENTS);
+    expect(parseWebviewMessage(sent)).toBeDefined();
   });
 
   it('starts from an empty draft', () => {
