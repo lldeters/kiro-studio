@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatProblems, resolveAttachments, type ContextDeps } from '../../src/view/promptContext';
+import {
+  formatProblems,
+  resolveAttachments,
+  uncommittedChanges,
+  type ContextDeps,
+  type GitCommand,
+  type GitOutput,
+} from '../../src/view/promptContext';
 
 const deps = (extra: Partial<ContextDeps> = {}): ContextDeps => ({
   platform: 'posix',
@@ -89,11 +96,37 @@ describe('resolveAttachments', () => {
     expect(cut.blocks).toEqual([
       {
         type: 'text',
-        text: 'Uncommitted changes (git diff):\n```diff\ndiff --git a/x b/x\n+one\n```\n(The diff is longer and was cut off here. Run git diff to see all of it.)',
+        text: 'Uncommitted changes (git diff HEAD):\n```diff\ndiff --git a/x b/x\n+one\n```\n(The diff is longer and was cut off here. Run git diff HEAD to see all of it.)',
       },
     ]);
     const whole = await resolveAttachments([{ kind: 'gitDiff' }], deps());
     expect(whole.blocks[0]).toMatchObject({ text: expect.not.stringContaining('cut off') as string });
+  });
+
+  it('names the new files git does not track, also when nothing else changed', async () => {
+    const both = await resolveAttachments(
+      [{ kind: 'gitDiff' }],
+      deps({
+        gitDiff: () => Promise.resolve({ text: 'diff --git a/x b/x\n+one\n', truncated: false, untracked: ['new.ts'] }),
+      }),
+    );
+    expect(both.blocks).toEqual([
+      {
+        type: 'text',
+        text: 'Uncommitted changes (git diff HEAD):\n```diff\ndiff --git a/x b/x\n+one\n```\n\nNew files that git does not track yet:\n- new.ts',
+      },
+    ]);
+
+    const many = Array.from({ length: 102 }, (_, i) => `f${i}.ts`);
+    const onlyNew = await resolveAttachments(
+      [{ kind: 'gitDiff' }],
+      deps({ gitDiff: () => Promise.resolve({ text: '', truncated: false, untracked: many }) }),
+    );
+    expect(onlyNew.labels).toEqual(['git diff']);
+    const text = (onlyNew.blocks[0] as { text: string }).text;
+    expect(text.startsWith('New files that git does not track yet:\n- f0.ts\n')).toBe(true);
+    expect(text).toContain('- f99.ts\n… and 2 more');
+    expect(text).not.toContain('f100.ts');
   });
 
   it('sends images only to an agent that accepts them', async () => {
@@ -104,6 +137,51 @@ describe('resolveAttachments', () => {
     const refused = await resolveAttachments([image], deps({ imageSupported: false }));
     expect(refused.blocks).toEqual([]);
     expect(refused.skipped).toEqual([{ reason: 'unsupported', label: 'shot.png' }]);
+  });
+});
+
+describe('uncommittedChanges', () => {
+  const output = (stdout: string, extra: Partial<GitOutput> = {}): GitOutput => ({
+    stdout,
+    failed: false,
+    truncated: false,
+    ...extra,
+  });
+  const fake = (answers: Record<string, GitOutput>) => {
+    const calls: string[] = [];
+    const git: GitCommand = (args) => {
+      const key = args.join(' ');
+      calls.push(key);
+      return Promise.resolve(answers[key] ?? output('', { failed: true }));
+    };
+    return { git, calls };
+  };
+  const diff = 'diff --no-color --no-ext-diff';
+
+  it('compares with the last commit, so that staged changes count too, and lists the untracked files', async () => {
+    const { git, calls } = fake({
+      [`diff HEAD --no-color --no-ext-diff`]: output('staged and unstaged\n'),
+      'ls-files --others --exclude-standard -z': output('new file.ts\0docs/ü.md\0'),
+    });
+    expect(await uncommittedChanges(git)).toEqual({
+      text: 'staged and unstaged\n',
+      truncated: false,
+      untracked: ['new file.ts', 'docs/ü.md'],
+    });
+    expect(calls).toEqual(['diff HEAD --no-color --no-ext-diff', 'ls-files --others --exclude-standard -z']);
+  });
+
+  it('takes the staged and the unstaged changes in a repository without a commit', async () => {
+    const { git } = fake({
+      'diff --cached --no-color --no-ext-diff': output('staged\n'),
+      [diff]: output('unstaged\n', { truncated: true }),
+      'ls-files --others --exclude-standard -z': output(''),
+    });
+    expect(await uncommittedChanges(git)).toEqual({ text: 'staged\nunstaged\n', truncated: true });
+  });
+
+  it('is undefined outside a repository', async () => {
+    expect(await uncommittedChanges(fake({}).git)).toBeUndefined();
   });
 });
 

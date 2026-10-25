@@ -15,7 +15,7 @@ export interface ContextDeps {
   /** Where a relative path starts. */
   base?: string;
   exists(path: string): Promise<boolean>;
-  /** Output of `git diff` (cut off when it is very long), or undefined when there is no repository. */
+  /** The uncommitted changes (see {@link uncommittedChanges}), or undefined when there is no repository. */
   gitDiff(): Promise<GitDiff | undefined>;
   /** The workspace problems, already formatted (see {@link formatProblems}). */
   problems(): Promise<string | undefined>;
@@ -27,6 +27,42 @@ export interface GitDiff {
   text: string;
   /** The diff was longer than the limit and ends early. */
   truncated: boolean;
+  /** New files that git does not track yet; no diff shows them. */
+  untracked?: string[];
+}
+
+/** What one git command printed. `truncated`: it printed more than the limit and was stopped (that is no failure). */
+export interface GitOutput {
+  stdout: string;
+  failed: boolean;
+  truncated: boolean;
+}
+
+export type GitCommand = (args: readonly string[]) => Promise<GitOutput>;
+
+const DIFF_OPTIONS = ['--no-color', '--no-ext-diff'];
+const MAX_UNTRACKED_LISTED = 100;
+
+/**
+ * Everything that is not committed: the staged and the unstaged changes against the last commit, and the new files git
+ * does not track yet. A repository without a commit has nothing to compare with, so there the staged changes (against
+ * nothing) and the unstaged ones are taken. Undefined when the folder is not in a repository.
+ */
+export async function uncommittedChanges(git: GitCommand): Promise<GitDiff | undefined> {
+  let parts = [await git(['diff', 'HEAD', ...DIFF_OPTIONS])];
+  if (parts[0]?.failed) {
+    const staged = await git(['diff', '--cached', ...DIFF_OPTIONS]);
+    if (staged.failed) return undefined;
+    parts = [staged, await git(['diff', ...DIFF_OPTIONS])];
+  }
+  // NUL-separated, so that names with spaces or other scripts come through as they are.
+  const listed = await git(['ls-files', '--others', '--exclude-standard', '-z']);
+  const untracked = listed.failed ? [] : listed.stdout.split('\0').filter((name) => name !== '');
+  return {
+    text: parts.map((part) => part.stdout).join(''),
+    truncated: parts.some((part) => part.truncated),
+    ...(untracked.length === 0 ? {} : { untracked }),
+  };
 }
 
 export type SkipReason = 'outside' | 'missing' | 'empty' | 'unsupported';
@@ -79,18 +115,27 @@ export async function resolveAttachments(
       }
       case 'gitDiff': {
         const diff = await deps.gitDiff();
-        if (diff === undefined || diff.text.trim() === '') result.skipped.push({ reason: 'empty', label: 'git diff' });
-        else {
+        const untracked = diff?.untracked ?? [];
+        if (diff === undefined || (diff.text.trim() === '' && untracked.length === 0)) {
+          result.skipped.push({ reason: 'empty', label: 'git diff' });
+          break;
+        }
+        const sections: string[] = [];
+        if (diff.text.trim() !== '') {
           // Kiro must know that it does not see all of it, or it would take the end of the text for the end of the diff.
           const cut = diff.truncated
-            ? '\n(The diff is longer and was cut off here. Run git diff to see all of it.)'
+            ? '\n(The diff is longer and was cut off here. Run git diff HEAD to see all of it.)'
             : '';
-          result.blocks.push({
-            type: 'text',
-            text: `Uncommitted changes (git diff):\n\`\`\`diff\n${diff.text.trimEnd()}\n\`\`\`${cut}`,
-          });
-          result.labels.push('git diff');
+          sections.push(`Uncommitted changes (git diff HEAD):\n\`\`\`diff\n${diff.text.trimEnd()}\n\`\`\`${cut}`);
         }
+        if (untracked.length > 0) {
+          const more =
+            untracked.length > MAX_UNTRACKED_LISTED ? `\n… and ${untracked.length - MAX_UNTRACKED_LISTED} more` : '';
+          const names = untracked.slice(0, MAX_UNTRACKED_LISTED).map((name) => `- ${name}`);
+          sections.push(`New files that git does not track yet:\n${names.join('\n')}${more}`);
+        }
+        result.blocks.push({ type: 'text', text: sections.join('\n\n') });
+        result.labels.push('git diff');
         break;
       }
       case 'image':
