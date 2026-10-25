@@ -321,6 +321,19 @@ describe('config options', () => {
     expect(s.modes.available.map((m) => m.id)).toContain('spec');
     expect(s.isAutopilot).toBe(true);
   });
+
+  it('takes the agent from the mode option, which a switch changes even without a mode update', () => {
+    const s = newSession();
+    s.applySessionResult(sessionResult());
+    expect(s.currentMode).toBe('vibe');
+    expect(s.applyWriteResponse(parseConfigOptions(configOptions({ mode: 'spec' })), s.configVersion)).toBe(true);
+    expect(s.modes.currentModeId).toBe('vibe');
+    expect(s.currentMode).toBe('spec');
+
+    const withoutOption = newSession();
+    withoutOption.applySessionResult({ sessionId: SESSION_ID, modes: { currentModeId: 'plan', availableModes: [] } });
+    expect(withoutOption.currentMode).toBe('plan');
+  });
 });
 
 describe('other session state', () => {

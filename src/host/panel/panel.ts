@@ -141,7 +141,7 @@ export class KiroPanel implements vscode.Disposable {
       sessions: (agent?.store.all() ?? []).map((s) => ({ id: s.id, status: s.status, title: s.title })),
       activeId: session?.id,
       modes: session?.modes.available ?? [],
-      currentMode: session?.modes.currentModeId,
+      currentMode: session?.currentMode,
     });
     if (key === this.lastLiveState) return;
     this.lastLiveState = key;
@@ -307,7 +307,7 @@ export class KiroPanel implements vscode.Disposable {
       {
         custom,
         modes: session?.modes.available ?? [],
-        ...(session?.modes.currentModeId === undefined ? {} : { currentMode: session.modes.currentModeId }),
+        ...(session?.currentMode === undefined ? {} : { currentMode: session.currentMode }),
         hasSession: session !== undefined,
       },
       t,

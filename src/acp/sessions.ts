@@ -212,6 +212,15 @@ export class Session {
     return this.configOption(id)?.currentValue;
   }
 
+  /**
+   * The agent the session runs. Agents are switched through the `mode` option, and Kiro answers that with the new
+   * options, not necessarily with a `current_mode_update`; `modes.currentModeId` is for a CLI without the option.
+   */
+  get currentMode(): string | undefined {
+    const mode = this.configValue('mode');
+    return typeof mode === 'string' ? mode : this.modes.currentModeId;
+  }
+
   /** Kiro's `autopilot` option: `on` is Autopilot, `off` is Supervised. */
   get isAutopilot(): boolean {
     return this.configValue('autopilot') === 'on';
