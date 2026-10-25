@@ -488,7 +488,7 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
   gestreamte Stücke kosten 0,6 s Skriptzeit (vorher 1,7 s), unabhängig von der Länge der Sitzung. Host-Seite: Ansicht der
   Sitzung rund 50 ms, ein Patch je Stück deutlich unter 1 ms; ein Test hält Budgets.
 - **Lokalisierung:** Deutsch war vollständig (Test); neu sind die deutschen Seiten der Einführung (`*.de.md`).
-- **Paket:** Icon (`resources/icon.png`, eigenes Motiv, erzeugt aus `resources/icon.svg`), Marketplace-Metadaten (Vorschau-Kennzeichen,
+- **Paket:** Icon (`resources/icon.png`, 256 px, verkleinert aus dem Logo `resources/logo.jpg`), Marketplace-Metadaten (Vorschau-Kennzeichen,
   Banner), README mit Screenshots und Abschnitten zu Datenschutz und Grenzen, `CHANGELOG.md`, `scripts/check-vsix.ts` prüft
   Inhalt, Größe (Grenze 5 MB, aktuell 2,2 MB) und README-Bilder und läuft am Ende von `npm run package` (also in der CI).
 

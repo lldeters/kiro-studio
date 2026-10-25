@@ -8,7 +8,7 @@
   "icon": "resources/icon.png",
   "preview": true,
   "galleryBanner": {
-    "color": "#1f2340",
+    "color": "#202020",
     "theme": "dark"
   },
   "private": true,

@@ -3,8 +3,11 @@
 !dist/extension.js.LEGAL.txt
 !dist/webview/**
 !l10n/**
-!resources/**
-resources/icon.svg
+# One by one: in this file a "!" wins over any exclusion, so the logo's original (resources/logo.jpg) is left out only
+# by not being named.
+!resources/icon.png
+!resources/kiro-studio.svg
+!resources/walkthrough/**
 !package.json
 !package.nls*.json
 !README.md

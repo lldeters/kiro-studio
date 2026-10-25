@@ -56,6 +56,12 @@ describe('package check', () => {
     expect(problems.join('\n')).toMatch(/build configuration/);
   });
 
+  it("refuses the logo's original, which only the icon is made from", () => {
+    expect(checkPackage([...good, 'resources/logo.jpg'], 1)).toEqual([
+      "not allowed (the logo's original (the package carries resources/icon.png)): resources/logo.jpg",
+    ]);
+  });
+
   it('refuses a package that has grown too large', () => {
     expect(checkPackage(good, MAX_VSIX_BYTES + 1)).toEqual([expect.stringMatching(/^too large/)]);
   });
