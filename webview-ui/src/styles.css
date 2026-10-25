@@ -394,6 +394,10 @@ button.secondary:hover:not(:disabled) {
 .picker select:hover:not(:disabled) {
   background: var(--vscode-toolbar-hoverBackground);
 }
+/* The row of pickers clips what sticks out (so that they can shrink), so the focus ring is drawn inside. */
+.picker select:focus-visible {
+  outline-offset: -1px;
+}
 .picker select:disabled {
   opacity: 1;
   cursor: default;
@@ -1288,6 +1292,9 @@ body[data-view='spec'] {
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) .shimmer {
   background: none;
   color: var(--vscode-foreground);
+}
+:is(body.vscode-high-contrast, body.vscode-high-contrast-light) .picker select:focus-visible {
+  outline-offset: -2px;
 }
 /* The input box draws the focus of its text itself. */
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) .composer textarea:focus-visible {
