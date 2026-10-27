@@ -63,7 +63,8 @@ export function samePath(a: string, b: string, platform: PlatformKind): boolean 
 export function isInside(root: string, target: string, platform: PlatformKind): boolean {
   const p = api(platform);
   const rel = p.relative(comparisonKey(root, platform), comparisonKey(target, platform));
-  return rel === '' || (!rel.startsWith('..') && !p.isAbsolute(rel));
+  // `..config` is a name inside the root; only `..` as a whole segment leaves it.
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${p.sep}`) && !p.isAbsolute(rel));
 }
 
 export function isInsideAny(roots: readonly string[], target: string, platform: PlatformKind): boolean {

@@ -5,6 +5,7 @@
  * Paths come from the agent, so they are normalised first and must lie inside a root the session may touch. Kiro's MCP
  * configuration is never written here ({@link isMcpConfigPath}).
  */
+import * as nodePath from 'node:path';
 import { RequestError } from '@agentclientprotocol/sdk';
 import { num, rec, str } from '../../util/json';
 import type { ProtocolLog } from '../../util/log';
@@ -16,6 +17,11 @@ export interface FileSystemPort {
   readText(path: string): Promise<string | undefined>;
   /** Writes the file, creating parent folders. */
   writeText(path: string, content: string): Promise<void>;
+  /**
+   * The path with every symbolic link resolved, `undefined` when nothing is there. Without it paths are only compared
+   * as they are written.
+   */
+  realPath?(path: string): Promise<string | undefined>;
 }
 
 /**
@@ -62,7 +68,7 @@ export class FsHandler {
 
   async read(params: unknown): Promise<{ content: string }> {
     const body = rec(params);
-    const file = this.resolve(body);
+    const file = await this.resolve(body);
     const text = await this.deps.port.readText(file);
     if (text === undefined) throw RequestError.resourceNotFound(file);
 
@@ -77,8 +83,9 @@ export class FsHandler {
 
   async write(params: unknown): Promise<Record<string, never>> {
     const body = rec(params);
-    const file = this.resolve(body);
-    if (isMcpConfigPath(file)) {
+    const file = await this.resolve(body);
+    // Also where a link leads: `cfg -> .kiro/settings` must not open a way around it.
+    if (isMcpConfigPath(file) || isMcpConfigPath(await this.realPath(file))) {
       this.deps.log?.info(`refused a write to the MCP configuration: ${file}`);
       throw new RequestError(-32602, MCP_CONFIG_REFUSAL, { path: file });
     }
@@ -95,7 +102,7 @@ export class FsHandler {
     return {};
   }
 
-  private resolve(body: Record<string, unknown>): string {
+  private async resolve(body: Record<string, unknown>): Promise<string> {
     const raw = str(body.path);
     const sessionId = str(body.sessionId);
     const cwd = sessionId === undefined ? undefined : this.deps.store.get(sessionId)?.cwd;
@@ -103,10 +110,32 @@ export class FsHandler {
     if (file === undefined)
       throw RequestError.invalidParams({ path: raw }, 'path must be an absolute path or inside the working directory');
     const roots = [...this.deps.roots(), ...(cwd === undefined ? [] : [cwd])];
-    if (!isInsideAny(roots, file, this.deps.platform)) {
+    if (!isInsideAny(roots, file, this.deps.platform) || !(await this.insideAfterLinks(roots, file))) {
       this.deps.log?.info(`refused file access outside the workspace: ${file}`);
       throw RequestError.invalidParams({ path: file }, 'path is outside the workspace');
     }
     return file;
+  }
+
+  /** A link inside the workspace can point anywhere; what counts is where the file really is. */
+  private async insideAfterLinks(roots: readonly string[], file: string): Promise<boolean> {
+    if (!this.deps.port.realPath) return true;
+    const [real, ...realRoots] = await Promise.all([file, ...roots].map((p) => this.realPath(p)));
+    return real !== undefined && isInsideAny(realRoots, real, this.deps.platform);
+  }
+
+  /**
+   * The real path of the deepest part of `file` that exists, with the rest added: a file that is about to be written
+   * may not exist yet, but the folder it goes into does.
+   */
+  private async realPath(file: string): Promise<string> {
+    const p = this.deps.platform === 'win32' ? nodePath.win32 : nodePath.posix;
+    const missing: string[] = [];
+    for (let current = file; ; current = p.dirname(current)) {
+      const real = await this.deps.port.realPath?.(current);
+      if (real !== undefined) return p.join(real, ...missing.reverse());
+      if (p.dirname(current) === current) return file;
+      missing.push(p.basename(current));
+    }
   }
 }
