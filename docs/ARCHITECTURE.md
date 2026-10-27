@@ -220,7 +220,9 @@ cards after the replay, oldest first, because their place in the conversation is
 
 The host builds plain views (`SessionView`: items, tools, approvals, plan, config selects, commands, checkpoints,
 context) from the session store and sends them as typed messages (`src/shared/chatProtocol.ts`). The webview that is
-showing gets the active session in full once, then **patches**: the tail of the transcript from the last item the
+showing gets the active session once (a long one with its last 200 items and their tools only, `itemsOffset` saying
+where they start; the page asks for 200 more with `loadOlder` when the reader reaches the top or presses _Show earlier
+messages_, and the list keeps its place through `firstItemIndex`), then **patches**: the tail of the transcript from the last item the
 webview has (only the last message can grow, tools are separate), the tools whose revision changed, and the small
 `meta` when it changed. `PatchTracker` computes this per webview; changes are merged to about one send per 30 ms.
 Only the active session is streamed; switching tabs sends the new one in full. Drafts (text and attachments) are kept

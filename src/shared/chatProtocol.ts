@@ -191,11 +191,19 @@ export interface SessionMeta {
 
 export interface SessionView extends SessionMeta {
   id: string;
+  /**
+   * A long session comes with its end only: `items` starts at this position of the transcript, and the tools are those
+   * of the items sent. The page asks for the earlier ones (`loadOlder`) when the reader scrolls up. Absent means 0.
+   */
+  itemsOffset?: number;
   items: ItemView[];
   tools: ToolView[];
 }
 
-/** A change to a session already sent. The items from `itemsFrom` on replace the ones the webview has. */
+/** How many items a session is sent with at first, and how many more each `loadOlder` brings. */
+export const ITEMS_WINDOW = 200;
+
+/** A change to a session already sent. The items from position `itemsFrom` of the transcript on replace the ones the webview has. */
 export interface SessionPatch {
   sessionId: string;
   itemsFrom: number;
@@ -267,6 +275,8 @@ export type HostMessage =
   | { type: 'patch'; patch: SessionPatch }
   /** The answer to `pickContext`; the webview adds these to the draft. */
   | { type: 'contextPicked'; attachments: AttachmentView[] }
+  /** The items before position `before` that the page asked for; they start at `offset`. */
+  | { type: 'olderItems'; sessionId: string; before: number; offset: number; items: ItemView[]; tools: ToolView[] }
   /** A `send` that was not sent (the session was busy or not connected, an attachment failed): back into the draft. */
   | { type: 'draftReturned'; sessionId: string; text: string; attachments: AttachmentView[] };
 
@@ -324,6 +334,8 @@ export type WebviewMessage =
   | { type: 'viewChanges'; sessionId: string; checkpointId: string; path?: string }
   | { type: 'revert'; sessionId: string; checkpointId: string; path?: string }
   | { type: 'exportSession'; sessionId: string }
+  /** The reader scrolled to the top of what the page has: the items before position `before`. */
+  | { type: 'loadOlder'; sessionId: string; before: number }
   | { type: 'command'; command: WebviewCommand }
   /** A button on the card of an MCP server in the assistant answer `itemId`. */
   | { type: 'mcpAction'; sessionId: string; itemId: number; server: string; action: McpAction }
@@ -499,6 +511,13 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'exportSession': {
       const sessionId = str('sessionId');
       return sessionId === undefined ? undefined : { type: 'exportSession', sessionId };
+    }
+    case 'loadOlder': {
+      const sessionId = str('sessionId');
+      const before = raw.before;
+      return sessionId === undefined || typeof before !== 'number' || !Number.isInteger(before) || before < 0
+        ? undefined
+        : { type: 'loadOlder', sessionId, before };
     }
     case 'compact': {
       const sessionId = str('sessionId');

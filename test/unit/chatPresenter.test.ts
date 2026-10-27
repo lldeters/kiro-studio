@@ -6,10 +6,14 @@ import {
   PatchTracker,
   contextTokens,
   countLineChanges,
+  olderItemsView,
   sessionView,
   tabView,
   toolView,
+  windowedSessionView,
 } from '../../src/view/chatPresenter';
+import { ITEMS_WINDOW } from '../../src/shared/chatProtocol';
+import { longSession } from '../support/longSession';
 import { SESSION_ID, configOptions, info, permissionRequest, u, update } from '../support/kiro';
 import { approvalDetails } from '../../src/acp/sessions';
 import { createRedactor } from '../../src/util/redact';
@@ -190,6 +194,44 @@ describe('session views', () => {
     expect(sessionView(s, 'posix').autopilot).toBe(true);
     s.configOptions = parseConfigOptions(configOptions({ autopilot: 'off' }));
     expect(sessionView(s, 'posix').autopilot).toBe(false);
+  });
+});
+
+describe('long sessions', () => {
+  it('are sent with their end only: the last window of items and the tools of those', () => {
+    const session = longSession(200); // a few items per turn, so far more than a window
+    const length = session.transcript.length;
+    const view = windowedSessionView(session, 'posix');
+    expect(view.itemsOffset).toBe(length - ITEMS_WINDOW);
+    expect(view.items).toHaveLength(ITEMS_WINDOW);
+    expect(view.items[ITEMS_WINDOW - 1]?.id).toBe(session.transcript[length - 1]?.id);
+    const sentTools = new Set(view.items.flatMap((i) => (i.toolCallId === undefined ? [] : [i.toolCallId])));
+    expect(view.tools.map((t) => t.toolCallId).sort()).toEqual([...sentTools].sort());
+    expect(view.tools.length).toBeLessThan(session.tools.size);
+  });
+
+  it('are sent whole when they are not much longer than a window', () => {
+    const session = longSession(10);
+    expect(windowedSessionView(session, 'posix', undefined, session.transcript.length - 5).itemsOffset).toBeUndefined();
+  });
+
+  it('give the items before a position one window at a time, down to the first', () => {
+    const session = longSession(200);
+    const older = olderItemsView(session, 250, 'posix');
+    expect(older.offset).toBe(250 - ITEMS_WINDOW);
+    expect(older.items.map((i) => i.id)).toEqual(session.transcript.slice(50, 250).map((i) => i.id));
+    expect(older.tools.every((t) => older.items.some((i) => i.toolCallId === t.toolCallId))).toBe(true);
+    const first = olderItemsView(session, 30, 'posix');
+    expect([first.offset, first.items.length]).toEqual([0, 30]);
+  });
+
+  it('get patches that count from the start of the transcript', () => {
+    const session = longSession(200);
+    const tracker = new PatchTracker('posix');
+    const full = tracker.full(session);
+    session.beginTurn('one more');
+    const patch = tracker.diff(session);
+    expect(isPatch(patch) && patch.itemsFrom).toBe((full.itemsOffset ?? 0) + full.items.length - 1);
   });
 });
 

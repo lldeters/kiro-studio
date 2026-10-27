@@ -17,6 +17,7 @@ import type {
   ToolState,
   ToolView,
 } from '../shared/chatProtocol';
+import { ITEMS_WINDOW } from '../shared/chatProtocol';
 import { currentPlatform, normalizeAgentPath, type PlatformKind } from '../util/paths';
 import { stripContext } from '../workspace/mcpInstructions';
 import { mcpSessionView } from './mcpView';
@@ -365,6 +366,50 @@ export function sessionView(
   };
 }
 
+/**
+ * The end of a long session: the last {@link ITEMS_WINDOW} items and their tools, with the position of the first. A
+ * session that is not much longer goes whole, so that a page never has to ask for a handful of items.
+ */
+export function windowedSessionView(
+  session: Session,
+  platform: PlatformKind = currentPlatform(),
+  redact: Redact = unchanged,
+  window = ITEMS_WINDOW,
+): SessionView {
+  const length = session.transcript.length;
+  if (length <= window + window / 2) return sessionView(session, platform, redact);
+  const offset = length - window;
+  const { items, tools } = itemsWithTools(session, offset, length, platform);
+  return { id: session.id, ...metaView(session, redact), itemsOffset: offset, items, tools };
+}
+
+/** The items before position `before` that a page asked for, at most one window of them, with their tools. */
+export function olderItemsView(
+  session: Session,
+  before: number,
+  platform: PlatformKind = currentPlatform(),
+  window = ITEMS_WINDOW,
+): { offset: number; items: ItemView[]; tools: ToolView[] } {
+  const end = Math.min(before, session.transcript.length);
+  const offset = Math.max(0, end - window);
+  return { offset, ...itemsWithTools(session, offset, end, platform) };
+}
+
+function itemsWithTools(
+  session: Session,
+  from: number,
+  to: number,
+  platform: PlatformKind,
+): { items: ItemView[]; tools: ToolView[] } {
+  const waiting = waitingToolIds(session);
+  const slice = session.transcript.slice(from, to);
+  const tools = slice.flatMap((item) => {
+    const tool = item.kind === 'tool' ? session.tools.get(item.toolCallId) : undefined;
+    return tool ? [toolView(tool, waiting.has(tool.toolCallId), platform)] : [];
+  });
+  return { items: slice.map(itemView), tools };
+}
+
 export function tabView(session: Session): TabView {
   return {
     id: session.id,
@@ -393,10 +438,10 @@ export class PatchTracker {
     private readonly redact: Redact = unchanged,
   ) {}
 
-  /** The whole session; the webview replaces what it has. */
+  /** The session (the end of it, when it is long); the webview replaces what it has. */
   full(session: Session): SessionView {
-    const view = sessionView(session, this.platform, this.redact);
-    this.itemsSent = view.items.length;
+    const view = windowedSessionView(session, this.platform, this.redact);
+    this.itemsSent = (view.itemsOffset ?? 0) + view.items.length;
     this.lastItemSize = sizeOf(view.items[view.items.length - 1]);
     this.lastItemId = view.items[view.items.length - 1]?.id;
     this.tools.clear();

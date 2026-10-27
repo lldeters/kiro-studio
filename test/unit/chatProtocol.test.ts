@@ -34,6 +34,7 @@ describe('messages from the webview', () => {
       { type: 'revert', sessionId: 's1', checkpointId: '2' },
       { type: 'revert', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
       { type: 'exportSession', sessionId: 's1' },
+      { type: 'loadOlder', sessionId: 's1', before: 200 },
       { type: 'command', command: 'kiroStudio.restart' },
       { type: 'mcpAction', sessionId: 's1', itemId: 3, server: 'linear', action: 'add' },
       { type: 'error', message: 'boom' },
@@ -81,6 +82,9 @@ describe('messages from the webview', () => {
     { type: 'command', command: 'workbench.action.terminal.new' },
     { type: 'command', command: 'kiroStudio.debug.sendPrompt' },
     { type: 'copy', text: 'x'.repeat(1_000_001) },
+    { type: 'loadOlder', sessionId: 's1' },
+    { type: 'loadOlder', sessionId: 's1', before: -1 },
+    { type: 'loadOlder', sessionId: 's1', before: 2.5 },
   ])('rejects %j', (message) => {
     expect(parseWebviewMessage(message)).toBeUndefined();
   });

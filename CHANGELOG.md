@@ -14,6 +14,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   the chat, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts a session while the
   chat has the focus. _Stop the Running Turn_ is a command.
 - ↑ and ↓ in the empty input bring back the earlier messages of the session.
+- A long session opens with its last 200 items; earlier ones come when you scroll to the top (or with _Show earlier
+  messages_), so the first view of a session of a thousand turns no longer waits for all of it.
 - `#terminal` attaches a recent command of the active terminal and what it printed (the end of it, without colour codes),
   recorded through VS Code's shell integration.
 - _Delete Session…_ in the Sessions view, when the CLI offers `session/delete` (2.33.1 does), after a confirmation. An open

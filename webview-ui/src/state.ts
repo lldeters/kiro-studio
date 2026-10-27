@@ -100,17 +100,23 @@ function announcementFor(before: SessionView, after: SessionView, seq: number): 
   return undefined;
 }
 
+function mergeTools(tools: ToolView[], changed: ToolView[]): ToolView[] {
+  if (changed.length === 0) return tools;
+  const next = new Map<string, ToolView>(tools.map((t) => [t.toolCallId, t]));
+  for (const tool of changed) next.set(tool.toolCallId, tool);
+  return [...next.values()];
+}
+
 function applyPatch(session: SessionView, patch: SessionPatch): SessionView {
-  const items = patch.items.length > 0 ? [...session.items.slice(0, patch.itemsFrom), ...patch.items] : session.items;
-  let tools = session.tools;
-  if (patch.tools.length > 0) {
-    const next = new Map<string, ToolView>(tools.map((t) => [t.toolCallId, t]));
-    for (const tool of patch.tools) next.set(tool.toolCallId, tool);
-    tools = [...next.values()];
-  }
+  // `itemsFrom` counts from the start of the transcript; the page may have only its end.
+  const from = Math.max(0, patch.itemsFrom - (session.itemsOffset ?? 0));
+  const items = patch.items.length > 0 ? [...session.items.slice(0, from), ...patch.items] : session.items;
+  const tools = mergeTools(session.tools, patch.tools);
   // The host sends the meta in full, and leaves out what has nothing to say (`plan`, `mcp`), so it replaces the old one.
+  // Where the items start is not part of it.
   if (patch.meta === undefined) return { ...session, items, tools };
-  return { id: session.id, ...patch.meta, items, tools };
+  const offset = session.itemsOffset === undefined ? {} : { itemsOffset: session.itemsOffset };
+  return { id: session.id, ...patch.meta, ...offset, items, tools };
 }
 
 export function reduce(state: ChatState, message: HostMessage): ChatState {
@@ -154,6 +160,18 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
         sessions: { ...state.sessions, [current.id]: next },
         ...(announcement === undefined ? {} : { announcement }),
       };
+    }
+    case 'olderItems': {
+      const current = state.sessions[message.sessionId];
+      // Only what fits in front of what the page has: a session sent anew meanwhile starts somewhere else.
+      if (!current || (current.itemsOffset ?? 0) !== message.before) return state;
+      const next: SessionView = {
+        ...current,
+        itemsOffset: message.offset,
+        items: [...message.items, ...current.items],
+        tools: mergeTools(current.tools, message.tools),
+      };
+      return { ...state, sessions: { ...state.sessions, [current.id]: next } };
     }
     case 'contextPicked':
       return { ...state, picked: [...state.picked, ...message.attachments] };
