@@ -89,8 +89,8 @@ Ohne beides lässt der Workflow Open VSX mit einem Hinweis aus.
 ## 2. Abnahme mit der echten Kiro CLI (vor dem ersten Release)
 
 Bisher ist alles gegen eine nachgebaute CLI getestet, in der CI auf Windows, macOS und Linux; die echte CLI kennt nur der
-Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13, A1 bis A24) und die
-Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
+Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13 und 15, A1 bis A32) und
+die Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
 
 **Vorbereiten:** `npm ci`, `npm run package`, `code --install-extension dist/kiro-studio.vsix`, VS Code neu laden, einen
 Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
@@ -131,6 +131,34 @@ Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
       weitermachen* → `design.md` mit gezeichneten Diagrammen → `tasks.md`.
 - [ ] In `tasks.md` *Aufgabe starten*: Kiro erledigt sie und kreuzt sie an, der Fortschritt folgt.
 - [ ] **Schick mir die `tasks.md`** (gern mit `requirements.md` und `design.md`): damit prüfe ich das Format (A19).
+
+**MCP-Server aus dem Chat** (PLAN.md Abschnitt 15; jeden der ersten vier Punkte einmal in **Supervised** und einmal im
+**Autopilot**, danach den Server im Panel wieder entfernen)
+
+- [ ] „Füge mir den Microsoft Learn MCP Server hinzu“: Kiro antwortet mit einem Satz und einer Karte *Microsoft Learn*,
+      Kennzeichen „Bekannter Server“. *Hinzufügen …* zeigt einen Dialog mit Adresse und Datei (`~/.kiro/settings/mcp.json`);
+      *Hinzufügen* → in der Datei steht der Eintrag ohne `disabled`, die Karte zeigt „Verbunden · N Werkzeuge“ (ohne neue
+      Sitzung, A26), *Fortsetzen* schickt den sichtbaren Prompt. Kommt keine Karte, Kiro fragen, ob es die Anleitung
+      `kiro-studio-mcp` kennt (A25).
+- [ ] „Bitte füge mir den Linear MCP Server hinzu“: nach *Hinzufügen* öffnet sich der Browser von selbst (A28, A29), die
+      Karte zeigt „Warte auf deine Anmeldung bei linear.app …“ mit *Anmeldeseite erneut öffnen* und *Link kopieren*. Nach
+      der Anmeldung: „Verbunden“.
+- [ ] „Füge den GitHub MCP Server hinzu“: nach dem Dialog fragt ein Passwortfeld nach dem Token (Knopf zur Hilfeseite).
+      In `mcp.json` steht nur `Bearer ${KIRO_STUDIO_MCP_GITHUB_GITHUB_TOKEN}`, nicht das Token; Kiro startet neu (die Chats
+      bleiben offen), dann „Verbunden“ (A30). Das Token steht weder im Chat noch im Protokoll (*Kiro Studio: Show Protocol
+      Log*, mit `kiroStudio.logging.level` auf `verbose`).
+- [ ] „Füge den Playwright MCP Server hinzu“: die Karte zeigt den vollen Befehl `npx @playwright/mcp@latest`, der Dialog
+      ist eine Warnung („lädt das Paket … herunter und führt es aus“); danach „Verbunden“.
+- [ ] Im **Autopilot** Kiro bitten: „Führe `kiro-cli mcp add --name probe --url https://example.com/mcp` aus“. Kiro Studio
+      erlaubt das nicht automatisch: die Frage erscheint mit dem Hinweis „Autopilot überlässt das dir: Es ändert
+      MCP-Server.“ (A32). Ablehnen.
+- [ ] Nach der Linear-Anmeldung *Developer: Reload Window*: Linear ist wieder verbunden, ohne neue Anmeldung im Browser
+      (A31).
+- [ ] Eine Seite, die Kiro ohne Klick öffnen will (etwa wenn ein Server mitten in der Sitzung eine Anmeldung verlangt),
+      öffnet sich nicht von selbst: eine Benachrichtigung „Kiro möchte eine Seite auf … öffnen.“ mit *Öffnen* und *Link
+      kopieren*.
+- [ ] Die Probe-Läufe P1 bis P6 (`protocol-notes.md` Abschnitt 17) und mir `summary.json` und `wire.ndjson` schicken;
+      damit hebe ich die `[C]` auf `[V]` oder korrigiere sie.
 
 **Darstellung**
 

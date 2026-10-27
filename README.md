@@ -33,6 +33,10 @@ real Kiro session._
   Autopilot, Kiro Studio allows each request once for you (see [Safety](#privacy-and-safety)); Supervised always asks.
 - **Checkpoints:** every turn that changes files leaves a card with _View changes_ and _Revert_, backed by a separate
   Git repository in the extension's storage. Your own repository is never touched. Needs Git.
+- **MCP servers from the chat:** ask Kiro in your own words ("add the Linear MCP server") and its answer shows a card.
+  _Add…_ shows in a VS Code dialog exactly what is written where. Servers from Kiro Studio's list of known ones are
+  written as listed; anything else is marked. You sign in in the browser from the card, and API keys go into a password
+  field and VS Code's secret storage, never into a file.
 - **Kiro panel:** your earlier sessions (open, search, fork where the CLI allows it), and your specs, steering files,
   hooks, MCP servers and custom agents, read from `.kiro` and `~/.kiro`, with the actions to create, switch on and off,
   and remove them. Edits keep your comments and formatting.
@@ -73,6 +77,7 @@ real Kiro session._
 | `kiroStudio.autoAllowInAutopilot`                         | on           | In Autopilot, answer each permission request that offers "allow once" with "allow once". Never a permanent "always". User settings only. |
 | `kiroStudio.checkpoints.enabled`                          | on           | Record what each turn changes, for _View changes_ and _Revert_.                                                                          |
 | `kiroStudio.hooks.enabled`                                | off          | Let Kiro load and run hooks, **including your global ones**. User settings only.                                                         |
+| `kiroStudio.mcp.addFromChat`                              | on           | Let Kiro suggest MCP servers as cards you add with a click (about 900 tokens per answer). User settings only.                            |
 | `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                        |
 | `kiroStudio.specs.codeLens`                               | on           | _Start task_ and _Update tasks_ above the tasks in `tasks.md`.                                                                           |
 | `kiroStudio.defaultMode`, `defaultModel`, `defaultEffort` | empty        | Agent, model and effort to select in new sessions. Empty keeps Kiro's default. The agent: user settings only.                            |
@@ -87,14 +92,21 @@ real Kiro session._
   not ask for what it denies; Kiro's ask rules are answered. A permanent "always" is never chosen for you, the end-of-turn
   review stays yours, and every automatic answer is shown in the chat. Switch the setting off to be asked every time.
 - **Hooks** run only after you turn them on, and then also your global hooks from `~/.kiro/hooks`.
+- **MCP servers from the chat** are written only after you confirm a VS Code dialog that shows the address or command and
+  the file. API keys you enter stay in VS Code's secret storage and reach only the `kiro-cli` process, as environment
+  variables (so commands Kiro runs can see them too). In Autopilot, Kiro's own attempts to change MCP servers are left to
+  you. Pages Kiro wants to open ask first, except the sign-in page right after you add a server or click _Sign in in
+  browser_.
 - The protocol log hides tokens, e-mail addresses and your home folder. Values of `env` and headers of MCP servers are never
   read out; only their names are shown. Kiro's own session files are never read or written directly.
 - Checkpoints live in the extension's storage, not in your repository.
 
 ## Known limits
 
-- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 12) lists
-  every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
+- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 13 and 15)
+  lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
+- Adding MCP servers from the chat is built on reading the shipped code of Kiro CLI 2.34.2, not on a run. A CLI that
+  cannot start a sign-in for Kiro Studio says so on the card and asks you to update it.
 - The scripted stand-in for the CLI is a shell script, so the integration tests that use it are skipped on Windows.
 - Only the first workspace folder is tracked by checkpoints. Sessions of a remote Kiro are listed but not driven specially.
 
@@ -133,7 +145,8 @@ npm run probe                   # also sends one tiny prompt
 
 Output goes to `probe-logs/<timestamp>/` (`summary.json`, `wire.ndjson`, `stderr.log`), which is git-ignored. The
 logs are redacted on a best-effort basis; read them before sharing. `npm run validate-wire -- <wire.ndjson>`
-checks which recorded messages the ACP SDK's own schemas would reject.
+checks which recorded messages the ACP SDK's own schemas would reject. `--help` also lists the MCP probes P1 to P6
+(sign-in, steering, live reload; see [docs/protocol-notes.md](docs/protocol-notes.md), section 17).
 
 ## License
 

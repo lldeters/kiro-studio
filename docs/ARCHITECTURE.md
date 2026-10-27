@@ -46,12 +46,16 @@ VS Code window (extension host, extensionKind: workspace)
 │   │                       treeProvider.ts (nodes -> tree items)
 │   ├─ specs/ ............. specActions.ts (new spec, run a task, update tasks, review: all prompts to Kiro),
 │   │                       codeLens.ts (tasks.md), specView.ts (the spec view panels), specsFeature.ts (commands)
+│   ├─ mcpChat.ts ......... MCP servers from the chat: the actions of the card, the dialogs, writing `mcp.json`, the
+│   │                       browser sign-in and its timers, the steering document and the hidden fallback block
+│   ├─ mcpKeys.ts ......... API keys the user entered: VS Code secret storage, the password box, the spawn environment
 │   ├─ setup.ts, settings.ts, approvalUi.ts, fsPort.ts, statusBar.ts, statusView.ts, quickMenu.ts, commands.ts,
 │   │   debugChat.ts, logger.ts
 │
 ├─ src/shared/ ............. the chat protocol (`chatProtocol.ts`), the spec view protocol (`specProtocol.ts`), both with
-│                            validation of webview messages, and the list of webview messages (`uiMessages.ts`);
-│                            no `vscode`, no DOM, imported by host and webview
+│                            validation of webview messages, the list of webview messages (`uiMessages.ts`), and the
+│                            `kiro-mcp` blocks (`mcpProposal.ts`: extraction, validation) with Kiro Studio's list of
+│                            known MCP servers (`mcpCatalog.ts`); no `vscode`, no DOM, imported by host and webview
 │
 ├─ src/view/ ............... pure view models, tested without VS Code
 │   ├─ chatPresenter.ts ... session store -> what the webview renders; `PatchTracker` computes what changed
@@ -59,6 +63,8 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ panelTrees.ts ...... the nodes of the six Kiro panel views (labels, icons, context flags, commands)
 │   ├─ specPresenter.ts ... the files of a spec -> what the spec view shows
 │   ├─ approvalQueue.ts ... which request the picker shows; the next opens when one is answered
+│   ├─ mcpAddPlan.ts, mcpFlow.ts, mcpView.ts ... what the add dialog says and writes, how the host reacts to MCP
+│   │                       status and sign-ins, and the state each card shows
 │   ├─ exportMarkdown.ts, chatHtml.ts, statusModel.ts, statusTree.ts, transcriptPrinter.ts
 │
 ├─ src/checkpoints/ ........ no `vscode`: git.ts (runs `git`), shadowRepo.ts (the shadow repository),
@@ -66,7 +72,8 @@ VS Code window (extension host, extensionKind: workspace)
 │
 ├─ src/workspace/ .......... no `vscode`: readers and editors of the `.kiro` files behind the Kiro panel:
 │                            frontmatter, steering, specs, tasks (the task tree of `tasks.md`), specPrompts (the prompts
-│                            that start and steer a spec), hooks, mcp (config, edits, status broadcast),
+│                            that start and steer a spec), hooks, mcp (config, edits, status broadcast), mcpInstructions
+│                            (what Kiro is told about `kiro-mcp` blocks), mcpUrl (which page may open by itself),
 │                            agents, jsonEdit (jsonc-parser edits that keep comments and indentation), sessionList
 │                            (the merged list of sessions); they read through a small `FileReader`
 │
@@ -80,7 +87,8 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ dispatcher.ts ...... tolerant routing of session/update and `_kiro/*` notifications, parks early ones
 │   ├─ types.ts, capabilities.ts, prompt.ts ... lenient parsing of Kiro payloads; prompt content blocks
 │   ├─ sessions.ts ........ Session (transcript, tools, approvals, checkpoints, turn state), SessionStore
-│   └─ handlers/ ........... permissions.ts (PermissionBroker, rule E1), fs.ts (path-guarded read/write, WriteGate)
+│   └─ handlers/ ........... permissions.ts (PermissionBroker, rule E1), fs.ts (path-guarded read/write, WriteGate),
+│                            secrets.ts (Kiro's `_kiro/secret/*` on top of a secret port)
 │
 └─ src/util/ ............... json helpers, emitter, async helpers, path normalisation, redaction, protocol log
 
@@ -113,7 +121,27 @@ the agent is never started (`capabilities.untrustedWorkspaces: limited`, no virt
   keeps its own value per session and starts new ones in Autopilot.
 - Kiro's file reads and writes pass a path guard (workspace folders and the session's working directory); anything
   else is refused with `-32602`. A missing file answers `-32002`, which Kiro uses as an existence check.
-- Only `http(s)` URLs from `_kiro/openExternalUrl` are opened.
+- Only `http(s)` URLs from `_kiro/openExternalUrl` are opened, and only within 90 s of a Sign-in click (or of the
+  automatic sign-in right after adding a server); otherwise a notification asks. Kiro gets `{}` at once either way.
+- An MCP server from the chat is written only after a native dialog that shows the address or the full command and the
+  file. Webview messages for it carry the session, the answer's item id, the server name and an action, never a URL, a
+  command or a configuration: the host reads the proposal again from the answer in its own transcript and checks it again.
+- Known servers are written from Kiro Studio's list (`src/shared/mcpCatalog.ts`), keeping only Kiro's name; a name from
+  the list with a different address needs an explicit choice in a dialog of its own. A proposal may not carry a literal
+  secret, and every `${NAME}` in it must be a key it declares, so it cannot send the user's own environment variables to
+  a server.
+- API keys the user enters go to VS Code's secret storage and, under namespaced names (`KIRO_STUDIO_MCP_<SERVER>_<NAME>`),
+  into the environment of `kiro-cli` when it starts; the file holds only `${…}`. They never reach the transcript, the
+  webview or a file, and the protocol log redacts them wherever they appear.
+- The values of Kiro's `_kiro/secret/*` requests (its MCP sign-ins) and of our answers to `get` are redacted in the
+  protocol log at every level.
+- Autopilot never auto-allows a change to MCP configuration: a permission request that mentions `.kiro/settings` or a
+  `kiro-cli mcp` / `powers` command that adds, imports, removes, installs or uninstalls is shown to the user with a note
+  (`mustAskInAutopilot`, best effort, since the shape of shell requests is unverified).
+- Kiro's `fs/write_text_file` to any `.kiro/settings/mcp.json` is refused with `-32602` and a sentence telling Kiro to
+  propose a `kiro-mcp` block instead. The panel's MCP actions and every write from the chat need a trusted workspace.
+- `kiroStudio.mcp.addFromChat` is `application` scoped too, so a repository cannot decide whether Kiro is taught to
+  propose servers.
 - The approval prompt never answers by itself: closing it leaves the request pending, `Kiro Studio: Answer Pending
   Kiro Request` and the status bar item open it again.
 - The chat webview is untrusted: every message is validated (`parseWebviewMessage`: kinds, sizes, image types), only
@@ -229,6 +257,25 @@ error to the host for the protocol log, and can draw the chat again, instead of 
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
 
+**MCP servers from the chat.** Kiro is taught to answer a request for an MCP server with a fenced `kiro-mcp` block that
+holds one JSON object. The teaching is a client steering document (`_meta.kiro.steering` on `session/new` and
+`session/load`, `inclusion: "always"`, about 900 tokens) while `kiroStudio.mcp.addFromChat` is on; until Kiro confirms it
+with a `client:` document, a hidden `resource` block carries the same text after a message that looks like an MCP request
+(at most once in 10 turns), and `stripContext` keeps it out of the transcript and the export. In the webview the
+assistant's Markdown is wrapped in an `ItemContext` (session and item id), and `CodeBlock` renders a `kiro-mcp` block as
+`McpProposalCard` when `capabilities.mcpCards` is on; reasoning, the spec view and a disabled setting show plain code. The
+card finds its block among `extractProposals` of the whole answer, the same function the host uses, so both agree on
+which blocks are closed, valid and unique; while the answer streams it shows a placeholder, and an invalid block shows
+the code with the reason. What the card shows after Add comes from `SessionMeta.mcp` (`McpSessionView`, built by
+`mcpSessionView` from the session's MCP state: Kiro's per-session `_kiro/mcp/status`, the governance lock, and what the
+host did, such as "added", "signing in on linear.app" or "needs a restart"); it is left out of the meta while it has no
+servers and no lock. The sign-in URL and key values stay in the host. A button posts only `mcpAction`; `McpChat` checks
+trust, governance and that the block is still in that answer, shows the native dialogs (add, address choice, collision,
+password box), writes `mcp.json` with `jsonc-parser`, then follows the server: a 20 s wait for Kiro to pick it up (Kiro
+reloads `mcp.json` in running sessions), the browser sign-in through `_kiro/mcp/resetServer` and `_kiro/openExternalUrl`
+(started by itself once right after Add, otherwise from the card), a restart when a new key needs it, and _Continue_,
+which sends a visible prompt. The announcer reads a server that connects, needs a sign-in or fails.
+
 Themes: colours, fonts and spacing come from `--vscode-*` variables, so every theme works. The one exception is a
 purple accent for the focus ring of the input box, its send button and the context ring (`--kiro-*` in `styles.css`);
 the high-contrast themes replace it with their focus and button colours. The high-contrast
@@ -272,7 +319,7 @@ Specs, steering, hooks, MCP settings and custom agents are plain files under `.k
 | Specs | `.kiro/specs/<name>/{requirements,bugfix,design,tasks}.md`; the tasks of `tasks.md` as children of the task document, with their state | new spec (assistant), open the spec view, start a task, update tasks, open documents |
 | Steering | `.kiro/steering/*.md`, `~/.kiro/steering`, and the built-in documents of `_kiro/steering/documents_changed` (`uri: builtin:…`) | new file, delete, let Kiro write the foundational files (a prompt), show built-in text |
 | Hooks | `.kiro/hooks/*.kiro.hook`, `~/.kiro/hooks`; they only run when `kiroStudio.hooks.enabled` is on (decision E4), and the view offers the switch | new, turn one on or off, open |
-| MCP | `.kiro/settings/mcp.json`, `~/.kiro/settings/mcp.json`; live state from the `_kiro/mcp/status` broadcast | add (always switched off first), turn on or off, remove, open |
+| MCP | `.kiro/settings/mcp.json`, `~/.kiro/settings/mcp.json`; live state from the `_kiro/mcp/status` broadcast | add (always switched off first; servers added from the chat are on, PLAN.md decision E6), turn on or off, remove, open |
 | Agents | the agents of the active session (`mode` option) and `.kiro/agents/*.json`, `~/.kiro/agents` | use in this session, new, open |
 
 What a view says is decided by pure functions (`src/view/panelTrees.ts`); the files are read through a `FileReader` so
@@ -338,7 +385,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
 - **Unit (Vitest, `npm test`):** the protocol layer against a scripted fake agent over in-memory streams (streaming,
   replay, cancel, approvals, late config advertisements, process crash, restart and resume, early notifications,
   write ordering, turn hooks), the dispatcher, parsers, CLI discovery with an injected environment, redaction, path
-  handling, the readers and editors of the `.kiro` files, the task parser, the spec prompts and the panel trees, a consistency test of the manifest
+  handling, the readers and editors of the `.kiro` files, the task parser, the spec prompts and the panel trees, the MCP
+  proposal parser, list, instructions, add plan, flow and card state, the Autopilot and `mcp.json` guards, a consistency test of the manifest
   (menus, welcome content, views, titles), the presenter and patch tracker, attachment resolution, the shadow repository and checkpoint service
   **against real `git`** in temporary folders (including that the user's repository is untouched), the Markdown
   export, message validation, and a coverage test that every runtime message, webview message and manifest string has a
@@ -346,7 +394,8 @@ and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapsho
 - **Webview (Vitest with jsdom, `webview-ui/src/**/*.test.tsx`):** the reducer, the app in every setup and connection
   state, Markdown, code blocks, tool cards, diffs, approvals, pickers, the line under the input, composer (menus,
   keyboard, chips, drafts, drops, Send and Stop, the chip with the last changes),
-  checkpoint cards, the spec view (tabs with the keyboard, review, starting tasks), the announcements for screen readers,
+  checkpoint cards, the MCP card in every state (and that it finds the same blocks as the host), the spec view (tabs with
+  the keyboard, review, starting tasks), the announcements for screen readers,
   the block-wise Markdown and the highlight cache, and axe-core over all of them.
 - **Fake CLI:** `test/integration/fixtures/fake-kiro.cjs` stands in for `kiro-cli` (scenarios `ready`, `signedout`,
   `old`): `--version`, `whoami`, `acp --help` and a minimal ACP conversation, with the agents `vibe`, `spec`,

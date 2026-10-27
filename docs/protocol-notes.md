@@ -6,7 +6,9 @@ behaves. Whenever the installed CLI disagrees with this file, the CLI wins and t
 Status: **Phase 0. One verification run on a real CLI exists** (tag **[V]**). Everything without **[V]** still
 comes from the task description, third-party recordings or the SDK source. `kiro-cli` is not installed in the
 cloud container this was written in, and `kiro.dev` / `agentclientprotocol.com` are blocked by its network
-policy, so the Kiro docs were never read at the source. Further probe runs are listed in section 17.
+policy, so the Kiro docs were never read at the source. Further probe runs are listed in section 17. The MCP facts
+behind "add MCP servers from the chat" were read in the shipped code of CLI 2.34.2 (tag **[C]**) and not run; probes P1
+to P6 in section 17 check them.
 
 ## Evidence levels
 
@@ -19,6 +21,7 @@ Every statement below carries one of these tags.
 | **[T]** | Third-party statement in the same PR (description and code comments), covering CLI 2.27 to 2.33. Weaker than [R]. |
 | **[S]** | Read from the source of `@agentclientprotocol/sdk` 2.0.1 or checked by running its schemas. |
 | **[V]** | Verified by this project's probe (`scripts/probe-acp.ts`) on the owner's machine: `kiro-cli` **2.33.1** (`--version` prints `kiro-cli-chat 2.33.1`), Kiro Agent Server 0.66.58, Windows 11 (10.0.26300), Google social login, 2026-10-23. One run, one OS, one account type: anything about other platforms or logins stays unverified. |
+| **[C]** | Read in the shipped code of `kiro-cli` **2.34.2** (Linux build of 2026-10-26; its V3 engine is `@kiro/agent` **0.66.62**, `dist/server/acp-server.js`), **not run**. Minified code read statically: a [C] statement says what the code does on the paths that were read, for that version only. It is newer than the verified 2.33.1. Probes P1 to P6 (section 17) are to raise each [C] to [V] or correct it. |
 | **[P]** | Unknown. A further probe run or a test has to answer it. |
 
 Search-result snippets of the Kiro docs also confirmed: V3 uses `session/set_config_option` with
@@ -408,7 +411,7 @@ Compared to the task description **[D]**:
 | --- | --- | --- |
 | `_kiro/session/context`, `compact`, `rename` | `context`, `compact` yes; **`rename` no**; `export`, `history` extra | Rename only if advertised |
 | `_kiro/account/getUsage` | no | Credits: `turn_completion.promptTurnSummaries` meanwhile |
-| `_kiro/mcp/status`, `_kiro/mcp/resetServer` | no | `_kiro/mcp/status` exists as a **broadcast** (below); reset method **[P]** |
+| `_kiro/mcp/status`, `_kiro/mcp/resetServer` | no | `_kiro/mcp/status` exists as a **broadcast** (below); `resetServer` is **handled anyway** in 2.34.2 **[C]** (see "MCP in the shipped 2.34.2 code" below) |
 | `_kiro/hooks/list`, `_kiro/tools/didChange` | no | `_kiro/tools/didChange` exists as a broadcast; hooks arrive as `_kiro/hooks/didChange` after opt-in **[T]** |
 | `_kiro/governance/state`, `_kiro/error/*` | no | `governance/state` exists as a broadcast; `_kiro/error/*` not seen |
 | `_session/steer` | no | see section 8 |
@@ -422,9 +425,9 @@ except `sessions/changed`.
 
 | Method | Payload (observed) | Feeds |
 | --- | --- | --- |
-| `_kiro/mcp/status` | `{ sessionId, servers: [] }`, a full snapshot (entry shape: **[P]**, no server was configured) | MCP panel |
+| `_kiro/mcp/status` | `{ sessionId, servers: [] }`, a full snapshot (no server was configured; entry shapes and envelope from the 2.34.2 code below **[C]**) | MCP panel, the MCP cards of that session's chat |
 | `_kiro/tools/didChange` | `{ sessionId, tags: [{ source: "builtin", tag: "read" \| "write" \| "shell" \| "web", description }] }` | tool categories, not single tools |
-| `_kiro/steering/documents_changed` | `{ sessionId, status: "success", documents: [{ name, type: "steering", scope: "global", uri: "builtin:<name>", inclusion: "manual", content, … }] }`, 11.7 KB in this run, with the full `content` | Steering panel |
+| `_kiro/steering/documents_changed` | `{ sessionId, status: "success", documents: [{ name, type: "steering", scope: "global", uri: "builtin:<name>", inclusion: "manual", content, … }] }`, 11.7 KB in this run, with the full `content`. Documents the client sent in `_meta.kiro.steering` come back with `uri: "client:<sessionId>:<name>"` **[C]** (section 12) | Steering panel (`builtin:` only); confirms Kiro Studio's MCP document |
 | `_kiro/sessions/changed` | `{ upserted: [{ sessionId, source?, executionTarget?, cwd?, title?, updatedAt, status? }], deleted: [] }`. **Partial objects: merge by `sessionId`.** `status` is `idle`, `in_progress` or `waiting_on_user` | Sessions panel, live |
 | `_kiro/governance/state` | `{ sessionId, isEnterprise, features: { mcpEnabled, webToolsEnabled, usageAnalytics, contentCollection, promptLogging, codeReferenceTracker, autonomousAgents } }` | disable MCP / web UI when off |
 | `_kiro/powers/items_changed` | `{ sessionId, status, powers: [] }` | Powers (later) |
@@ -434,10 +437,76 @@ No `_kiro/hooks/*` message appeared; hooks were not opted in. Workspace and glob
 and `scope` values are **[P]** (the temp workspace had none). `_kiro/config/template` lists agents without creating a
 session, so no MCP server starts. **[T]**
 
+### MCP in the shipped 2.34.2 code **[C]**
+
+Nothing in this subsection was run; probes P1 to P6 (section 17) check it on a real CLI.
+
+- **`_kiro/mcp/resetServer { serverName, startOAuth?, sessionId? }` → `{ success: true }`** is handled although it is not in
+  `extensionMethods`. The handler (`handleResetMcpServer`):
+  - throws `"MCP governance is disabled by your organization"` while governance has MCP switched off;
+  - with `sessionId`, throws when that session does not bind a server of that name; without it, resets every server of
+    that name;
+  - waits for the reset at most **60 s** (`awaitBoundedReset`) and then answers `{ success: true }` anyway;
+  - with `startOAuth: true`, drops the stored credentials and starts the sign-in through `_kiro/openExternalUrl`
+    (section 12).
+
+  Kiro Studio calls it through a one-method allowlist for unadvertised methods, with a 75 s timeout. It remembers
+  `-32601` for the connection (an older CLI) and retries once without `sessionId` after any other error from Kiro
+  except the governance one. On 2.33.1, which did not advertise it either, its presence is **[P]**.
+- **Status envelope:** `{ sessionId, servers, accessMode?, accessModeFilteredServers?, unresolvedRegistryServers?,
+  registryServers? }`. The four optional fields are only sent when the organisation set a registry URL. When MCP is
+  switched off, every session gets `{ sessionId, servers: [] }`.
+- **Status entries**, one of (an entry may also carry `_meta.kiro.resource`):
+  - `{ name, status: "connecting", authType? }`
+  - `{ name, status: "connected", authType, tools: [{ name, description, disabled, inputSchema }], prompts, resources,
+    resourceTemplates }`
+  - `{ name, status: "failed", authType, failedAuthorization, authorizationUrl?, errorMessage, errorCode? }`
+    (`errorCode` seen: `"timeout_too_low"`)
+  - `{ name, status: "disabled" }`
+
+  `authType` is `"oauth"` for every HTTP server, so it alone does not mean a sign-in is needed; `failedAuthorization:
+  true` does. The `authorizationUrl` belongs to a callback listener that has already stopped, so Kiro Studio never
+  reads or opens it. These shapes replace the guess of PLAN.md assumption A17.
+- **Live reload:** Kiro watches `.kiro/settings/mcp.json` in each workspace root and in the user config folder
+  (`$KIRO_HOME`, default `~/.kiro`). After a change it calls `reconcileEachLocalSessionMcp()`, so running sessions pick
+  the change up without a restart or a new session, and the status is broadcast again. A change of `disabledTools`,
+  `timeout` or `waitForReady` only updates metadata; an `autoApprove` change restarts nothing.
+- **The `mcp.json` file:** unknown keys are dropped; the transport follows from the fields (`command` is stdio, `url`
+  is Streamable HTTP with an SSE fallback); `http:` is allowed only for `localhost`, `127.0.0.1` and `::1`. The
+  workspace file is read only for a trusted workspace (the stdio `acp` entry point counts as trusted) and wins over the
+  user file on a name clash.
+- **`${VAR}`** is expanded in every string of an entry, from the entry's own `env` first and then from the process
+  environment of `kiro-cli`; an unknown name stays as it is, and `${env:VAR}` is **not** expanded by V3. Kiro Studio
+  therefore writes `${KIRO_STUDIO_MCP_<SERVER>_<NAME>}` and sets that variable when it starts `kiro-cli`.
+
 ## 12. Client capabilities and client-side requests
 
 - `clientCapabilities._meta.kiro.openExternalUrl: true` **[D]**. Advertised by the probe; `_kiro/openExternalUrl` was not
-  sent in the run (nothing needed OAuth) nor in the recordings. Direction and response **[P]**.
+  sent in the run (nothing needed OAuth) nor in the recordings. **[V]** In the 2.34.2 code it is an **agent→client
+  request with `{ url }` only** (no server name, no session), sent only when the client advertised the capability. Kiro
+  waits for the answer and rethrows an error from it, so an error answer makes that sign-in fail. It is sent after
+  `_kiro/mcp/resetServer` with `startOAuth: true` and when a server answers 401 in the middle of a session (Kiro then
+  waits up to 300 s for the sign-in). A 401 at start-up only marks the server `failedAuthorization` and opens nothing.
+  **[C]** Kiro Studio answers `{}` at once and opens the page only within 90 s of starting a sign-in (a click on Sign
+  in, or the automatic one right after adding a server); any other page gets a notification that asks first. A non-web address is answered with `-32602`.
+- `clientCapabilities._meta.kiro.secretStorage: true` makes Kiro keep MCP sign-ins through the client:
+  `_kiro/secret/get { key } → { value }`, `_kiro/secret/store { key, value }` and `_kiro/secret/delete { key }`, with keys
+  like `kiro.mcp.<sha256>.{client,tokens,verifier,discovery}`. An error answer to `get` counts as a missing value; errors
+  of `store` and `delete` are rethrown. Without the capability the tokens live in the agent's memory only and are gone
+  after every restart. **[C]** Kiro Studio stores the values in VS Code's secret storage and hides them in the protocol log.
+- **Client steering:** `session/new` and `session/load` accept `_meta.kiro.steering`, an array of at most 100
+  `{ name (at least 1 character), inclusion: "always" | "fileMatch" | "manual", fileMatchPattern?, content (at most
+  1,000,000 characters) }`. Kiro turns each into a steering document with `uri: "client:<sessionId>:<name>"` and lists it
+  in `_kiro/steering/documents_changed`. **[C]** Kiro Studio sends one document, `kiro-studio-mcp`, with `inclusion:
+  "always"` while `kiroStudio.mcp.addFromChat` is on, and counts it as confirmed when that broadcast lists it with a
+  `client:` uri; until then a hidden `resource` block carries the same text when a message looks like an MCP request.
+  Whether Kiro replays such a block after `session/load`: **[P]** (P2).
+- **Kiro's own file tool may not write `.kiro/settings/**`**, neither in the home folder nor in a workspace (path policy
+  `settings: { home: "deny", workspace: "deny" }`; `~/.kiro/powers/installed/*/mcp.json` is denied too). **[C]** Kiro
+  Studio also refuses `fs/write_text_file` to any `.kiro/settings/mcp.json` with `-32602`. A shell command (`kiro-cli mcp
+  add`, an editor, `echo >`) is not covered by that policy; in Autopilot Kiro Studio therefore leaves any request that
+  mentions `.kiro/settings`, `$KIRO_HOME/settings` or a `kiro-cli` / `kiro-cli-chat` / `q` `mcp` or `powers` command that
+  adds, imports, removes, installs or uninstalls to the user. How a shell permission request looks is still **[P]**.
 - `clientCapabilities._meta.kiro.hooks: { enabled: true, v2: true }`: **required for V3 to load any hooks**.
   `enabled` alone makes Kiro send `_kiro/hooks/*` requests the client must answer. **[T]** Not in the task
   description. Kiro Studio makes it an opt-in setting, off by default (PLAN.md decision E4). The probe only sends it with `--hooks`
@@ -526,6 +595,8 @@ session, so no MCP server starts. **[T]**
 14. Kiro **uses the client's `fs/*`** when it is advertised (section 7). **[V]**
 15. Notifications for a new session arrive before `session/new` returns the id (section 4). **[V]**
 16. On Windows the CLI is slow to start (17 s for `session/new`) and did not exit on end-of-input (section 1). **[V]**
+17. `_kiro/mcp/resetServer` is handled without being advertised, `_kiro/openExternalUrl` is a request whose error fails
+    the sign-in, and the client can keep MCP sign-ins and send steering documents (sections 11 and 12). **[C]**
 
 ## 17. What is still open, and the next probe runs
 
@@ -546,8 +617,26 @@ npm run probe -- --hooks --no-prompt           # which _kiro/hooks/* traffic app
 npm run probe -- --acp-args "acp --auth-method=cli"   # confirm that 2.33.1 needs --agent-engine=v3
 ```
 
+**MCP probes P1 to P6** (they check the [C] facts of sections 11 and 12; the probe writes `mcp.json` only in its temp
+folder, never opens a page, and records secret key names, never values). After the run, raise each [C] to [V] or
+correct it, and update PLAN.md A25 to A32.
+
+```
+npm run probe -- --mcp-config --no-prompt      # P1: Microsoft Learn in the temp folder's mcp.json; the status entry shapes
+npm run probe -- --client-steering             # P2: client: steering documents; a hidden resource block; replay after load
+npm run probe -- --mcp-live-reload --no-prompt # P3: a server added to mcp.json after session/new; time until its status
+npm run probe -- --mcp-sign-in linear --no-prompt
+                                               # P4: resetServer with startOAuth; how _kiro/openExternalUrl arrives;
+                                               # answered with an error, nothing is opened
+npm run probe -- --mcp-sign-in linear --secret-storage --no-prompt
+                                               # P5: you open the printed sign-in page yourself; the probe restarts the
+                                               # CLI and checks that the sign-in survived (key names only)
+npm run probe -- --env-expansion --no-prompt   # P6: a 127.0.0.1 server that answers 401: is ${VAR} in a header expanded
+                                               # from the environment kiro-cli was started with?
+```
+
 **Still open and not coverable by the probe** (needs a UI, several sessions or other accounts): behaviour when logged out;
-`session/fork` parameters; `session/load` of an old session; `_session/steer`; cancel timing; MCP OAuth and
-`_kiro/mcp/resetServer`; `plan` / `agent_thought_chunk` updates; list scopes and pagination; MCP server entry shape in
-`_kiro/mcp/status`; workspace steering `uri`/`scope`; other platforms and login types. Phase 1 and 2 integration tests cover
-them.
+`session/fork` parameters; `session/load` of an old session; `_session/steer`; cancel timing; `plan` /
+`agent_thought_chunk` updates; list scopes and pagination; workspace steering `uri`/`scope`; the MCP flow with an
+organisation registry or governance; other platforms and login types. Phase 1 and 2 integration tests cover them. MCP
+sign-in, `_kiro/mcp/resetServer` and the status entry shape are no longer blank: they are [C] and P1 to P6 check them.
