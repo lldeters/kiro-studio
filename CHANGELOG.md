@@ -4,7 +4,19 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+
+- Checkpoints record every folder of a multi-root workspace, not only the first; with several folders a file is shown
+  after its folder's name.
+- `kiroStudio.checkpoints.exclude` leaves more files out of checkpoints (`.gitignore` syntax), and
+  `kiroStudio.checkpoints.maxFileSizeMB` (default 10) leaves out new files that are larger. A turn that creates such a
+  file gets a notice in the chat, because Revert cannot put it back.
+
 ### Fixed
+
+- Two windows on the same folder shared the index and the chain of snapshots of the checkpoint repository: their snapshots
+  could fail on the index lock and switch checkpoints off, and each new window cut off the other's chain. Every window now
+  has an index, an exclude list and a chain of its own; the objects are still shared.
 
 - _Revert_ of a turn also put back what a second session changed in the same folder while the turn ran, without a word,
   because a checkpoint compares the whole folder. A file that only the other session's tool calls named is now left to

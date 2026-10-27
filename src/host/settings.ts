@@ -26,6 +26,18 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('checkpoints.enabled', true);
   }
 
+  /** Patterns in `.gitignore` syntax that checkpoints leave out, besides `.gitignore` itself. */
+  checkpointsExclude(scope?: vscode.Uri): string[] {
+    const value = vscode.workspace.getConfiguration('kiroStudio', scope).get<unknown>('checkpoints.exclude', []);
+    return Array.isArray(value) ? value.filter((p): p is string => typeof p === 'string' && p.trim() !== '') : [];
+  }
+
+  /** New files larger than this are left out of checkpoints; 0 means no limit. */
+  checkpointsMaxFileBytes(scope?: vscode.Uri): number {
+    const mb = vscode.workspace.getConfiguration('kiroStudio', scope).get<number>('checkpoints.maxFileSizeMB', 10);
+    return typeof mb === 'number' && Number.isFinite(mb) && mb > 0 ? Math.round(mb * 1024 * 1024) : 0;
+  }
+
   hooksEnabled(): boolean {
     return this.config.get<boolean>('hooks.enabled', false);
   }
