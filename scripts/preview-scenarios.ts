@@ -17,7 +17,7 @@ function feed(session: Session, ...updates: Record<string, unknown>[]): void {
 
 function init(
   sessions: Session[],
-  overrides: { setup?: SetupView; phase?: 'starting' | 'ready'; plan?: PlanView } = {},
+  overrides: { setup?: SetupView; phase?: 'starting' | 'ready'; plan?: PlanView; mcpCards?: boolean } = {},
 ): HostMessage {
   return {
     type: 'init',
@@ -26,7 +26,7 @@ function init(
     ...(sessions[0] ? { activeId: sessions[0].id } : {}),
     setup: overrides.setup ?? 'ready',
     agent: { phase: overrides.phase ?? 'ready' },
-    capabilities: { image: true, compact: true, mcpCards: false },
+    capabilities: { image: true, compact: true, mcpCards: overrides.mcpCards ?? false },
     ...(overrides.plan === undefined ? {} : { plan: overrides.plan }),
   };
 }
@@ -197,6 +197,101 @@ function idle(): HostMessage[] {
     checkedAt: new Date(2026, 9, 27, 9, 5).getTime(),
   };
   return [init([session], { plan }), { type: 'session', session: new PatchTracker('posix').full(session) }];
+}
+
+const kiroMcp = (entry: Record<string, unknown>): string => `\`\`\`kiro-mcp\n${JSON.stringify(entry)}\n\`\`\``;
+
+/** One finished turn: the user's words and Kiro's answer. */
+function turn(session: Session, question: string, answer: string, messageId: string): void {
+  session.beginTurn(question);
+  feed(session, u.agent(answer, { messageId }), u.turnCompletion(0.31));
+  session.endTurn({ stopReason: 'end_turn' });
+}
+
+/**
+ * MCP servers Kiro proposed, as cards: one signing in, one that waits for a restart to use its key, a known program
+ * still to add, a server that is not in the list and connected, and a known name with another address.
+ */
+function mcpScenario(): HostMessage[] {
+  const session = new Session('sess_preview_m', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'auto' }),
+  });
+  session.title = 'MCP servers';
+  turn(
+    session,
+    'Add the Linear and the GitHub MCP servers.',
+    'Linear signs you in through the browser; GitHub needs a personal access token.\n\n' +
+      `${kiroMcp({ name: 'linear', title: 'Linear', url: 'https://mcp.linear.app/mcp' })}\n\n` +
+      kiroMcp({ name: 'github', title: 'GitHub', url: 'https://api.githubcopilot.com/mcp/' }),
+    'a1',
+  );
+  turn(
+    session,
+    'Also Playwright, and the Acme server from their docs.',
+    'Playwright runs on your computer; Acme documents its server on its own site.\n\n' +
+      `${kiroMcp({ name: 'playwright', title: 'Playwright', command: 'npx', args: ['@playwright/mcp@latest'] })}\n\n` +
+      kiroMcp({
+        name: 'acme',
+        title: 'Acme Issues',
+        url: 'https://mcp.acme.example/v1/mcp',
+        source: 'https://docs.acme.example/mcp',
+      }),
+    'a2',
+  );
+  turn(
+    session,
+    'And Jira.',
+    'Jira comes with the Atlassian server.\n\n' +
+      kiroMcp({ name: 'jira', title: 'Jira', url: 'https://jira-mcp.example.net/mcp' }),
+    'a3',
+  );
+  const at = Date.now();
+  session.setMcpRuntime({
+    runtime: [
+      { name: 'linear', status: 'failed', needsAuth: true },
+      { name: 'acme', status: 'connected', toolCount: 12 },
+    ],
+  });
+  session.updateMcpLocal('linear', {
+    scope: 'user',
+    addedAt: at,
+    signIn: { phase: 'waiting', host: 'linear.app', url: 'https://linear.app/oauth', browserOpened: true, at },
+  });
+  session.updateMcpLocal('github', { scope: 'user', addedAt: at, needsRestart: true });
+  session.updateMcpLocal('acme', { scope: 'workspace', addedAt: at });
+  return [init([session], { mcpCards: true }), { type: 'session', session: new PatchTracker('posix').full(session) }];
+}
+
+/** The other states of a card, and a block Kiro Studio cannot use, for a look at all of them. */
+function mcpStatesScenario(): HostMessage[] {
+  const session = new Session('sess_preview_n', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'auto' }),
+  });
+  session.title = 'MCP states';
+  const names = ['not-picked-up', 'failed', 'off', 'unsupported', 'connecting'];
+  turn(
+    session,
+    'Add these servers.',
+    names.map((name) => kiroMcp({ name, url: `https://mcp.${name}.example/mcp` })).join('\n\n') +
+      '\n\n```kiro-mcp\n{"name": "broken", "url": "http://mcp.broken.example/mcp"}\n```',
+    'b1',
+  );
+  const at = Date.now();
+  session.setMcpRuntime({
+    runtime: [
+      { name: 'failed', status: 'failed', error: 'spawn uvx ENOENT: the program was not found' },
+      { name: 'off', status: 'disabled' },
+      { name: 'unsupported', status: 'failed', needsAuth: true },
+    ],
+  });
+  session.updateMcpLocal('not-picked-up', { scope: 'user', addedAt: at, notPickedUp: true });
+  session.updateMcpLocal('unsupported', { scope: 'user', signIn: { phase: 'unsupported', at } });
+  session.updateMcpLocal('connecting', { scope: 'user', addedAt: at });
+  return [init([session], { mcpCards: true }), { type: 'session', session: new PatchTracker('posix').full(session) }];
 }
 
 const setupOnly = (setup: SetupView): HostMessage[] => [init([], { setup })];
@@ -382,6 +477,8 @@ export const SCENARIOS: Record<string, Step[]> = {
   waiting: waiting(),
   reasoning: reasoning(),
   idle: idle(),
+  mcp: mcpScenario(),
+  'mcp-states': mcpStatesScenario(),
   empty: [init([])],
   connecting: [init([], { phase: 'starting' })],
   cliMissing: setupOnly('cliMissing'),

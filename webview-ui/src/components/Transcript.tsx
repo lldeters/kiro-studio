@@ -3,6 +3,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import type { CheckpointView, ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
 import { formatCredits, formatDuration } from '../../../src/shared/format';
+import { ItemContext } from '../itemContext';
 import { waitingForOutput } from '../thinking';
 import { CheckpointCard } from './CheckpointCard';
 import { Markdown } from './Markdown';
@@ -87,6 +88,8 @@ const Item = memo(function Item({
   checkpoint: CheckpointView | undefined;
 }) {
   const t = useT();
+  // The same object while the item is the same, so that a new chunk of text does not re-render every code block in it.
+  const context = useMemo(() => ({ sessionId, itemId: item.id }), [sessionId, item.id]);
   switch (item.kind) {
     case 'user':
       return (
@@ -108,7 +111,10 @@ const Item = memo(function Item({
       return (
         <div className="message assistant">
           <div className="author">{t('Kiro')}</div>
-          <Markdown text={item.text} streaming={streaming} />
+          {/* Only an answer turns a kiro-mcp block into a card; reasoning and specs show it as code. */}
+          <ItemContext.Provider value={context}>
+            <Markdown text={item.text} streaming={streaming} />
+          </ItemContext.Provider>
         </div>
       );
     case 'thought':

@@ -10,9 +10,17 @@
  */
 import type { McpAssessment, McpTrustLevel } from '../shared/mcpCatalog';
 import { catalogProposal, downloadedPackage } from '../shared/mcpCatalog';
-import { secretEnvName, toConfigEntry, type McpConfigEntry, type McpProposal } from '../shared/mcpProposal';
+import {
+  commandLine,
+  secretEnvName,
+  toConfigEntry,
+  type McpConfigEntry,
+  type McpProposal,
+} from '../shared/mcpProposal';
 import { identityTranslate, type Translate } from '../util/translate';
 import { findServerEntry } from '../workspace/mcp';
+
+export { commandLine };
 
 /** How an entry compares with the server of the same name in a file. */
 export type Collision = 'none' | 'same' | 'different';
@@ -133,11 +141,6 @@ export function freeName(name: string, taken: (candidate: string) => boolean): s
     const candidate = `${name.slice(0, MAX_NAME_CHARS - suffix.length).replace(/-+$/, '')}${suffix}`;
     if (!taken(candidate)) return candidate;
   }
-}
-
-/** A command line as the user would type it, with arguments that contain spaces or quotes in double quotes. */
-export function commandLine(command: string, args: readonly string[]): string {
-  return [command, ...args].map((part) => (/[\s"']/.test(part) ? `"${part.replace(/"/g, '\\"')}"` : part)).join(' ');
 }
 
 /** A link without its scheme and trailing slash, for a dialog line. */

@@ -398,6 +398,14 @@ function checkScopes(value: unknown): string[] | undefined {
 // ---------------------------------------------------------------------------------------------------------------
 
 /**
+ * A command line as the user would type it, with arguments that contain spaces or quotes in double quotes. The card
+ * and the Add dialog show a program this way.
+ */
+export function commandLine(command: string, args: readonly string[]): string {
+  return [command, ...args].map((part) => (/[\s"']/.test(part) ? `"${part.replace(/"/g, '\\"')}"` : part)).join(' ');
+}
+
+/**
  * The environment variable a declared secret is written as: `KIRO_STUDIO_MCP_<SERVER>_<NAME>`. Kiro keeps the value
  * of `GITHUB_TOKEN` in VS Code's secret storage and passes it to the Kiro process under this name, so that it never
  * overrides the user's own `GITHUB_TOKEN` for Kiro and for every program Kiro starts.
@@ -407,7 +415,7 @@ export const secretEnvName = (server: string, name: string): string =>
 
 /**
  * The mcp.json entry for a proposal. Each `${NAME}` that `envNames` maps is rewritten to the variable it is written as
- * (see {@link secretEnvName}); without a map the references stay as Kiro wrote them, which is what the card shows.
+ * (see {@link secretEnvName}); without a map the references stay as Kiro wrote them.
  */
 export function toConfigEntry(proposal: McpProposal, envNames: Readonly<Record<string, string>> = {}): McpConfigEntry {
   const rename = (text: string): string =>

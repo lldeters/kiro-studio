@@ -1122,6 +1122,174 @@ button.autonomy.autopilot:hover:not(:disabled) {
   color: var(--vscode-gitDecoration-deletedResourceForeground, var(--vscode-errorForeground));
 }
 
+/* The card of an MCP server Kiro proposes in an answer */
+.mcp-card {
+  --mcp-tone: var(--kiro-ring);
+  margin: 0.6em 0;
+  border: 1px solid
+    var(--vscode-editorWidget-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
+  border-left: 3px solid var(--mcp-tone);
+  border-radius: 4px;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  overflow-wrap: anywhere;
+}
+.mcp-card.mismatch {
+  --mcp-tone: var(--vscode-errorForeground, #f48771);
+}
+.mcp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 6px 10px 2px;
+}
+.mcp-card.preparing .mcp-head {
+  padding-bottom: 6px;
+}
+.mcp-icon {
+  flex: none;
+  color: var(--mcp-tone);
+}
+.mcp-title {
+  font-weight: 600;
+}
+.mcp-name {
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15));
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.85em;
+}
+/* The trust level: a tinted pill with the text in the foreground colour, which stays readable in every theme. */
+.mcp-badge {
+  --badge-tone: var(--vscode-descriptionForeground);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--badge-tone) 60%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--badge-tone) 14%, transparent);
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+.mcp-badge .codicon {
+  font-size: 12px;
+  color: var(--badge-tone);
+}
+.mcp-badge.known {
+  --badge-tone: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991));
+}
+.mcp-badge.unlisted,
+.mcp-badge.program {
+  --badge-tone: var(--vscode-editorWarning-foreground, #cca700);
+}
+.mcp-badge.mismatch {
+  --badge-tone: var(--vscode-errorForeground, #f48771);
+  color: var(--vscode-errorForeground, #f48771);
+  white-space: normal;
+}
+.mcp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 10px 4px;
+}
+.mcp-host {
+  font-weight: 600;
+}
+.mcp-command {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.15));
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 0.92em;
+}
+.mcp-warning {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.mcp-warning .codicon,
+.mcp-status .codicon {
+  flex: none;
+  margin-right: 6px;
+  position: relative;
+  top: 2px;
+}
+.mcp-status {
+  display: flex;
+  align-items: baseline;
+  padding: 2px 10px 4px;
+}
+.mcp-status.mcp-busy .codicon {
+  color: var(--vscode-progressBar-background, var(--kiro-ring));
+}
+.mcp-status.mcp-ok .codicon {
+  color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #73c991));
+}
+.mcp-status.mcp-attention .codicon {
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+.mcp-status.mcp-error .codicon {
+  color: var(--vscode-errorForeground, #f48771);
+}
+.mcp-status.mcp-off .codicon {
+  color: var(--vscode-descriptionForeground);
+}
+.mcp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 10px 6px;
+}
+.mcp-actions button {
+  padding: 2px 10px;
+}
+.mcp-config {
+  border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
+}
+.mcp-config .disclosure-head {
+  padding: 2px 10px;
+}
+.mcp-config .disclosure-toggle {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+.mcp-config .disclosure-toggle:hover {
+  color: var(--vscode-foreground);
+}
+.mcp-config pre {
+  margin: 0;
+  padding: 6px 10px 8px;
+  overflow-x: auto;
+  background: var(--vscode-textCodeBlock-background);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: 1.45;
+  overflow-wrap: normal;
+}
+.mcp-config code {
+  font-family: inherit;
+}
+/* A block that cannot be used: the reason above the code. */
+.mcp-invalid {
+  border-left: 3px solid var(--vscode-editorWarning-foreground, #cca700);
+}
+.mcp-invalid-reason {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px 0;
+}
+.mcp-invalid-reason .codicon {
+  flex: none;
+  position: relative;
+  top: 2px;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
 /* Spec view: an editor tab, so it sits on the editor background */
 body[data-view='spec'] {
   background: var(--vscode-editor-background);
@@ -1276,6 +1444,8 @@ body[data-view='spec'] {
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light)
   :is(
     .tool,
+    .mcp-card,
+    .mcp-badge,
     .code-block,
     .message.user .text,
     .chip,

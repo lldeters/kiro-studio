@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { HostMessage, SessionMeta, ItemView, SessionView, ToolView } from '../../src/shared/chatProtocol';
+import type {
+  HostMessage,
+  McpServerView,
+  SessionMeta,
+  ItemView,
+  SessionView,
+  ToolView,
+} from '../../src/shared/chatProtocol';
 import { initialState, reduce, type ChatState } from './state';
 import { translate } from './i18n';
 
@@ -114,6 +121,24 @@ describe('chat state', () => {
     expect(s.phase).toBe('running');
   });
 
+  it('replaces the meta as a whole, so that what the host leaves out is gone', () => {
+    const state = run([
+      init,
+      {
+        type: 'session',
+        session: {
+          ...session('s1'),
+          plan: [{ content: 'Step' }],
+          mcp: { allowed: true, blocked: 'registry', servers: [] },
+        },
+      },
+      { type: 'patch', patch: { sessionId: 's1', itemsFrom: 0, items: [], tools: [], meta: { ...meta } } },
+    ]);
+    expect(state.sessions.s1?.mcp).toBeUndefined();
+    expect(state.sessions.s1?.plan).toBeUndefined();
+    expect(state.sessions.s1?.id).toBe('s1');
+  });
+
   it('ignores a patch for a session it does not have', () => {
     const state = run([init]);
     expect(
@@ -184,6 +209,60 @@ describe('announcements for screen readers', () => {
     let state = run([withMeta({ phase: 'running' }), withMeta({ phase: 'idle' })], start);
     state = run([withMeta({ phase: 'running' }), withMeta({ phase: 'idle' })], state);
     expect(state.announcement).toEqual({ seq: 2, kind: 'done' });
+  });
+
+  describe('MCP servers', () => {
+    const servers = (...list: McpServerView[]) => withMeta({ mcp: { allowed: true, servers: list } });
+
+    it('announces a server added from the chat when it needs a sign-in, connects or fails', () => {
+      const added = run([servers({ name: 'linear', state: 'connecting', scope: 'user' })], start);
+      expect(added.announcement).toBeUndefined(); // its first state
+      const needs = run([servers({ name: 'linear', state: 'needsSignIn', scope: 'user' })], added);
+      expect(needs.announcement).toEqual({
+        seq: 1,
+        kind: 'mcp',
+        server: { name: 'linear', state: 'needsSignIn', scope: 'user' },
+      });
+      const signing = run([servers({ name: 'linear', state: 'signingIn', scope: 'user' })], needs);
+      expect(signing.announcement).toBe(needs.announcement);
+      const connected = run([servers({ name: 'linear', state: 'connected', scope: 'user', toolCount: 3 })], signing);
+      expect(connected.announcement).toMatchObject({
+        seq: 2,
+        kind: 'mcp',
+        server: { state: 'connected', toolCount: 3 },
+      });
+      const failed = run([servers({ name: 'linear', state: 'failed', scope: 'user', error: 'boom' })], connected);
+      expect(failed.announcement).toMatchObject({ seq: 3, kind: 'mcp', server: { state: 'failed', error: 'boom' } });
+    });
+
+    it('announces a server the user already had after a sign-in from its card', () => {
+      const signing = run([servers({ name: 'notion', state: 'signingIn' })], start);
+      const connected = run([servers({ name: 'notion', state: 'connected' })], signing);
+      expect(connected.announcement).toMatchObject({ kind: 'mcp', server: { name: 'notion', state: 'connected' } });
+    });
+
+    it('does not announce the servers Kiro starts by itself', () => {
+      const connecting = run([servers({ name: 'fetch', state: 'connecting' })], start);
+      const connected = run([servers({ name: 'fetch', state: 'connected', toolCount: 1 })], connecting);
+      expect(connected.announcement).toBeUndefined();
+      const failed = run([servers({ name: 'fetch', state: 'failed' })], connected);
+      expect(failed.announcement).toBeUndefined();
+    });
+
+    it('announces a question before a server', () => {
+      const added = run([servers({ name: 'linear', state: 'connecting', scope: 'user' })], start);
+      const both = run(
+        [
+          withMeta({
+            phase: 'awaitingApproval',
+            approvals: [question(1, 'Write File')],
+            mcp: { allowed: true, servers: [{ name: 'linear', state: 'connected', scope: 'user' }] },
+          }),
+        ],
+        added,
+      );
+      expect(both.announcement).toMatchObject({ kind: 'question', title: 'Write File' });
+    });
   });
 
   it('does not announce a change in a text patch', () => {
