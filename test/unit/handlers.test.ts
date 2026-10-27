@@ -369,6 +369,21 @@ describe('file access', () => {
     expect((await read(h, 'kiro-snapshot-v2://x')).error).toMatchObject({ code: -32602 });
   });
 
+  it('remembers what a turn wrote through the client, for its checkpoint', async () => {
+    const h = make({
+      fake: {
+        turn: async (ctx) => {
+          ctx.startTurn();
+          await ctx.request('fs/write_text_file', { sessionId: SESSION_ID, path: '/ws/out.txt', content: 'x' });
+          return 'end_turn';
+        },
+      },
+    });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await h.agent.prompt(session.id, 'write it');
+    expect([...session.touched]).toEqual(['/ws/out.txt']);
+  });
+
   it("refuses to write Kiro's MCP configuration, which only Kiro Studio writes", async () => {
     const gated: string[] = [];
     const h = make({

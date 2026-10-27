@@ -17,9 +17,9 @@ afterEach(cleanup);
 const checkpoint = (extra: Partial<CheckpointView> = {}): CheckpointView => ({
   id: '3',
   files: [
-    { path: 'src/a.ts', status: 'modified', added: 4, removed: 1, binary: false, reverted: false },
-    { path: 'src/new.ts', status: 'added', added: 10, removed: 0, binary: false, reverted: false },
-    { path: 'logo.png', status: 'added', added: 0, removed: 0, binary: true, reverted: false },
+    { path: 'src/a.ts', status: 'modified', added: 4, removed: 1, binary: false, reverted: false, bySession: true },
+    { path: 'src/new.ts', status: 'added', added: 10, removed: 0, binary: false, reverted: false, bySession: true },
+    { path: 'logo.png', status: 'added', added: 0, removed: 0, binary: true, reverted: false, bySession: true },
   ],
   ...extra,
 });
@@ -56,6 +56,19 @@ describe('checkpoint card', () => {
       { type: 'viewChanges', sessionId: 's1', checkpointId: '3', path: 'src/a.ts' },
       { type: 'revert', sessionId: 's1', checkpointId: '3', path: 'src/new.ts' },
     ]);
+  });
+
+  it('marks files that no tool call of the turn named, and says when another session worked at the same time', () => {
+    const files = checkpoint().files.map((f) => ({ ...f, bySession: f.path !== 'src/new.ts' }));
+    render(<CheckpointCard checkpoint={checkpoint({ files })} sessionId="s1" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getAllByText('not from a tool call')).toHaveLength(1);
+    expect(screen.queryByText(/Another session worked/)).toBeNull();
+
+    cleanup();
+    render(<CheckpointCard checkpoint={checkpoint({ files, overlapped: true })} sessionId="s1" />);
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+    expect(screen.getByText(/Another session worked in this folder at the same time/)).toBeTruthy();
   });
 
   it('cannot show the diff of a binary file', () => {

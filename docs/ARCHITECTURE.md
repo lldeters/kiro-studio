@@ -377,7 +377,14 @@ fallback); "Revert" puts files back to the `before` state, but only files that s
 the user changed since is reported as a conflict and touched only after a second, explicit confirmation. Checkpoints
 need Git; without it, or after an error, they switch themselves off once with a message. Only the first workspace
 folder is tracked. Writes by Kiro's file tools and by its shell are both caught, because the snapshots compare trees
-and do not depend on `fs/write_text_file`. Kiro's own checkpoints (`kiro-snapshot-v2://`) remain an optional extra
+and do not depend on `fs/write_text_file`.
+
+A snapshot also catches what changed beside the turn: a second session working in the same folder, or the user. The
+session therefore collects the files its running turn names (`Session.touched`: tool call locations and diffs, previews,
+writes through `fs/write_text_file`), and each file of a checkpoint says whether the turn named it (`bySession`). The
+service knows which turns run at the same time: a file that only another, overlapping turn named is left to that turn's
+checkpoint, and both checkpoints are marked `overlapped`. Files no turn named (a command Kiro ran, the user) stay in the
+checkpoint, marked; "Revert" lists them and offers to put back only the files from tool calls. Kiro's own checkpoints (`kiro-snapshot-v2://`) remain an optional extra
 (PLAN.md decision E2). Unverified: what Kiro does when the user rejects the end-of-turn review (PLAN.md assumption A1).
 
 ## Testing

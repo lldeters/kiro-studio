@@ -473,7 +473,7 @@ describe('load session', () => {
     const session = await h.agent.loadSession('sess_old', '/ws');
     session.addCheckpoint({
       id: 'c1',
-      files: [{ path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: true }],
+      files: [{ path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: true, bySession: true }],
     });
     await h.agent.loadSession('sess_old', '/ws');
     expect(session.checkpoints.get('c1')?.files[0]).toMatchObject({ path: 'a.txt', reverted: true });
@@ -521,7 +521,9 @@ describe('load session', () => {
     const session = await h.agent.loadSession('sess_old', '/ws');
     session.addCheckpoint({
       id: 'c1',
-      files: [{ path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: false }],
+      files: [
+        { path: 'a.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: false, bySession: true },
+      ],
     });
     const createdAt = session.checkpoints.get('c1')?.createdAt;
     let fail = true;

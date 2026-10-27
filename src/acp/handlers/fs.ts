@@ -99,6 +99,7 @@ export class FsHandler {
       if (verdict === 'reject') throw new RequestError(-32000, 'The change was rejected by the user', { path: file });
     }
     await this.deps.port.writeText(file, content);
+    this.deps.store.get(str(body.sessionId) ?? '')?.noteTouched(file);
     return {};
   }
 

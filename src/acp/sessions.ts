@@ -73,12 +73,19 @@ export interface CheckpointFile {
   binary: boolean;
   /** The file was put back to its state before the turn. */
   reverted: boolean;
+  /**
+   * A tool call of the turn named the file, or Kiro wrote it through us. False: something else changed it while the turn
+   * ran (a command Kiro ran, another session, the user).
+   */
+  bySession: boolean;
 }
 
 /** What one turn changed, recorded by the checkpoint service. */
 export interface CheckpointInfo {
   id: string;
   files: CheckpointFile[];
+  /** Another session's turn ran in the same folder at the same time. */
+  overlapped?: boolean;
   createdAt: number;
 }
 
@@ -241,6 +248,11 @@ export class Session {
   readonly tools = new Map<string, ToolCallState>();
   readonly approvals: PendingApproval[] = [];
   readonly checkpoints = new Map<string, CheckpointInfo>();
+  /**
+   * The files the running turn named, as Kiro spelled them: locations and diffs of its tool calls, previews and writes
+   * through the client. Starts empty with every turn.
+   */
+  readonly touched = new Set<string>();
   readonly autoApprovals: AutoApproval[] = [];
   /**
    * The session's MCP servers. Kept by {@link resetForReplay}: Kiro does not replay its status broadcasts, and what Kiro
@@ -457,6 +469,10 @@ export class Session {
     if (event.rawOutput !== undefined) tool.rawOutput = event.rawOutput;
     if (event.content !== undefined) tool.content = event.content;
     if (event.locations !== undefined) tool.locations = event.locations;
+    if (!event.meta.replay) {
+      for (const location of event.locations ?? []) this.noteTouched(location.path);
+      for (const item of event.content ?? []) if (item.type === 'diff') this.noteTouched(item.path);
+    }
 
     const preview = rec(event.meta.kiro.preview);
     if (Object.keys(preview).length > 0) {
@@ -466,6 +482,7 @@ export class Session {
         ...opt('originalContent', str(preview.originalContent)),
         ...opt('modifiedContent', str(preview.modifiedContent)),
       };
+      if (!event.meta.replay && tool.preview.file !== undefined) this.noteTouched(tool.preview.file);
     }
     tool.rev++;
     this.changes.emit('tools');
@@ -556,7 +573,13 @@ export class Session {
     });
     this.changes.emit('transcript');
     this.turnStarted = false;
+    this.touched.clear();
     this.setPhase('starting');
+  }
+
+  /** A file the running turn changes or names. Ignored outside a turn (a replay, say). */
+  noteTouched(path: string): void {
+    if (this.busy) this.touched.add(path);
   }
 
   private noteTurnStarted(): void {

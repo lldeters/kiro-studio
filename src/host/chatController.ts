@@ -281,8 +281,9 @@ export class ChatController implements vscode.Disposable {
   }
 
   /**
-   * Puts a turn's changes back: all of them, or one file. Asks first, and asks again for files that changed after the
-   * turn, because reverting those would overwrite what the user did since.
+   * Puts a turn's changes back: all of them, or one file. Asks first (and offers to leave out the files no tool call of
+   * the turn named), and asks again for files that changed after the turn, because reverting those would overwrite what
+   * the user did since.
    */
   private async revert(sessionId: string, checkpointId: string, file?: string): Promise<void> {
     const session = this.host.agent?.store.get(sessionId);
@@ -293,17 +294,41 @@ export class ChatController implements vscode.Disposable {
       void vscode.window.showInformationMessage(vscode.l10n.t('Wait until Kiro has finished its turn.'));
       return;
     }
-    const todo = info.files.filter((f) => !f.reverted && (file === undefined || f.path === file));
+    let todo = info.files.filter((f) => !f.reverted && (file === undefined || f.path === file));
     if (todo.length === 0) return;
 
+    // Files no tool call of the turn named may not be Kiro's: a second session or the user can have changed them.
+    const foreign = todo.filter((f) => !f.bySession);
+    const detail =
+      foreign.length === 0
+        ? undefined
+        : [
+            info.overlapped === true
+              ? vscode.l10n.t('Another session worked in this folder at the same time.')
+              : undefined,
+            vscode.l10n.t(
+              'No tool call of this turn named these files; a command Kiro ran, another session or you changed them:',
+            ),
+            ...foreign.map((f) => f.path),
+          ]
+            .filter((line) => line !== undefined)
+            .join('\n');
     const confirm = vscode.l10n.t('Revert');
+    const onlyOwn = vscode.l10n.t('Only files from tool calls');
     const question =
       todo.length === 1 && todo[0]
         ? vscode.l10n.t('Revert {0} to its state before this turn?', todo[0].path)
         : vscode.l10n.t('Revert {0} files to their state before this turn?', todo.length);
-    if ((await vscode.window.showWarningMessage(question, { modal: true }, confirm)) !== confirm) return;
+    const buttons = foreign.length > 0 && foreign.length < todo.length ? [confirm, onlyOwn] : [confirm];
+    const choice = await vscode.window.showWarningMessage(
+      question,
+      { modal: true, ...(detail === undefined ? {} : { detail }) },
+      ...buttons,
+    );
+    if (choice === undefined) return;
+    if (choice === onlyOwn) todo = todo.filter((f) => f.bySession);
 
-    const options = file === undefined ? {} : { path: file };
+    const options = { paths: todo.map((f) => f.path) };
     let result = await service.revert(session, checkpointId, options);
     if (result && result.conflicts.length > 0) {
       const anyway = vscode.l10n.t('Revert anyway');

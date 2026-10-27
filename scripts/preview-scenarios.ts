@@ -146,9 +146,25 @@ function conversation(): HostMessage[] {
   session.addCheckpoint({
     id: '1',
     files: [
-      { path: 'src/parser.ts', status: 'modified', added: 3, removed: 1, binary: false, reverted: false },
-      { path: 'test/parser.test.ts', status: 'added', added: 24, removed: 0, binary: false, reverted: false },
-      { path: 'old/notes.md', status: 'deleted', added: 0, removed: 8, binary: false, reverted: true },
+      {
+        path: 'src/parser.ts',
+        status: 'modified',
+        added: 3,
+        removed: 1,
+        binary: false,
+        reverted: false,
+        bySession: true,
+      },
+      {
+        path: 'test/parser.test.ts',
+        status: 'added',
+        added: 24,
+        removed: 0,
+        binary: false,
+        reverted: false,
+        bySession: true,
+      },
+      { path: 'old/notes.md', status: 'deleted', added: 0, removed: 8, binary: false, reverted: true, bySession: true },
     ],
   });
   const other = new Session('sess_preview_2');

@@ -36,7 +36,9 @@ describe('exportMarkdown', () => {
       checkpoints: [
         {
           id: '1',
-          files: [{ path: 'a.ts', status: 'modified', added: 2, removed: 1, binary: false, reverted: false }],
+          files: [
+            { path: 'a.ts', status: 'modified', added: 2, removed: 1, binary: false, reverted: false, bySession: true },
+          ],
         },
       ],
     };
