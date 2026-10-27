@@ -118,6 +118,46 @@ export interface PlanEntryView {
   status?: string;
 }
 
+/** What the card of an MCP server Kiro proposed shows about that server; worked out in `src/view/mcpView.ts`. */
+export type McpCardState =
+  | 'connecting'
+  | 'notPickedUp'
+  | 'needsSignIn'
+  | 'signingIn'
+  | 'signInStalled'
+  | 'signInUnfinished'
+  | 'signInUnsupported'
+  | 'connected'
+  | 'failed'
+  | 'off'
+  | 'needsRestart'
+  | 'blocked'
+  | 'unknown';
+
+/** One MCP server of a session. Never holds a key, a header value or the sign-in address. */
+export interface McpServerView {
+  name: string;
+  state: McpCardState;
+  toolCount?: number;
+  /** Kiro's error message, redacted and at most 300 characters long. */
+  error?: string;
+  /** Kiro's word for a state Kiro Studio does not know. */
+  rawStatus?: string;
+  scope?: 'user' | 'workspace';
+  /** While signing in: the host of the sign-in page, whether it has an international name, whether it opened. */
+  signInHost?: string;
+  punycode?: boolean;
+  browserOpened?: boolean;
+}
+
+/** The MCP servers of a session, by name: the servers Kiro reported and the ones added from the chat. */
+export interface McpSessionView {
+  /** False when the organisation switched MCP servers off. */
+  allowed: boolean;
+  blocked?: 'governance' | 'registry';
+  servers: McpServerView[];
+}
+
 /** Everything about a session except its transcript and tools. Small enough to resend as a whole. */
 export interface SessionMeta {
   title?: string;
