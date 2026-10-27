@@ -204,6 +204,7 @@
   "Known server": "Known server",
   "Known server, checked against {0}.": "Known server, checked against {0}.",
   "Known: {0}": "Known: {0}",
+  "Larger than the size limit of checkpoints, so Revert cannot put them back: {0}": "Larger than the size limit of checkpoints, so Revert cannot put them back: {0}",
   "Last turn": "Last turn",
   "MCP is switched off by your organisation": "MCP is switched off by your organisation",
   "MCP server on the web": "MCP server on the web",

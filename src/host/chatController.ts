@@ -3,7 +3,6 @@
  * (merged to about 30 ms), and carries out what the webview asks for. The webview is not trusted: every message is
  * validated, and a file path is opened only when it lies inside the workspace or the session's folder.
  */
-import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeError } from '../acp/errors';
 import { currentPlatform, isInsideAny, normalizeAgentPath, type PlatformKind } from '../util/paths';
@@ -254,15 +253,14 @@ export class ChatController implements vscode.Disposable {
     const session = this.host.agent?.store.get(sessionId);
     const service = session && this.host.checkpointsFor(session);
     const files = service?.open(sessionId, checkpointId)?.filter((f) => file === undefined || f.path === file);
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!service || !files || files.length === 0 || root === undefined) return;
+    if (!service || !files || files.length === 0) return;
 
     const texts = [];
     for (const changed of files) {
       const sides = await service.sides(sessionId, checkpointId, changed.path);
       if (!sides || changed.binary) continue;
       texts.push({
-        path: path.join(root, ...changed.path.split('/')),
+        path: sides.absolute,
         oldText: sides.before?.toString('utf8') ?? null,
         newText: sides.after?.toString('utf8') ?? '',
       });

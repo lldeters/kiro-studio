@@ -363,20 +363,28 @@ review the workflow is about.
 
 ## Checkpoints and revert
 
-A shadow Git repository in the extension's global storage (`checkpoints/<hash of the workspace path>`, bare, with the
-workspace as work tree) records the workspace without touching the user's repository. `KiroAgent` calls turn hooks:
+A shadow Git repository per workspace folder in the extension's global storage (`checkpoints/<hash of the folder path>`,
+bare, with the folder as work tree) records the workspace without touching the user's repository. Two windows on the
+same folder share it, objects included, but nothing they write to: each window has an index (`index-<window>`, started
+from the newest one another window left so that unchanged files are not read again), an exclude file
+(`exclude-<window>`, as `core.excludesFile`) and a chain of snapshots (`refs/windows/<window>`). `KiroAgent` calls turn hooks:
 `before` just before the prompt is sent, `after` once it has settled and before the session goes idle, so the marker
 comes before the next message. Each is a snapshot (`git add --all`, `write-tree`, `commit-tree`); `.gitignore` and a
-fixed exclude list (`node_modules`, `dist`, `out`, `build`, `target`, `.venv`) keep generated files out; Git runs without
-the system and the user's global configuration, so neither decides what a snapshot holds. Checkpoints live as long as a
-window, so the first snapshot of a window starts a new chain of commits and prunes what earlier windows left that is older
-than two days (another window may still use what is younger); no reflog keeps anything alive. A turn that
+fixed exclude list (`node_modules`, `dist`, `out`, `build`, `target`, `.venv`) keep generated files out, and so do the
+patterns of `kiroStudio.checkpoints.exclude` and new files above `kiroStudio.checkpoints.maxFileSizeMB` (measured when
+they show up in `git ls-files --others`, named one by one in the window's exclude file, and taken in once they are small
+enough; a turn that creates one gets a notice, because Revert cannot put it back); Git runs without the system and the
+user's global configuration, so neither decides what a snapshot holds. Checkpoints live as long as a window, so the
+first snapshot of a window lets go of the chains, indexes and exclude files of windows that recorded nothing for two days
+and prunes what nothing reaches any more and is older than that (another window may still use what is younger); no
+reflog keeps anything alive. A turn that
 changed files adds a checkpoint to the session: a marker in the transcript and the file list (status, +x −y) in the
 meta. "View changes" opens one file as a diff or all files in VS Code's multi-file diff editor (a list is the
 fallback); "Revert" puts files back to the `before` state, but only files that still have the `after` content: a file
 the user changed since is reported as a conflict and touched only after a second, explicit confirmation. Checkpoints
-need Git; without it, or after an error, they switch themselves off once with a message. Only the first workspace
-folder is tracked. Writes by Kiro's file tools and by its shell are both caught, because the snapshots compare trees
+need Git; without it, or after an error, they switch themselves off once with a message. Every workspace folder is
+tracked; with several, a checkpoint shows each file after its folder's name (`api/src/a.ts`), and View changes and Revert
+find the folder again. Writes by Kiro's file tools and by its shell are both caught, because the snapshots compare trees
 and do not depend on `fs/write_text_file`.
 
 A snapshot also catches what changed beside the turn: a second session working in the same folder, or the user. The

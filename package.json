@@ -767,6 +767,22 @@
           "default": true,
           "markdownDescription": "%config.checkpointsEnabled%"
         },
+        "kiroStudio.checkpoints.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "resource",
+          "markdownDescription": "%config.checkpointsExclude%"
+        },
+        "kiroStudio.checkpoints.maxFileSizeMB": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "scope": "resource",
+          "markdownDescription": "%config.checkpointsMaxFileSize%"
+        },
         "kiroStudio.planUsage.enabled": {
           "type": "boolean",
           "default": true,

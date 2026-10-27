@@ -24,7 +24,9 @@ beforeEach(async () => {
   await fs.mkdir(ws);
   unavailable.length = 0;
   shadow = new ShadowRepo(path.join(root, 'shadow'), ws);
-  service = new CheckpointService(shadow, undefined, (reason) => unavailable.push(reason));
+  service = new CheckpointService(() => [{ name: 'ws', repo: shadow }], {
+    onUnavailable: (reason) => unavailable.push(reason),
+  });
   session = new Session('s1', { cwd: ws });
 });
 // The repository cleans up in the background after its first snapshot; on Windows its folder is busy until then.
@@ -92,7 +94,11 @@ describe('checkpoint service', () => {
   it('gives the sides of a file of a checkpoint, and nothing for a file that is not in it', async () => {
     await write('a.txt', 'x\n');
     await turn(() => write('b.txt', 'y\n'));
-    expect(await service.sides('s1', '1', 'b.txt')).toEqual({ before: null, after: Buffer.from('y\n') });
+    expect(await service.sides('s1', '1', 'b.txt')).toEqual({
+      before: null,
+      after: Buffer.from('y\n'),
+      absolute: path.join(ws, 'b.txt'),
+    });
     expect(await service.sides('s1', '1', 'a.txt')).toBeUndefined();
     expect(await service.sides('s1', '9', 'b.txt')).toBeUndefined();
     expect(await service.sides('other', '1', 'b.txt')).toBeUndefined();
@@ -165,14 +171,64 @@ describe('checkpoint service', () => {
     expect(session.checkpoints.get('1')?.overlapped).toBeUndefined();
   });
 
+  it('records every workspace folder, with the folder before its files, and reverts in the right one', async () => {
+    const other = path.join(root, 'other');
+    await fs.mkdir(other);
+    const otherRepo = new ShadowRepo(path.join(root, 'shadow-other'), other);
+    const both = new CheckpointService(() => [
+      { name: 'ws', repo: shadow },
+      { name: 'other', repo: otherRepo },
+    ]);
+    await fs.writeFile(path.join(other, 'lib.ts'), 'old\n');
+    session.beginTurn('both folders');
+    await both.before(session);
+    session.noteTouched(path.join(other, 'lib.ts'));
+    await write('a.txt', 'new\n');
+    await fs.writeFile(path.join(other, 'lib.ts'), 'new\n');
+    await both.after(session);
+    session.endTurn({ stopReason: 'end_turn' });
+    await otherRepo.idle();
+
+    expect(session.checkpoints.get('1')?.files.map((f) => `${f.path}:${String(f.bySession)}`)).toEqual([
+      'other/lib.ts:true',
+      'ws/a.txt:false',
+    ]);
+    expect((await both.sides('s1', '1', 'other/lib.ts'))?.absolute).toBe(path.join(other, 'lib.ts'));
+    expect(await both.revert(session, '1')).toEqual({
+      restored: ['other/lib.ts', 'ws/a.txt'],
+      conflicts: [],
+      failed: [],
+    });
+    expect(await fs.readFile(path.join(other, 'lib.ts'), 'utf8')).toBe('old\n');
+    await expect(fs.stat(path.join(ws, 'a.txt'))).rejects.toThrow();
+  });
+
+  it('says which new files were too large to record, because Revert cannot put them back', async () => {
+    const limited = new ShadowRepo(path.join(root, 'limited'), ws, { maxFileBytes: () => 10 });
+    const small = new CheckpointService(() => [{ name: 'ws', repo: limited }]);
+    session.beginTurn('big');
+    await small.before(session);
+    await write('big.bin', 'more than ten bytes\n');
+    await write('small.txt', 'tiny\n');
+    await small.after(session);
+    session.endTurn({ stopReason: 'end_turn' });
+    await limited.idle();
+
+    expect(session.checkpoints.get('1')?.files.map((f) => f.path)).toEqual(['small.txt']);
+    expect(session.transcript.some((i) => i.kind === 'notice' && i.text.includes('big.bin'))).toBe(true);
+  });
+
   it('knows nothing of a checkpoint that does not exist', async () => {
     expect(await service.revert(session, '5')).toBeUndefined();
   });
 
   it('switches itself off, once and with the reason, when Git is not there', async () => {
     const noGit: GitRunner = () => Promise.resolve({ code: -1, stdout: Buffer.alloc(0), stderr: 'ENOENT' });
-    const off = new CheckpointService(new ShadowRepo(path.join(root, 'x'), ws, noGit), undefined, (r) =>
-      unavailable.push(r),
+    const off = new CheckpointService(
+      () => [{ name: 'ws', repo: new ShadowRepo(path.join(root, 'x'), ws, { git: noGit }) }],
+      {
+        onUnavailable: (r) => unavailable.push(r),
+      },
     );
     await off.before(session);
     await off.before(session);
@@ -188,8 +244,8 @@ describe('checkpoint service', () => {
       calls.push([...args]);
       return runGit(args, options);
     };
-    const countedRepo = new ShadowRepo(path.join(root, 'counted'), ws, counting);
-    const counted = new CheckpointService(countedRepo);
+    const countedRepo = new ShadowRepo(path.join(root, 'counted'), ws, { git: counting });
+    const counted = new CheckpointService(() => [{ name: 'ws', repo: countedRepo }]);
     for (const text of ['1\n', '2\n', '3\n']) {
       await counted.before(session);
       await write('a.txt', text);

@@ -4,17 +4,17 @@
  */
 import * as os from 'node:os';
 import * as vscode from 'vscode';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { KiroAgent } from '../acp/agent';
 import type { BroadcastEvent } from '../acp/dispatcher';
 import { describeError } from '../acp/errors';
 import type { SecretPort } from '../acp/handlers/secrets';
-import { CheckpointService } from '../checkpoints/service';
+import { CheckpointService, type CheckpointRoot } from '../checkpoints/service';
 import { ShadowRepo } from '../checkpoints/shadowRepo';
 import type { Session } from '../acp/sessions';
 import type { JsonObject } from '../util/json';
-import { currentPlatform, isInside } from '../util/paths';
+import { currentPlatform, isInsideAny } from '../util/paths';
 import { spawnTransport } from '../acp/transport';
 import { ApprovalUi } from './approvalUi';
 import { VsCodeFileSystemPort } from './fsPort';
@@ -159,28 +159,45 @@ export class AgentHost implements vscode.Disposable {
     this.approvalUi?.showNext();
   }
 
-  private readonly checkpointServices = new Map<string, CheckpointService>();
+  private checkpoints: CheckpointService | undefined;
+  /** One repository per workspace folder, kept when the folder is removed so that earlier checkpoints still work. */
+  private readonly checkpointRepos = new Map<string, ShadowRepo>();
+  /** Names this window's part of the checkpoint repositories, which other windows on the same folder share. */
+  private readonly checkpointWindow = randomUUID().replace(/-/g, '').slice(0, 16);
 
   /**
-   * The checkpoint service of the workspace folder a session works in, or undefined when checkpoints are off, there is
-   * no workspace folder (the home folder is never snapshotted) or the session works outside of it.
+   * The checkpoint service, or undefined when checkpoints are off, there is no workspace folder (the home folder is never
+   * snapshotted) or the session works outside of the workspace folders.
    */
   checkpointsFor(session: Session): CheckpointService | undefined {
     if (!this.deps.settings.checkpointsEnabled()) return undefined;
-    const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (folder === undefined || (session.cwd !== undefined && !isInside(folder, session.cwd, currentPlatform())))
+    const folders = (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath);
+    if (folders.length === 0 || (session.cwd !== undefined && !isInsideAny(folders, session.cwd, currentPlatform())))
       return undefined;
-    let service = this.checkpointServices.get(folder);
-    if (!service) {
-      const id = createHash('sha1').update(folder).digest('hex').slice(0, 16);
-      service = new CheckpointService(
-        new ShadowRepo(path.join(this.deps.storagePath, 'checkpoints', id), folder),
-        this.deps.protocol.log,
-        this.deps.onCheckpointsUnavailable,
-      );
-      this.checkpointServices.set(folder, service);
-    }
-    return service;
+    this.checkpoints ??= new CheckpointService(() => this.checkpointRoots(), {
+      log: this.deps.protocol.log,
+      onUnavailable: this.deps.onCheckpointsUnavailable,
+      translate: (message, ...args) => vscode.l10n.t(message, ...args),
+    });
+    return this.checkpoints;
+  }
+
+  private checkpointRoots(): CheckpointRoot[] {
+    const { settings } = this.deps;
+    return (vscode.workspace.workspaceFolders ?? []).map((folder) => {
+      const root = folder.uri.fsPath;
+      let repo = this.checkpointRepos.get(root);
+      if (!repo) {
+        const id = createHash('sha1').update(root).digest('hex').slice(0, 16);
+        repo = new ShadowRepo(path.join(this.deps.storagePath, 'checkpoints', id), root, {
+          window: this.checkpointWindow,
+          exclude: () => settings.checkpointsExclude(folder.uri),
+          maxFileBytes: () => settings.checkpointsMaxFileBytes(folder.uri),
+        });
+        this.checkpointRepos.set(root, repo);
+      }
+      return { name: folder.name, repo };
+    });
   }
 
   /** The folder the agent process and new sessions start in. */

@@ -204,6 +204,7 @@
   "Known server": "Bekannter Server",
   "Known server, checked against {0}.": "Bekannter Server, geprüft anhand von {0}.",
   "Known: {0}": "Bekannt: {0}",
+  "Larger than the size limit of checkpoints, so Revert cannot put them back: {0}": "Größer als die Grenze für Checkpoints, deshalb kann „Zurücknehmen“ sie nicht wiederherstellen: {0}",
   "Last turn": "Letzter Durchlauf",
   "MCP is switched off by your organisation": "MCP ist von deiner Organisation ausgeschaltet",
   "MCP server on the web": "MCP-Server im Web",

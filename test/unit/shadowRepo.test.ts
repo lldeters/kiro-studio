@@ -3,7 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ShadowRepo } from '../../src/checkpoints/shadowRepo';
+import { ShadowRepo, literalPattern } from '../../src/checkpoints/shadowRepo';
 
 let root: string;
 let ws: string;
@@ -95,6 +95,68 @@ describe('ShadowRepo', () => {
     expect((await repo.changes(before, after)).map((f) => f.path)).toEqual(['src/b.ts']);
   });
 
+  it('leaves out what the exclude setting names', async () => {
+    const own = new ShadowRepo(path.join(root, 'own'), ws, { exclude: () => ['*.log', 'data/', '  '] });
+    const before = await own.snapshot('before');
+    await write('run.log', 'x\n');
+    await write('data/set.csv', 'x\n');
+    await write('src/a.ts', 'a\n');
+    const after = await own.snapshot('after');
+    expect((await own.changes(before, after)).map((f) => f.path)).toEqual(['src/a.ts']);
+    await own.idle();
+  });
+
+  it('leaves out new files above the size limit until they are small enough, and keeps recording what it holds', async () => {
+    let limit = 10;
+    const sized = new ShadowRepo(path.join(root, 'sized'), ws, { maxFileBytes: () => limit });
+    await write('grows.txt', 'small\n');
+    const first = await sized.snapshot('1');
+    await write('video [1].bin', 'far more than ten bytes\n');
+    await write('grows.txt', 'now more than ten bytes\n');
+    const second = await sized.snapshot('2');
+    expect((await sized.changes(first, second)).map((f) => f.path)).toEqual(['grows.txt']);
+    expect(sized.leftOut).toEqual(['video [1].bin']);
+
+    await write('video [1].bin', 'tiny\n');
+    const third = await sized.snapshot('3');
+    expect((await sized.changes(second, third)).map((f) => f.path)).toEqual(['video [1].bin']);
+    expect(sized.leftOut).toEqual([]);
+
+    limit = 0; // no limit
+    await write('huge.bin', 'x'.repeat(100));
+    const fourth = await sized.snapshot('4');
+    expect((await sized.changes(third, fourth)).map((f) => f.path)).toEqual(['huge.bin']);
+    await sized.idle();
+  });
+
+  it('writes a path as a pattern that names exactly that file', () => {
+    expect(literalPattern('a/b.txt')).toBe('/a/b.txt');
+    expect(literalPattern('x[1]*?.bin')).toBe('/x\\[1\\]\\*\\?.bin');
+    expect(literalPattern('#notes !.md')).toBe('/\\#notes \\!.md');
+    expect(literalPattern('trailing  ')).toBe('/trailing\\ \\ ');
+    expect(literalPattern('new\nline')).toBeUndefined();
+  });
+
+  it('lets two windows on the same folder record at the same time without sharing an index or a chain', async () => {
+    const gitDir = path.join(root, 'shared');
+    const one = new ShadowRepo(gitDir, ws, { window: 'one' });
+    const two = new ShadowRepo(gitDir, ws, { window: 'two' });
+    await write('a.txt', '1\n');
+    const [oneBefore, twoBefore] = await Promise.all([one.snapshot('one'), two.snapshot('two')]);
+    await write('a.txt', '2\n');
+    const [oneAfter, twoAfter] = await Promise.all([one.snapshot('one'), two.snapshot('two')]);
+    await Promise.all([one.idle(), two.idle()]);
+
+    expect((await one.changes(oneBefore, oneAfter)).map((f) => f.path)).toEqual(['a.txt']);
+    expect((await two.changes(twoBefore, twoAfter)).map((f) => f.path)).toEqual(['a.txt']);
+    const names = await fs.readdir(gitDir);
+    expect(names).toEqual(expect.arrayContaining(['index-one', 'index-two']));
+    const refs = execFileSync('git', ['--git-dir', gitDir, 'for-each-ref', '--format=%(refname)'], {
+      encoding: 'utf8',
+    });
+    expect(refs.trim().split('\n').sort()).toEqual(['refs/windows/one', 'refs/windows/two']);
+  });
+
   it('does not touch the repository of the user', async () => {
     const git = (...args: string[]) => execFileSync('git', args, { cwd: ws, encoding: 'utf8' });
     git('init', '-q');
@@ -132,13 +194,13 @@ describe('ShadowRepo', () => {
     };
 
     it('are removed once nothing can use them any more', async () => {
-      const earlier = new ShadowRepo(gitDir(), ws, undefined, 'now');
+      const earlier = new ShadowRepo(gitDir(), ws, { expireMs: 0 });
       await write('big.bin', 'first version\n');
       const first = await earlier.snapshot('earlier window');
       await write('big.bin', 'second version\n');
       await earlier.snapshot('earlier window');
 
-      const window = new ShadowRepo(gitDir(), ws, undefined, 'now');
+      const window = new ShadowRepo(gitDir(), ws, { expireMs: 0 });
       await write('more.txt', 'new\n');
       const before = await window.snapshot('this window');
       await write('more.txt', 'newer\n');

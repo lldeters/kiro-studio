@@ -76,6 +76,8 @@ real Kiro session._
 | `kiroStudio.autonomy`                                     | `supervised` | `supervised`: Kiro asks before it changes files and shows a review at the end of a turn. `autopilot`: no review. User settings only.     |
 | `kiroStudio.autoAllowInAutopilot`                         | on           | In Autopilot, answer each permission request that offers "allow once" with "allow once". Never a permanent "always". User settings only. |
 | `kiroStudio.checkpoints.enabled`                          | on           | Record what each turn changes, for _View changes_ and _Revert_.                                                                          |
+| `kiroStudio.checkpoints.exclude`                          | empty        | More files and folders checkpoints leave out, in `.gitignore` syntax (`*.log`, `data/`).                                                 |
+| `kiroStudio.checkpoints.maxFileSizeMB`                    | `10`         | New files larger than this are left out of checkpoints (the chat says so). `0`: no limit.                                                |
 | `kiroStudio.hooks.enabled`                                | off          | Let Kiro load and run hooks, **including your global ones**. User settings only.                                                         |
 | `kiroStudio.mcp.addFromChat`                              | on           | Let Kiro suggest MCP servers as cards you add with a click (about 900 tokens per answer). User settings only.                            |
 | `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                        |
@@ -108,7 +110,7 @@ real Kiro session._
 - Adding MCP servers from the chat is built on reading the shipped code of Kiro CLI 2.34.2, not on a run. A CLI that
   cannot start a sign-in for Kiro Studio says so on the card and asks you to update it.
 - The scripted stand-in for the CLI is a shell script, so the integration tests that use it are skipped on Windows.
-- Only the first workspace folder is tracked by checkpoints. Sessions of a remote Kiro are listed but not driven specially.
+- Sessions of a remote Kiro are listed but not driven specially.
 
 ## More
 
