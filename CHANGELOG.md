@@ -6,6 +6,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Fixed
 
+- _Revert_ of a turn also put back what a second session changed in the same folder while the turn ran, without a word,
+  because a checkpoint compares the whole folder. A file that only the other session's tool calls named is now left to
+  that session's checkpoint, and both cards say that another session worked at the same time. Files that no tool call of
+  the turn named (a command Kiro ran, or your own edits during the turn) are marked on the card, and _Revert_ lists them
+  and offers to put back only the files from tool calls.
 - Kiro could read and write files outside the workspace through a symbolic link inside it (`link -> ~/.ssh`, say): the
   check compared paths only as they were written. It now compares where the file really is, and so does the refusal to
   write `.kiro/settings/mcp.json`, which a link to `.kiro/settings` got around. A file or folder whose name starts with

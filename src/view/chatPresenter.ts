@@ -319,6 +319,7 @@ export function metaView(session: Session, redact: Redact = unchanged): SessionM
           checkpoints: [...session.checkpoints.values()].map((c) => ({
             id: c.id,
             files: c.files.map((f) => ({ ...f })),
+            ...(c.overlapped === true ? { overlapped: true } : {}),
           })),
         }),
     ...(mcp === undefined ? {} : { mcp }),

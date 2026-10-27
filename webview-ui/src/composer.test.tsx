@@ -307,6 +307,7 @@ describe('composer', () => {
       removed,
       binary: false,
       reverted,
+      bySession: true,
     });
     const checkpoints = [
       { id: 'c1', files: [file('old.ts', 9, 9)] },

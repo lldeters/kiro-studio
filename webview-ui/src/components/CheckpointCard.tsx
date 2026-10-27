@@ -42,8 +42,17 @@ export function CheckpointCard({ checkpoint, sessionId }: { checkpoint: Checkpoi
     </>
   );
 
+  const otherOrigin = t(
+    'No tool call of this turn named the file: a command Kiro ran, another session or you changed it.',
+  );
+
   return (
     <Disclosure className="checkpoint" head={head} tail={tail}>
+      {checkpoint.overlapped === true && (
+        <p className="checkpoint-note">
+          {t('Another session worked in this folder at the same time. Files only it named are on its own card.')}
+        </p>
+      )}
       <ul className="checkpoint-files">
         {files.map((file) => (
           <li key={file.path} className={file.reverted ? 'reverted' : ''}>
@@ -51,6 +60,11 @@ export function CheckpointCard({ checkpoint, sessionId }: { checkpoint: Checkpoi
             <span className="checkpoint-file" title={file.path}>
               {file.path}
             </span>
+            {!file.bySession && (
+              <span className="checkpoint-origin" title={otherOrigin}>
+                {t('not from a tool call')}
+              </span>
+            )}
             {!file.binary && (
               <span className="stat">
                 <span className="added">+{file.added}</span> <span className="removed">−{file.removed}</span>

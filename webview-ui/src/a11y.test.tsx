@@ -87,8 +87,16 @@ const busySession = (): SessionView => ({
     {
       id: 'c1',
       files: [
-        { path: 'src/parser.ts', status: 'modified', added: 4, removed: 1, binary: false, reverted: false },
-        { path: 'logo.png', status: 'added', added: 0, removed: 0, binary: true, reverted: false },
+        {
+          path: 'src/parser.ts',
+          status: 'modified',
+          added: 4,
+          removed: 1,
+          binary: false,
+          reverted: false,
+          bySession: true,
+        },
+        { path: 'logo.png', status: 'added', added: 0, removed: 0, binary: true, reverted: false, bySession: true },
       ],
     },
   ],

@@ -81,6 +81,11 @@ export class ShadowRepo {
     private readonly pruneExpire = '2.days.ago',
   ) {}
 
+  /** The folder whose files are recorded. */
+  get root(): string {
+    return this.workTree;
+  }
+
   /** Resolves when every operation queued so far is done, the clean-up in the background included. */
   idle(): Promise<void> {
     return this.chain.then(() => undefined);

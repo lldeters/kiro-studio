@@ -33,24 +33,39 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
-async function turn(change: () => Promise<void>): Promise<void> {
-  await service.before(session);
+/** A turn as the agent runs it: the session is busy from before the first snapshot until after the last. */
+async function turn(change: () => Promise<void>, of: Session = session): Promise<void> {
+  await begin(of);
   await change();
-  await service.after(session);
+  await end(of);
 }
+async function begin(of: Session): Promise<void> {
+  of.beginTurn('do it');
+  await service.before(of);
+}
+async function end(of: Session): Promise<void> {
+  await service.after(of);
+  of.endTurn({ stopReason: 'end_turn' });
+}
+/** A write that the turn names, as a tool call or a write through the client would. */
+const writeByKiro = async (of: Session, file: string, text: string) => {
+  of.noteTouched(path.join(ws, file));
+  await write(file, text);
+};
 
 describe('checkpoint service', () => {
   it('records what a turn changed and puts a marker in the transcript', async () => {
     await write('a.txt', 'one\n');
     await turn(async () => {
-      await write('a.txt', 'one\ntwo\n');
+      await writeByKiro(session, 'a.txt', 'one\ntwo\n');
       await write('b.txt', 'new\n');
     });
-    expect(session.transcript.map((i) => i.kind)).toEqual(['checkpoint']);
+    expect(session.transcript.map((i) => i.kind)).toEqual(['user', 'checkpoint']);
     expect([...session.checkpoints.values()][0]?.files).toEqual([
-      { path: 'a.txt', status: 'modified', added: 1, removed: 0, binary: false, reverted: false },
-      { path: 'b.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: false },
+      { path: 'a.txt', status: 'modified', added: 1, removed: 0, binary: false, reverted: false, bySession: true },
+      { path: 'b.txt', status: 'added', added: 1, removed: 0, binary: false, reverted: false, bySession: false },
     ]);
+    expect(session.checkpoints.get('1')?.overlapped).toBeUndefined();
     expect(sessionView(session, 'posix').checkpoints).toMatchObject([
       { id: '1', files: [{ path: 'a.txt' }, { path: 'b.txt' }] },
     ]);
@@ -60,7 +75,7 @@ describe('checkpoint service', () => {
     await write('a.txt', 'one\n');
     await turn(() => Promise.resolve());
     expect(session.checkpoints.size).toBe(0);
-    expect(session.transcript).toEqual([]);
+    expect(session.transcript.map((i) => i.kind)).toEqual(['user']);
   });
 
   it('numbers the checkpoints and keeps each turn apart', async () => {
@@ -107,7 +122,7 @@ describe('checkpoint service', () => {
     });
     await write('b.txt', '2 and mine\n');
 
-    expect(await service.revert(session, '1', { path: 'a.txt' })).toMatchObject({ restored: ['a.txt'] });
+    expect(await service.revert(session, '1', { paths: ['a.txt'] })).toMatchObject({ restored: ['a.txt'] });
     expect(await read('b.txt')).toBe('2 and mine\n');
 
     const all = await service.revert(session, '1');
@@ -116,6 +131,38 @@ describe('checkpoint service', () => {
 
     expect(await service.revert(session, '1', { force: true })).toMatchObject({ restored: ['b.txt'] });
     expect(await read('b.txt')).toBe('1\n');
+  });
+
+  it('leaves to another session what only that session changed while both worked, and says they overlapped', async () => {
+    const other = new Session('s2', { cwd: ws });
+    await write('a.txt', 'a0\n');
+    await write('b.txt', 'b0\n');
+    await begin(session);
+    await begin(other);
+    other.noteTouched('b.txt'); // relative to the session's folder, as Kiro may send it
+    await write('b.txt', 'b1 by the other session\n');
+    await writeByKiro(session, 'a.txt', 'a1\n');
+    await write('c.txt', 'by a command or the user\n');
+    await end(other);
+    await end(session);
+
+    const mine = session.checkpoints.get('2');
+    const theirs = other.checkpoints.get('1');
+    expect(mine?.files.map((f) => `${f.path}:${String(f.bySession)}`)).toEqual(['a.txt:true', 'c.txt:false']);
+    expect(theirs?.files.map((f) => `${f.path}:${String(f.bySession)}`)).toEqual(['b.txt:true', 'c.txt:false']);
+    expect([mine?.overlapped, theirs?.overlapped]).toEqual([true, true]);
+
+    expect(await service.revert(session, '2')).toMatchObject({ restored: ['a.txt', 'c.txt'] });
+    expect(await read('b.txt')).toBe('b1 by the other session\n');
+    expect(await read('a.txt')).toBe('a0\n');
+  });
+
+  it('does not count its own earlier turn as another one', async () => {
+    await begin(session);
+    await begin(session);
+    await writeByKiro(session, 'a.txt', 'x\n');
+    await end(session);
+    expect(session.checkpoints.get('1')?.overlapped).toBeUndefined();
   });
 
   it('knows nothing of a checkpoint that does not exist', async () => {

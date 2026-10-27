@@ -65,6 +65,9 @@ export const UI_MESSAGES = [
   'View changes',
   'Revert',
   'Revert this file',
+  'No tool call of this turn named the file: a command Kiro ran, another session or you changed it.',
+  'Another session worked in this folder at the same time. Files only it named are on its own card.',
+  'not from a tool call',
   'Reverted',
   'Export the session as Markdown',
   // Toolbar

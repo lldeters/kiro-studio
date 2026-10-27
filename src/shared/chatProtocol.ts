@@ -90,12 +90,16 @@ export interface CheckpointFileView {
   removed: number;
   binary: boolean;
   reverted: boolean;
+  /** False when no tool call of the turn named the file (a command, another session or the user changed it). */
+  bySession: boolean;
 }
 
 /** What one turn changed in the workspace. */
 export interface CheckpointView {
   id: string;
   files: CheckpointFileView[];
+  /** Another session worked in the same folder during the turn. */
+  overlapped?: boolean;
 }
 
 export interface ConfigSelectView {

@@ -112,6 +112,36 @@ describe('tool calls', () => {
   });
 });
 
+describe('files a turn names', () => {
+  it('collects locations, diffs and previews of the running turn, and starts empty with the next one', () => {
+    const s = newSession();
+    apply(s, u.toolCall('before-any-turn', { locations: [{ path: '/ws/early.txt' }] }));
+    expect([...s.touched]).toEqual([]);
+
+    s.beginTurn('go');
+    apply(
+      s,
+      u.toolCall('t1', {
+        locations: [{ path: '/ws/a.txt' }],
+        content: [{ type: 'diff', path: '/ws/b.txt', oldText: null, newText: 'x' }],
+      }),
+    );
+    s.noteTouched('/ws/written.txt');
+    expect([...s.touched].sort()).toEqual(['/ws/a.txt', '/ws/b.txt', '/ws/hello.txt', '/ws/written.txt']);
+
+    s.endTurn({ stopReason: 'end_turn' });
+    s.beginTurn('again');
+    expect([...s.touched]).toEqual([]);
+  });
+
+  it('ignores the tool calls of a replay', () => {
+    const s = newSession();
+    s.beginTurn('go');
+    apply(s, { ...u.toolCall('old', { locations: [{ path: '/ws/old.txt' }] }), _meta: { kiro: { replay: true } } });
+    expect([...s.touched]).toEqual([]);
+  });
+});
+
 describe('turn state machine', () => {
   it('goes idle → starting → running → idle and ignores turn_end/turn_completion as an end', () => {
     const s = newSession();
@@ -277,7 +307,17 @@ describe('resetForReplay', () => {
   it('keeps the checkpoints, with their times, and shows their cards after the replay in the order they were made', () => {
     let now = 1000;
     const s = new Session(SESSION_ID, { now: () => now });
-    const files = [{ path: 'a.ts', status: 'modified' as const, added: 1, removed: 0, binary: false, reverted: false }];
+    const files = [
+      {
+        path: 'a.ts',
+        status: 'modified' as const,
+        added: 1,
+        removed: 0,
+        binary: false,
+        reverted: false,
+        bySession: true,
+      },
+    ];
     s.addCheckpoint({ id: '1', files });
     now = 2000;
     s.resetForReplay();

@@ -290,7 +290,17 @@ describe('a transcript that was rebuilt between two sends', () => {
 });
 
 describe('checkpoints in the view', () => {
-  const files = [{ path: 'a.ts', status: 'modified' as const, added: 2, removed: 1, binary: false, reverted: false }];
+  const files = [
+    {
+      path: 'a.ts',
+      status: 'modified' as const,
+      added: 2,
+      removed: 1,
+      binary: false,
+      reverted: false,
+      bySession: true,
+    },
+  ];
 
   it('puts a marker in the transcript and the details in the meta', () => {
     const s = make();
