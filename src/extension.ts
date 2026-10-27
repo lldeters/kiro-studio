@@ -3,6 +3,7 @@ import { AgentHost } from './host/agentHost';
 import { ChatController } from './host/chatController';
 import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
+import { registerEditorCommands } from './host/editorCommands';
 import { DebugChat } from './host/debugChat';
 import { DiffProvider } from './host/diffProvider';
 import { McpChat } from './host/mcpChat';
@@ -36,6 +37,8 @@ export interface KiroStudioApi {
   startSpec(workflow: SpecWorkflow, name: string, description: string): Promise<void>;
   /** The text of the last message the user sent in the active session. */
   readonly lastUserMessage: string | undefined;
+  /** The names of what was attached to that message (`a.ts`, `a.ts:3-9`). */
+  readonly lastUserAttachments: readonly string[];
   /** True while the active session is in the middle of a turn. */
   readonly activeBusy: boolean;
   /** The agent (mode) of the active session. */
@@ -128,8 +131,23 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   );
 
   registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat, plan });
+  registerEditorCommands({ context, chat, settings });
+  // The debug commands of the first phase are for working on the extension; users have the chat.
+  void vscode.commands.executeCommand(
+    'setContext',
+    'kiroStudio.development',
+    context.extensionMode !== vscode.ExtensionMode.Production,
+  );
 
   const firstCheck = setup.check();
+  const lastUser = () => {
+    const items = agentHost.activeSession?.transcript ?? [];
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (item?.kind === 'user') return item;
+    }
+    return undefined;
+  };
   return {
     get uiState() {
       return setup.state;
@@ -148,12 +166,10 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     },
     startSpec: (workflow, name, description) => specs.actions.startSpec(workflow, name, description),
     get lastUserMessage() {
-      const items = agentHost.activeSession?.transcript ?? [];
-      for (let i = items.length - 1; i >= 0; i--) {
-        const item = items[i];
-        if (item?.kind === 'user') return item.text;
-      }
-      return undefined;
+      return lastUser()?.text;
+    },
+    get lastUserAttachments() {
+      return lastUser()?.attachments ?? [];
     },
     get activeBusy() {
       return agentHost.activeSession?.busy ?? false;

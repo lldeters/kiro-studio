@@ -66,6 +66,28 @@ suite('Kiro Studio', () => {
     assert.strictEqual(api.agentPhase, 'stopped');
   });
 
+  test('offers "Fix with Kiro" among the quick fixes of an error', async () => {
+    await activate();
+    const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', 'sample.txt'));
+    await vscode.window.showTextDocument(uri);
+    const problems = vscode.languages.createDiagnosticCollection('kiro-studio-test');
+    try {
+      const range = new vscode.Range(0, 0, 0, 5);
+      problems.set(uri, [new vscode.Diagnostic(range, 'Something is wrong here', vscode.DiagnosticSeverity.Error)]);
+      const titles = async (): Promise<string[]> =>
+        (
+          await vscode.commands.executeCommand<(vscode.CodeAction | vscode.Command)[]>(
+            'vscode.executeCodeActionProvider',
+            uri,
+            range,
+          )
+        ).map((action) => action.title);
+      await waitForAsync(async () => (await titles()).includes('Fix with Kiro'), 'the quick fix of Kiro Studio');
+    } finally {
+      problems.dispose();
+    }
+  });
+
   test('"Restart" without a usable CLI shows the error instead of throwing', async () => {
     await activate();
     await vscode.commands.executeCommand('kiroStudio.restart');
@@ -130,6 +152,19 @@ suite('Kiro Studio', () => {
       } finally {
         fs.rmSync(output, { force: true });
       }
+    });
+
+    test('explains the selected lines, with the lines attached', async () => {
+      const api = await activate();
+      await setCliPath(createFakeCli('ready'));
+      await recheck();
+      const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', 'sample.txt'));
+      const editor = await vscode.window.showTextDocument(uri);
+      editor.selection = new vscode.Selection(0, 0, 0, 5);
+      await vscode.commands.executeCommand('kiroStudio.explainSelection');
+      await waitFor(() => api.lastUserMessage === 'Explain what this code does and how it works.', 'the prompt');
+      assert.deepStrictEqual(api.lastUserAttachments, ['sample.txt:1']);
+      await waitFor(() => !api.activeBusy, 'the turn to end');
     });
 
     test('lists the sessions of the agent in the Kiro panel and opens an earlier one', async () => {

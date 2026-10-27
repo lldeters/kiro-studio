@@ -6,6 +6,14 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Added
 
+- The editor in the chat: _Kiro Studio_ in the editor's context menu adds the selected lines or the file to the chat, or
+  asks Kiro to explain or fix the selection (with the problems VS Code knows of in it); the explorer and the editor tab
+  add files and folders; `#selection` attaches the selected lines from the input. Errors and warnings offer _Fix with
+  Kiro_ among their quick fixes (setting `kiroStudio.quickFix`).
+- Keys: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> on macOS) adds the selection to
+  the chat, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts a session while the
+  chat has the focus. _Stop the Running Turn_ is a command.
+- ↑ and ↓ in the empty input bring back the earlier messages of the session.
 - Checkpoints record every folder of a multi-root workspace, not only the first; with several folders a file is shown
   after its folder's name.
 - `kiroStudio.checkpoints.exclude` leaves more files out of checkpoints (`.gitignore` syntax), and
@@ -14,10 +22,11 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ### Fixed
 
+- The debug commands of the first phase (_Debug: New Session_, _Send Prompt_, _Cancel Turn_) were in every user's command
+  palette. They are only there while the extension is being developed.
 - Two windows on the same folder shared the index and the chain of snapshots of the checkpoint repository: their snapshots
   could fail on the index lock and switch checkpoints off, and each new window cut off the other's chain. Every window now
   has an index, an exclude list and a chain of its own; the objects are still shared.
-
 - _Revert_ of a turn also put back what a second session changed in the same folder while the turn ran, without a word,
   because a checkpoint compares the whole folder. A file that only the other session's tool calls named is now left to
   that session's checkpoint, and both cards say that another session worked at the same time. Files that no tool call of

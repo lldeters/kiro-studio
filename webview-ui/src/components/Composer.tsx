@@ -32,6 +32,9 @@ export function Composer({ session }: { session: SessionView }) {
   const [caret, setCaret] = useState(text.length);
   const [selected, setSelected] = useState(0);
   const [dismissedAt, setDismissedAt] = useState<string>();
+  /** While the user goes through earlier messages with ↑ and ↓: which one of which session is in the box. */
+  const [recall, setRecall] = useState<{ sessionId: string; index: number }>();
+  const recalled = recall?.sessionId === session.id ? recall.index : undefined;
 
   const busy = session.phase !== 'idle';
   const canSend = session.status === 'ready' && !busy && (text.trim() !== '' || attachments.length > 0);
@@ -116,13 +119,42 @@ export function Composer({ session }: { session: SessionView }) {
         return;
       }
     }
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && goThroughHistory(event)) {
+      event.preventDefault();
+    } else if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       send();
     } else if (event.key === 'Escape' && busy) {
       event.preventDefault();
       cancel();
     }
+  };
+
+  /**
+   * ↑ in an empty box brings back the last message of the session, and further ↑ and ↓ go through the earlier ones, as
+   * in a terminal. Only while the box holds a recalled message unchanged, and only from its first (↑) or last (↓) line,
+   * so that moving through a text of several lines still works. Returns whether it took the key.
+   */
+  const goThroughHistory = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return false;
+    const history = session.items.flatMap((item) =>
+      item.kind === 'user' && item.text.trim() !== '' ? [item.text] : [],
+    );
+    const browsing = recalled !== undefined && history[recalled] === text;
+    if (!browsing && text !== '') return false;
+    const { selectionStart, selectionEnd, value } = event.currentTarget;
+    const up = event.key === 'ArrowUp';
+    if (up ? value.lastIndexOf('\n', selectionStart - 1) >= 0 : value.indexOf('\n', selectionEnd) >= 0) return false;
+    const from = browsing ? recalled : history.length;
+    const next = from + (up ? -1 : 1);
+    if (next < 0 || (!browsing && !up)) return false;
+    const message = next < history.length ? history[next] : undefined;
+    setRecall(message === undefined ? undefined : { sessionId: session.id, index: next });
+    update({ text: message ?? '' });
+    const end = message?.length ?? 0;
+    setCaret(end);
+    requestAnimationFrame(() => area.current?.setSelectionRange(end, end));
+    return true;
   };
 
   const addFiles = async (files: Iterable<File>) => {
@@ -281,6 +313,8 @@ function chipIcon(attachment: AttachmentView): string {
       return 'warning';
     case 'gitDiff':
       return 'git-compare';
+    case 'selection':
+      return 'list-selection';
     default:
       return 'file';
   }

@@ -37,6 +37,36 @@ describe('resolveAttachments', () => {
     expect(result.skipped).toEqual([]);
   });
 
+  it('sends a selection as text with the file and the lines, in a fence its own backticks cannot end', async () => {
+    const result = await resolveAttachments(
+      [
+        { kind: 'selection', path: 'src/a.ts', startLine: 3, endLine: 4, text: 'const s = `x`;\n// ```\n' },
+        { kind: 'selection', path: '/ws/b.py', startLine: 7, endLine: 7, text: 'pass' },
+      ],
+      deps(),
+    );
+    expect(result.blocks).toEqual([
+      { type: 'text', text: 'Selected lines 3-4 of /ws/src/a.ts:\n````ts\nconst s = `x`;\n// ```\n````' },
+      { type: 'text', text: 'Selected line 7 of /ws/b.py:\n```py\npass\n```' },
+    ]);
+    expect(result.labels).toEqual(['a.ts:3-4', 'b.py:7']);
+  });
+
+  it('does not send a selection from outside the workspace, or one that holds nothing', async () => {
+    const result = await resolveAttachments(
+      [
+        { kind: 'selection', path: '/etc/passwd', startLine: 1, endLine: 1, text: 'root' },
+        { kind: 'selection', path: 'a.ts', startLine: 1, endLine: 2, text: '  \n' },
+      ],
+      deps(),
+    );
+    expect(result.blocks).toEqual([]);
+    expect(result.skipped).toEqual([
+      { reason: 'outside', label: 'passwd:1' },
+      { reason: 'empty', label: 'a.ts:1-2' },
+    ]);
+  });
+
   it('does not link anything outside the workspace or anything that is not there', async () => {
     const result = await resolveAttachments(
       [

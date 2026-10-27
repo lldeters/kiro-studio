@@ -6,7 +6,9 @@ interface Manifest {
     commands: { command: string; title: string }[];
     views: Record<string, { id: string }[]>;
     viewsWelcome: { view: string; contents: string }[];
-    menus: Record<string, { command: string; when?: string }[]>;
+    menus: Record<string, { command?: string; submenu?: string; when?: string }[]>;
+    submenus?: { id: string; label: string }[];
+    keybindings?: { command: string; key: string; when?: string }[];
     configuration: { properties: Record<string, unknown> };
   };
 }
@@ -21,9 +23,24 @@ describe('manifest', () => {
     expect(manifest.contributes.commands.length).toBe(commands.size);
   });
 
-  it('puts only declared commands into the menus', () => {
-    const used = Object.values(manifest.contributes.menus).flatMap((entries) => entries.map((e) => e.command));
+  it('puts only declared commands and submenus into the menus, and gives every key a declared command', () => {
+    const entries = Object.values(manifest.contributes.menus).flat();
+    const used = entries.flatMap((e) => (e.command === undefined ? [] : [e.command]));
     expect(used.filter((id) => !commands.has(id))).toEqual([]);
+    const submenus = new Set((manifest.contributes.submenus ?? []).map((s) => s.id));
+    const nested = entries.flatMap((e) => (e.submenu === undefined ? [] : [e.submenu]));
+    expect(nested.filter((id) => !submenus.has(id))).toEqual([]);
+    for (const id of submenus) expect(manifest.contributes.menus[id], id).toBeDefined();
+    for (const label of (manifest.contributes.submenus ?? []).map((s) => s.label))
+      expect(nls[label.replace(/%/g, '')], label).toBeTruthy();
+    const keyed = (manifest.contributes.keybindings ?? []).map((k) => k.command);
+    expect(keyed.filter((id) => !commands.has(id))).toEqual([]);
+  });
+
+  it('keeps the debug commands of the first phase out of the command palette of users', () => {
+    const palette = manifest.contributes.menus.commandPalette ?? [];
+    for (const id of [...commands].filter((c) => c.startsWith('kiroStudio.debug.')))
+      expect(palette.find((e) => e.command === id)?.when, id).toBe('kiroStudio.development');
   });
 
   it('shows menus only on views that exist', () => {

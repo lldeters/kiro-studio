@@ -40,7 +40,9 @@ VS Code window (extension host, extensionKind: workspace)
 │   │                       session, the checkpoint services; merges change notifications to one per 40 ms
 │   ├─ chatController.ts .. talks to the chat webviews: sends changes (30 ms), validates and carries out requests
 │   ├─ chatView.ts ........ the sidebar view and the editor-tab variant; the page is built by src/view/chatHtml.ts
-│   ├─ promptContext.ts ... pickers (files, folders, steering, specs) and readers (git diff, problems) for attachments
+│   ├─ promptContext.ts ... pickers (files, folders, the selection, steering, specs) and readers (git diff,
+│   │                       problems) for attachments
+│   ├─ editorCommands.ts .. the editor in the chat: add the selection or files, Explain, Fix, the quick fix
 │   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors and read-only texts
 │   ├─ panel/ ............. panel.ts (state, commands, actions), kiroFiles.ts (VS Code reader, watcher on `.kiro`),
 │   │                       treeProvider.ts (nodes -> tree items)
@@ -149,7 +151,8 @@ the agent is never started (`capabilities.untrustedWorkspaces: limited`, no virt
   and only if it exists, only `http`, `https` and `mailto` links open, and a diff is looked up in the session by tool
   call and position, never taken from the message. The page has a strict content security policy: scripts only with a
   nonce or from the extension's `dist/webview`, no network, no remote images; Markdown cannot contain HTML.
-- Attachments: files and folders are linked (not read) only inside the workspace; the shadow repository for
+- Attachments: files and folders are linked (not read) only inside the workspace, and selected lines are sent as text
+  only for files inside it; the shadow repository for
   checkpoints is separate from the user's repository, which is never read or written (`#git diff` only runs a
   read-only `git diff`); the home folder is never snapshotted.
 
@@ -237,7 +240,9 @@ The input is a rounded box like the chat of VS Code: the context chips, the text
 model and effort (native selects that look like quiet buttons) and Send, which turns into Stop while a turn runs. Under
 the box a line shows Supervised/Autopilot, how full the context is (with the tokens, the sum of Kiro's breakdown), the
 credits of the session, compact and export; above it a chip shows what the last turn with changes changed (turns without
-changes leave no checkpoint) and opens those changes.
+changes leave no checkpoint) and opens those changes. ↑ in the empty input brings back the last message of the session,
+and ↑ and ↓ go through the earlier ones while the box holds a recalled message unchanged (from its first or last line, so
+that a text of several lines can still be moved through).
 
 Under every answer a quiet line says what the turn cost and how long it took. Kiro reports credits per turn
 (`turn_completion`, `promptTurnSummaries[].usage`, all summaries added up), not tokens; the session store turns each
@@ -253,6 +258,13 @@ from `shared/planText.ts`, used by both places. `kiroStudio.planUsage.enabled` t
 
 An error while the page is drawn is caught by an error boundary around the app: the page says what happened, sends the
 error to the host for the protocol log, and can draw the chat again, instead of React removing the whole page.
+
+Commands outside the chat feed it (`src/host/editorCommands.ts`): _Add Selection to Chat_ and _Add File to Chat_ put
+attachments into the draft of the session on screen (the chat is shown, a session started when there is none, and a page
+that is still loading gets them once it is ready); _Explain_, _Fix_ and the quick fix _Fix with Kiro_ send a prompt with
+the selected lines (whole lines, unsaved text included, with the problems VS Code knows of in them) to the session on
+screen when it is free, else to a new one. A selection is an attachment of its own (`selection`: path, lines, text),
+sent as a text block with the file, the lines and a fence longer than any run of backticks in it.
 
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
