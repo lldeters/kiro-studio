@@ -18,6 +18,8 @@ export interface HarnessOptions {
   workspace?: string;
   shutdownGraceMs?: number;
   files?: Record<string, string>;
+  /** Symbolic links, path to target. With it the file system resolves links (every path counts as existing). */
+  links?: Record<string, string>;
   /** Replaces the transport, for example to make starting fail. Receives the fake. */
   transport?: (fake: FakeAgent) => TransportFactory;
   writeGate?: WriteGate;
@@ -53,6 +55,16 @@ export function createHarness(options: HarnessOptions = {}) {
       writes.push({ path, content });
       return Promise.resolve();
     },
+    ...(options.links === undefined
+      ? {}
+      : {
+          realPath: (path: string) => {
+            for (const [link, target] of Object.entries(options.links ?? {}))
+              if (path === link || path.startsWith(`${link}/`))
+                return Promise.resolve(target + path.slice(link.length));
+            return Promise.resolve(path);
+          },
+        }),
   };
   const lines: string[] = [];
   const log = new ProtocolLog(

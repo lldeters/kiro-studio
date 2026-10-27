@@ -2,6 +2,15 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- Kiro could read and write files outside the workspace through a symbolic link inside it (`link -> ~/.ssh`, say): the
+  check compared paths only as they were written. It now compares where the file really is, and so does the refusal to
+  write `.kiro/settings/mcp.json`, which a link to `.kiro/settings` got around. A file or folder whose name starts with
+  two dots (`..cache`) was taken for a way out of the workspace and refused; it is allowed now.
+
 ## [0.2.0] - 2026-10-28
 
 ### Added

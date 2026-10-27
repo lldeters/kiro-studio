@@ -62,6 +62,12 @@ describe('comparison', () => {
     expect(isInside('/ws', '/ws/../etc/passwd', 'posix')).toBe(false);
     expect(isInside('/ws', '/ws/a/b', 'posix')).toBe(true);
   });
+  it('takes a name that starts with two dots for a name, not for a way up', () => {
+    expect(isInside('/ws', '/ws/..config/x', 'posix')).toBe(true);
+    expect(isInside('/ws', '/ws/..', 'posix')).toBe(false);
+    expect(isInside('C:\\Work', 'C:\\Work\\..cache\\a.ts', 'win32')).toBe(true);
+    expect(isInside('C:\\Work', 'C:\\Work\\..\\a.ts', 'win32')).toBe(false);
+  });
   it('checks several roots', () => {
     expect(isInsideAny(['/a', '/b'], '/b/c', 'posix')).toBe(true);
     expect(isInsideAny([], '/b/c', 'posix')).toBe(false);

@@ -3,6 +3,7 @@
  * unsaved changes. A write into an open document goes through the editor and is saved, so editor, disk and the
  * commands Kiro runs afterwards agree.
  */
+import * as fs from 'node:fs/promises';
 import * as vscode from 'vscode';
 import type { FileSystemPort } from '../acp/handlers/fs';
 import { currentPlatform, samePath } from '../util/paths';
@@ -25,6 +26,14 @@ export class VsCodeFileSystemPort implements FileSystemPort {
       if (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') return undefined;
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
       throw error;
+    }
+  }
+
+  async realPath(path: string): Promise<string | undefined> {
+    try {
+      return await fs.realpath(path);
+    } catch {
+      return undefined;
     }
   }
 

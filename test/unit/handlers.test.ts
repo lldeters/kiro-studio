@@ -337,6 +337,22 @@ describe('file access', () => {
     expect(h.lines.some((l) => l.includes('refused file access outside the workspace'))).toBe(true);
   });
 
+  it('refuses a path that leads out of the workspace through a symbolic link', async () => {
+    const h = make({ files: { '/etc/passwd': 'secret', '/ws/a.txt': 'ok' }, links: { '/ws/link': '/etc' } });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect((await read(h, '/ws/link/passwd')).error).toMatchObject({ code: -32602 });
+    expect((await write(h, '/ws/link/new.txt', 'bad')).error).toMatchObject({ code: -32602 });
+    expect(h.writes).toEqual([]);
+    expect((await read(h, '/ws/a.txt')).result).toEqual({ content: 'ok' });
+  });
+
+  it('allows a workspace that is itself reached through a link, and a file that does not exist yet', async () => {
+    const h = make({ links: { '/ws': '/private/ws' } });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect((await write(h, '/ws/sub/new.txt', 'hi')).error).toBeUndefined();
+    expect(h.writes).toEqual([{ path: '/ws/sub/new.txt', content: 'hi' }]);
+  });
+
   it('allows the session working directory even when it is not a workspace folder', async () => {
     const h = make({ files: { '/other/a.txt': 'ok' } });
     await h.agent.newSession({ cwd: '/other', applyDefaults: false });
@@ -387,6 +403,17 @@ describe('file access', () => {
       '/ws/docs/mcp.json',
       '/ws/.kiro/steering/mcp.md',
     ]);
+  });
+
+  it('refuses to write the MCP configuration through a symbolic link as well', async () => {
+    const h = make({ links: { '/ws/cfg': '/ws/.kiro/settings' } });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect((await write(h, '/ws/cfg/mcp.json', '{}')).error).toMatchObject({
+      code: -32602,
+      message: MCP_CONFIG_REFUSAL,
+    });
+    expect((await write(h, '/ws/cfg/other.json', '{}')).error).toBeUndefined();
+    expect(h.writes.map((w) => w.path)).toEqual(['/ws/cfg/other.json']);
   });
 
   it.each([
