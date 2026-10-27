@@ -2,8 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { Session } from '../../src/acp/sessions';
 import { parseConfigOptions, parseSessionNotification } from '../../src/acp/types';
 import type { SessionPatch, SessionView } from '../../src/shared/chatProtocol';
-import { PatchTracker, countLineChanges, sessionView, tabView, toolView } from '../../src/view/chatPresenter';
-import { SESSION_ID, configOptions, permissionRequest, u, update } from '../support/kiro';
+import {
+  PatchTracker,
+  contextTokens,
+  countLineChanges,
+  sessionView,
+  tabView,
+  toolView,
+} from '../../src/view/chatPresenter';
+import { SESSION_ID, configOptions, info, permissionRequest, u, update } from '../support/kiro';
 import { approvalDetails } from '../../src/acp/sessions';
 
 function apply(session: Session, body: Record<string, unknown>): void {
@@ -139,6 +146,36 @@ describe('session views', () => {
     expect(view.config.map((c) => c.id)).toEqual(['mode', 'model', 'memoryReflection', 'autopilot']);
     expect(view).toMatchObject({ title: 'Fix the bug', phase: 'starting', autopilot: false });
     expect(tabView(s)).toEqual({ id: SESSION_ID, title: 'Fix the bug', busy: true, attention: true, lost: false });
+  });
+
+  it('passes on what a turn cost and the tokens in the context', () => {
+    const s = make();
+    s.beginTurn('hello');
+    apply(s, u.turnCompletion(0.42));
+    apply(
+      s,
+      info('context_usage', {
+        usagePercentage: 12,
+        breakdown: {
+          contextFiles: { tokens: 1000, percent: 1 },
+          tools: { mcp: { tokens: 300, percent: 0.3 }, builtin: { tokens: 200, percent: 0.2 } },
+          yourPrompts: { tokens: 50, percent: 0.05 },
+          note: 'not a part',
+        },
+      }),
+    );
+    const view = sessionView(s, 'posix');
+    expect(view.items[1]).toMatchObject({ kind: 'usage', text: '', credits: 0.42, elapsedMs: 4106 });
+    expect(view.context).toEqual({ percentage: 12, tokens: 1550 });
+  });
+
+  it('counts the tokens of a breakdown, preferring a part’s own count to its sub-parts', () => {
+    expect(contextTokens(undefined)).toBeUndefined();
+    expect(contextTokens({})).toBeUndefined();
+    expect(contextTokens({ memory: { percent: 3 } })).toBeUndefined();
+    expect(
+      contextTokens({ tools: { tokens: 10, mcp: { tokens: 4 }, builtin: { tokens: 6 } }, memory: { tokens: 5 } }),
+    ).toBe(15);
   });
 
   it('shows the start of the id for a session without a title', () => {

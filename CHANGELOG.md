@@ -4,6 +4,13 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 
 ## [Unreleased]
 
+### Added
+
+- Under every answer: the credits it cost and how long it took, also in a conversation that was opened again. Kiro
+  reports credits per answer, not tokens.
+- The line under the input box shows the credits of the whole session instead of the last answer, and the context fill
+  names the tokens in the context when Kiro reports them.
+
 ### Fixed
 
 - Choosing an entry of the `/` or `#` list (a command, or a file from the picker, also after cancelling it) left the chat

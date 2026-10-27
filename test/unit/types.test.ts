@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseInitializeResult, hasExtension, looksLikeKiroV3 } from '../../src/acp/capabilities';
 import { parseConfigOptions, parseSessionNotification } from '../../src/acp/types';
-import { SESSION_ID, configOptions, initializeResult, u, update } from '../support/kiro';
+import { SESSION_ID, configOptions, info, initializeResult, u, update } from '../support/kiro';
 
 const parse = (body: Record<string, unknown>) => parseSessionNotification(update(SESSION_ID, body));
 
@@ -108,6 +108,20 @@ describe('parseSessionNotification', () => {
     expect(parse(u.turnCompletion(0.1))?.event).toMatchObject({
       info: { kind: 'turn_completion', credits: 0.1, elapsedMs: 4106, usedTools: ['fs_write'], status: 'success' },
     });
+    expect(
+      parse(
+        info('turn_completion', {
+          promptTurnSummaries: [
+            { unit: 'credit', usage: '0.25', usedTools: ['fs_write', 'fs_read'] },
+            { unit: 'credit', usage: 0.5, usedTools: ['fs_write'] },
+            { unit: 'credit' },
+          ],
+        }),
+      )?.event,
+    ).toMatchObject({ info: { kind: 'turn_completion', credits: 0.75, usedTools: ['fs_write', 'fs_read'] } });
+    expect(parse(info('turn_completion', { promptTurnSummaries: [{ usage: '' }] }))?.event).not.toHaveProperty(
+      'info.credits',
+    );
     expect(parse(u.turnEnd('cancelled'))?.event).toMatchObject({ info: { kind: 'turn_end', stopReason: 'cancelled' } });
     expect(parse(u.pending('t1'))?.event).toMatchObject({
       info: {

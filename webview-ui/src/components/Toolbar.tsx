@@ -1,11 +1,11 @@
 import type { CSSProperties } from 'react';
 import type { SessionView } from '../../../src/shared/chatProtocol';
-import { formatCredits } from '../../../src/shared/format';
+import { formatCredits, formatNumber } from '../../../src/shared/format';
 import { useT } from '../i18n';
 import { useChat } from '../store';
 import { post } from '../vscode';
 
-/** The line under the input box: Supervised or Autopilot, how full the context is, the last turn's credits. */
+/** The line under the input box: Supervised or Autopilot, how full the context is, the credits of the session. */
 export function Toolbar({ session }: { session: SessionView }) {
   const t = useT();
   const canCompact = useChat((s) => s.capabilities.compact);
@@ -14,7 +14,17 @@ export function Toolbar({ session }: { session: SessionView }) {
   const percentage = session.context?.percentage;
   const summarize = session.context?.summarizationThreshold ?? 80;
   const level = percentage === undefined ? '' : percentage >= 95 ? ' danger' : percentage >= summarize ? ' warn' : '';
-  const credits = session.lastTurn?.credits;
+  const locale = document.documentElement.lang || undefined;
+  const tokens = session.context?.tokens;
+  const contextLabel =
+    percentage === undefined
+      ? ''
+      : tokens === undefined
+        ? t('Context used: {0}%', Math.round(percentage))
+        : t('Context used: {0}% ({1} tokens)', Math.round(percentage), formatNumber(tokens, locale));
+  // Every finished turn of the session, also of a conversation that was opened again.
+  const usages = session.items.filter((item) => item.kind === 'usage' && item.credits !== undefined);
+  const credits = usages.length === 0 ? undefined : usages.reduce((sum, item) => sum + (item.credits ?? 0), 0);
 
   return (
     <div className="toolbar">
@@ -32,12 +42,7 @@ export function Toolbar({ session }: { session: SessionView }) {
         {session.autopilot ? t('Autopilot') : t('Supervised')}
       </button>
       {percentage !== undefined && (
-        <span
-          className={`status-item context${level}`}
-          title={t('Context used: {0}%', Math.round(percentage))}
-          role="img"
-          aria-label={t('Context used: {0}%', Math.round(percentage))}
-        >
+        <span className={`status-item context${level}`} title={contextLabel} role="img" aria-label={contextLabel}>
           <span
             className="context-ring"
             style={{ '--fill': `${Math.min(100, Math.max(2, percentage))}%` } as CSSProperties}
@@ -47,8 +52,8 @@ export function Toolbar({ session }: { session: SessionView }) {
         </span>
       )}
       {credits !== undefined && (
-        <span className="status-item credits" title={t('Credits used by the last turn')}>
-          {t('{0} credits', formatCredits(credits, document.documentElement.lang || undefined))}
+        <span className="status-item credits" title={t('Credits used in this session')}>
+          {t('{0} credits', formatCredits(credits, locale))}
         </span>
       )}
       <span className="toolbar-spacer" />

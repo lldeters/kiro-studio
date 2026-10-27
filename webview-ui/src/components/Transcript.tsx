@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import type { CheckpointView, ItemView, SessionView, ToolView } from '../../../src/shared/chatProtocol';
 import { useT } from '../i18n';
+import { formatCredits, formatDuration } from '../../../src/shared/format';
 import { waitingForOutput } from '../thinking';
 import { CheckpointCard } from './CheckpointCard';
 import { Markdown } from './Markdown';
@@ -118,8 +119,27 @@ const Item = memo(function Item({
       return tool ? <ToolCard tool={tool} sessionId={sessionId} /> : null;
     case 'checkpoint':
       return checkpoint ? <CheckpointCard checkpoint={checkpoint} sessionId={sessionId} /> : null;
+    case 'usage':
+      return <TurnUsage credits={item.credits} elapsedMs={item.elapsedMs} />;
   }
 });
+
+/** What a finished turn cost and how long it took, under its answer. */
+function TurnUsage({ credits, elapsedMs }: { credits: number | undefined; elapsedMs: number | undefined }) {
+  const t = useT();
+  const locale = document.documentElement.lang || undefined;
+  const parts = [
+    ...(credits === undefined ? [] : [t('{0} credits', formatCredits(credits, locale))]),
+    ...(elapsedMs === undefined ? [] : [formatDuration(elapsedMs, locale, t)]),
+  ];
+  if (parts.length === 0) return null;
+  return (
+    <div className="turn-usage" title={t('What this answer cost')}>
+      <span className="codicon codicon-credit-card" aria-hidden="true" />
+      <span>{parts.join(' · ')}</span>
+    </div>
+  );
+}
 
 /** "Kiro is thinking…", shimmering in the accent colour. Not a live region: the end of the turn is announced. */
 function Thinking() {

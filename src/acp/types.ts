@@ -141,6 +141,12 @@ export interface SessionNotification {
 // Parsing
 // ---------------------------------------------------------------------------------------------------------------
 
+/** A number, also when it comes as text ("0.0997"). */
+function amount(value: unknown): number | undefined {
+  if (typeof value === 'string' && value.trim() !== '') return num(Number(value));
+  return num(value);
+}
+
 function parseMeta(update: JsonObject): EventMeta {
   const kiro = kiroMeta(update);
   const messageKey = str(kiro.replayId) ?? str(kiro.messageId) ?? str(kiro.userMessageTag);
@@ -272,13 +278,20 @@ export function parseKiroInfo(update: JsonObject): KiroInfo | undefined {
     case 'turn_end':
       return { kind, ...opt('stopReason', str(kiro.stopReason) ?? str(rec(kiro.turnEnd).stopReason)) };
     case 'turn_completion': {
-      const summary = rec(arr(kiro.promptTurnSummaries)[0]);
+      // One summary per usage breakdown (the CLI's /usage speaks of "usage breakdowns"); a turn costs all of them.
+      const summaries = arr(kiro.promptTurnSummaries).map(rec);
+      const usages = summaries.flatMap((s) => {
+        const usage = amount(s.usage);
+        return usage === undefined ? [] : [usage];
+      });
       return {
         kind,
         ...opt('status', str(kiro.status)),
         ...opt('elapsedMs', num(kiro.elapsedTime)),
-        ...opt('credits', num(summary.usage)),
-        usedTools: arr(summary.usedTools).filter((t): t is string => typeof t === 'string'),
+        ...opt('credits', usages.length === 0 ? undefined : usages.reduce((sum, usage) => sum + usage, 0)),
+        usedTools: [...new Set(summaries.flatMap((s) => arr(s.usedTools)))].filter(
+          (t): t is string => typeof t === 'string',
+        ),
         ...opt('executionId', str(kiro.executionId)),
       };
     }

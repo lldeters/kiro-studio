@@ -198,15 +198,29 @@ describe('toolbar', () => {
     expect(outbox).toEqual([{ type: 'compact', sessionId: 's1' }]);
   });
 
-  it('shows the credits of the last turn once there are some, as the window language writes numbers', () => {
+  it('names the tokens in the context when Kiro reports them', () => {
+    document.documentElement.lang = 'en';
+    render(<Toolbar session={session({ context: { percentage: 42, tokens: 12345 } })} />);
+    expect(screen.getByRole('img', { name: 'Context used: 42% (12,345 tokens)' })).toBeTruthy();
+    document.documentElement.lang = '';
+  });
+
+  it('adds up the credits of every answer of the session, as the window language writes numbers', () => {
     document.documentElement.lang = 'en';
     const { rerender } = render(<Toolbar session={session()} />);
     expect(screen.queryByText(/credits/)).toBeNull();
-    rerender(<Toolbar session={session({ lastTurn: { credits: 0.4217 } })} />);
-    expect(screen.getByTitle('Credits used by the last turn').textContent).toBe('0.42 credits');
+    const items: SessionView['items'] = [
+      { id: 1, kind: 'user', text: 'one', replay: true },
+      { id: 2, kind: 'usage', text: '', credits: 0.2117, elapsedMs: 3000, replay: true },
+      { id: 3, kind: 'user', text: 'two', replay: false },
+      { id: 4, kind: 'usage', text: '', elapsedMs: 1000, replay: false },
+      { id: 5, kind: 'usage', text: '', credits: 0.21, replay: false },
+    ];
+    rerender(<Toolbar session={session({ items })} />);
+    expect(screen.getByTitle('Credits used in this session').textContent).toBe('0.42 credits');
     document.documentElement.lang = 'de';
-    rerender(<Toolbar session={session({ lastTurn: { credits: 0.4218 } })} />);
-    expect(screen.getByTitle('Credits used by the last turn').textContent).toBe('0,42 credits');
+    rerender(<Toolbar session={session({ items: [...items] })} />);
+    expect(screen.getByTitle('Credits used in this session').textContent).toBe('0,42 credits');
     document.documentElement.lang = '';
   });
 

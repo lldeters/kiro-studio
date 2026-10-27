@@ -53,6 +53,9 @@ export function exportMarkdown(session: SessionView, labels: ExportLabels = ENGL
       case 'notice':
         out.push(`> ${item.text.replace(/\n/g, '\n> ')}`);
         break;
+      case 'usage':
+        // The cost of a turn is shown in the chat, not part of the conversation.
+        break;
       case 'checkpoint': {
         const checkpoint = item.checkpointId === undefined ? undefined : checkpoints.get(item.checkpointId);
         if (checkpoint) {

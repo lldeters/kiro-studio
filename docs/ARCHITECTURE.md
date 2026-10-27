@@ -207,9 +207,14 @@ on, unless the reader opened or closed it. The recordings of the CLI contain no 
 
 The input is a rounded box like the chat of VS Code: the context chips, the text, and a row with `+` (context), agent,
 model and effort (native selects that look like quiet buttons) and Send, which turns into Stop while a turn runs. Under
-the box a line shows Supervised/Autopilot, how full the context is, the credits of the last turn, compact and export;
-above it a chip shows what the last turn with changes changed (turns without changes leave no checkpoint) and opens
-those changes.
+the box a line shows Supervised/Autopilot, how full the context is (with the tokens, the sum of Kiro's breakdown), the
+credits of the session, compact and export; above it a chip shows what the last turn with changes changed (turns without
+changes leave no checkpoint) and opens those changes.
+
+Under every answer a quiet line says what the turn cost and how long it took. Kiro reports credits per turn
+(`turn_completion`, `promptTurnSummaries[].usage`, all summaries added up), not tokens; the session store turns each
+completion into a `usage` item of the transcript, so a reopened conversation shows them too, and the session total is
+the sum of these items.
 
 An error while the page is drawn is caught by an error boundary around the app: the page says what happened, sends the
 error to the host for the protocol log, and can draw the chat again, instead of React removing the whole page.

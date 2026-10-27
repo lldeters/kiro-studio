@@ -10,8 +10,10 @@ export function waitingForOutput(session: SessionView): boolean {
   const last = session.items[session.items.length - 1];
   if (last === undefined) return true;
   switch (last.kind) {
+    // After `usage` Kiro has reported what the turn cost; it is about to end.
     case 'assistant':
     case 'thought':
+    case 'usage':
       return false;
     case 'tool': {
       const state = session.tools.find((tool) => tool.toolCallId === last.toolCallId)?.state;

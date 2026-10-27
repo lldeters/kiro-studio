@@ -49,6 +49,10 @@ describe('waitingForOutput', () => {
     expect(waitingForOutput(session({ items: [item(1, 'user'), item(2, 'thought')] }))).toBe(false);
   });
 
+  it('is false once Kiro has said what the turn cost', () => {
+    expect(waitingForOutput(session({ items: [item(1, 'user'), item(2, 'assistant'), item(3, 'usage')] }))).toBe(false);
+  });
+
   it('is false while a tool runs, and true again once it has finished', () => {
     const items = [item(1, 'user'), item(2, 'tool', { toolCallId: 't1' })];
     expect(waitingForOutput(session({ items, tools: [tool('running')] }))).toBe(false);

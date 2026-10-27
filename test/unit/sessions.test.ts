@@ -4,6 +4,7 @@ import { parseConfigOptions, parseSessionNotification } from '../../src/acp/type
 import {
   SESSION_ID,
   configOptions,
+  info,
   permissionRequest,
   sessionResult,
   turnApprovalRequest,
@@ -129,6 +130,23 @@ describe('turn state machine', () => {
       usedTools: ['fs_write'],
       stopReason: 'end_turn',
     });
+  });
+
+  it('puts what each turn cost under its answer, also for a replayed conversation', () => {
+    const s = newSession();
+    apply(s, u.user('First', { replay: true, messageId: 'm1' }));
+    apply(s, info('turn_completion', { replay: true, promptTurnSummaries: [{ unit: 'credit', usage: 0.25 }] }));
+    s.beginTurn('Second');
+    apply(s, u.agent('Done'));
+    const changes: SessionChange[] = [];
+    s.changes.on((c) => changes.push(c));
+    apply(s, u.turnCompletion());
+    expect(changes).toContain('transcript');
+    expect(s.transcript.map((i) => i.kind)).toEqual(['user', 'usage', 'user', 'assistant', 'usage']);
+    expect(s.transcript[4]).toMatchObject({ kind: 'usage', credits: 0.0997, elapsedMs: 4106 });
+    // Nothing to show: no item.
+    apply(s, info('turn_completion', { status: 'success' }));
+    expect(s.transcript).toHaveLength(5);
   });
 
   it('waits for approval and resumes', () => {

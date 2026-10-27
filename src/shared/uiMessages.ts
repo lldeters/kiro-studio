@@ -78,7 +78,11 @@ export const UI_MESSAGES = [
   'Context used: {0}%',
   'Compact the context',
   '{0} credits',
-  'Credits used by the last turn',
+  'Credits used in this session',
+  'Context used: {0}% ({1} tokens)',
+  'What this answer cost',
+  '{0} s',
+  '{0} min {1} s',
   // Context menu and attachments
   'Files from the workspace',
   'A folder',
