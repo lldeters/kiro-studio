@@ -10,7 +10,7 @@ import * as acp from '@agentclientprotocol/sdk';
 import type { Transformer } from 'node:stream/web';
 import { withTimeout } from '../util/async';
 import { Emitter } from '../util/emitter';
-import { errorMessage, rec, str } from '../util/json';
+import { errorMessage, rec, str, type JsonObject } from '../util/json';
 import type { ProtocolLog } from '../util/log';
 import { parseInitializeResult, hasExtension, type Capabilities } from './capabilities';
 import type { Dispatcher } from './dispatcher';
@@ -30,8 +30,18 @@ export interface ClientHandlers {
   requestPermission(params: unknown): Promise<acp.RequestPermissionResponse>;
   readTextFile(params: unknown): Promise<acp.ReadTextFileResponse>;
   writeTextFile(params: unknown): Promise<acp.WriteTextFileResponse>;
-  /** `_kiro/openExternalUrl` (for example an OAuth page). */
-  openExternalUrl(params: unknown): Promise<void>;
+  /**
+   * `_kiro/openExternalUrl` (for example an OAuth page). Decides at once and returns; whatever it starts goes on
+   * without the answer waiting for it, because Kiro waits for the sign-in only after the answer. Throws for an address
+   * that Kiro must be told is refused.
+   */
+  openExternalUrl(params: unknown): void;
+  /** `_kiro/secret/get`, `store` and `delete`; served only with {@link ClientFeatures.secretStorage}. */
+  secrets?: {
+    get(params: unknown): Promise<unknown>;
+    store(params: unknown): Promise<unknown>;
+    delete(params: unknown): Promise<unknown>;
+  };
 }
 
 export interface ClientFeatures {
@@ -41,7 +51,19 @@ export interface ClientFeatures {
   terminal: boolean;
   /** Opt in to hooks (`clientCapabilities._meta.kiro.hooks`). */
   hooks: boolean;
+  /**
+   * Keep Kiro's MCP sign-ins (`clientCapabilities._meta.kiro.secretStorage`, served by {@link ClientHandlers.secrets}).
+   * Without it Kiro keeps them in memory only.
+   */
+  secretStorage: boolean;
 }
+
+/**
+ * Methods that are called although Kiro does not list them in `extensionMethods`. Kiro CLI 2.34.2 handles
+ * `_kiro/mcp/resetServer` (restart a server, optionally starting its browser sign-in) without advertising it; it is the
+ * one exception to calling only what is advertised.
+ */
+const UNADVERTISED_ALLOWED = new Set(['_kiro/mcp/resetServer']);
 
 export interface ConnectionOptions {
   transport: TransportFactory;
@@ -103,18 +125,25 @@ export class KiroConnection {
         this.reportClosed();
       });
 
-      const client = this.buildApp().connect(this.buildStream(transport));
+      const features = this.options.features();
+      const secrets = features.secretStorage ? this.options.handlers.secrets : undefined;
+      const client = this.buildApp(secrets).connect(this.buildStream(transport));
       this.client = client;
       void client.closed.then(() => this.reportClosed());
 
-      const features = this.options.features();
       const request: acp.InitializeRequest = {
         protocolVersion: acp.PROTOCOL_VERSION,
         clientInfo: this.options.clientInfo,
         clientCapabilities: {
           ...(features.fs ? { fs: { readTextFile: true, writeTextFile: true } } : {}),
           ...(features.terminal ? { terminal: true } : {}),
-          _meta: { kiro: { openExternalUrl: true, ...(features.hooks ? { hooks: { enabled: true, v2: true } } : {}) } },
+          _meta: {
+            kiro: {
+              openExternalUrl: true,
+              ...(features.hooks ? { hooks: { enabled: true, v2: true } } : {}),
+              ...(secrets ? { secretStorage: true } : {}),
+            },
+          },
         },
       };
       const result = await withTimeout(
@@ -150,9 +179,9 @@ export class KiroConnection {
     );
   }
 
-  private buildApp(): acp.ClientApp {
+  private buildApp(secrets: ClientHandlers['secrets']): acp.ClientApp {
     const { handlers } = this.options;
-    return acp
+    const app = acp
       .client({ name: this.options.clientInfo.name })
       .onRequest(acp.methods.client.session.requestPermission, (ctx) => handlers.requestPermission(ctx.params))
       .onRequest(acp.methods.client.fs.readTextFile, (ctx) => handlers.readTextFile(ctx.params))
@@ -160,10 +189,28 @@ export class KiroConnection {
       .onRequest(
         '_kiro/openExternalUrl',
         (params: unknown) => rec(params),
-        async (ctx) => {
-          await handlers.openExternalUrl(ctx.params);
+        (ctx) => {
+          // Answered at once: Kiro waits for the sign-in only after this answer, and an error fails the sign-in.
+          handlers.openExternalUrl(ctx.params);
           return {};
         },
+      );
+    if (!secrets) return app;
+    return app
+      .onRequest(
+        '_kiro/secret/get',
+        (params: unknown) => rec(params),
+        (ctx) => secrets.get(ctx.params),
+      )
+      .onRequest(
+        '_kiro/secret/store',
+        (params: unknown) => rec(params),
+        (ctx) => secrets.store(ctx.params),
+      )
+      .onRequest(
+        '_kiro/secret/delete',
+        (params: unknown) => rec(params),
+        (ctx) => secrets.delete(ctx.params),
       );
   }
 
@@ -176,15 +223,18 @@ export class KiroConnection {
     return this.client.agent;
   }
 
+  /** `meta` goes out as the request's `_meta` (Kiro reads `_meta.kiro.steering`), and only when it is given. */
   newSession(params: {
     cwd: string;
     additionalDirectories?: string[];
     mcpServers?: acp.McpServer[];
+    meta?: JsonObject;
   }): Promise<unknown> {
     const request: acp.NewSessionRequest = {
       cwd: params.cwd,
       mcpServers: params.mcpServers ?? [],
       ...(params.additionalDirectories?.length ? { additionalDirectories: params.additionalDirectories } : {}),
+      ...(params.meta === undefined ? {} : { _meta: params.meta }),
     };
     return withTimeout(
       this.agent.request(acp.methods.agent.session.new, request),
@@ -193,12 +243,16 @@ export class KiroConnection {
     );
   }
 
-  /** Client-side MCP servers are not stored by Kiro, so the caller sends them again on every load. */
+  /**
+   * Client-side MCP servers and `meta` (client steering documents) are not stored by Kiro, so the caller sends them
+   * again on every load.
+   */
   loadSession(params: {
     sessionId: string;
     cwd: string;
     additionalDirectories?: string[];
     mcpServers?: acp.McpServer[];
+    meta?: JsonObject;
   }): Promise<unknown> {
     if (this._capabilities?.loadSession !== true) throw new Error('The Kiro CLI does not support loading sessions');
     const request: acp.LoadSessionRequest = {
@@ -206,6 +260,7 @@ export class KiroConnection {
       cwd: params.cwd,
       mcpServers: params.mcpServers ?? [],
       ...(params.additionalDirectories?.length ? { additionalDirectories: params.additionalDirectories } : {}),
+      ...(params.meta === undefined ? {} : { _meta: params.meta }),
     };
     return withTimeout(
       this.agent.request(acp.methods.agent.session.load, request),
@@ -282,6 +337,15 @@ export class KiroConnection {
   async callExtension(method: string, params: unknown): Promise<unknown> {
     if (!hasExtension(this._capabilities, method)) throw new ExtensionNotAdvertisedError(method);
     return withTimeout(this.agent.request<unknown, unknown>(method, params), this.timeouts.extension, method);
+  }
+
+  /**
+   * Calls one of the few `_kiro/*` methods Kiro handles without advertising them ({@link UNADVERTISED_ALLOWED}).
+   * Refuses every other method without sending anything; {@link callExtension} stays strict.
+   */
+  async callUnadvertised(method: string, params: unknown, timeoutMs: number): Promise<unknown> {
+    if (!UNADVERTISED_ALLOWED.has(method)) throw new ExtensionNotAdvertisedError(method);
+    return withTimeout(this.agent.request<unknown, unknown>(method, params), timeoutMs, method);
   }
 
   // -------------------------------------------------------------------------------------------------------------

@@ -4,17 +4,22 @@
  *
  * A {@link KiroConnection} lives as long as one process; this object lives as long as the window.
  */
-import { withTimeout } from '../util/async';
+import { RequestError } from '@agentclientprotocol/sdk';
+import { TimeoutError, withTimeout } from '../util/async';
 import { Emitter } from '../util/emitter';
-import { arr, errorMessage, opt, rec, str } from '../util/json';
+import { arr, errorMessage, opt, rec, str, type JsonObject } from '../util/json';
 import type { ProtocolLog } from '../util/log';
 import { currentPlatform, type PlatformKind } from '../util/paths';
 import { identityTranslate, type Translate } from '../util/translate';
+import { parseMcpStatus } from '../workspace/mcp';
+import { MCP_STEERING_NAME } from '../workspace/mcpInstructions';
+import { isWebUrl } from '../workspace/mcpUrl';
 import type { Capabilities } from './capabilities';
 import { KiroConnection, type ClientFeatures, type ConnectionClosed } from './connection';
-import { Dispatcher, type BroadcastEvent } from './dispatcher';
+import { Dispatcher, type BroadcastEvent, type SteeringDocument } from './dispatcher';
 import { describeError, isConnectionClosed } from './errors';
 import { FsHandler, type FileSystemPort, type WriteGate } from './handlers/fs';
+import { SecretBridge, type SecretPort } from './handlers/secrets';
 import type { PromptInput } from './prompt';
 import { PermissionBroker } from './handlers/permissions';
 import { type Session, type SessionStatus, SessionStore, type TurnOutcome } from './sessions';
@@ -49,8 +54,20 @@ export interface AgentDeps {
   fs: FileSystemPort;
   /** Folders of the open workspace; files inside them (and inside a session's working directory) may be accessed. */
   workspaceRoots(): readonly string[];
-  /** Opens a web page for the user (for example a login page Kiro asks for). Only `http` and `https` are passed. */
-  openUrl(url: string): void | Promise<void>;
+  /**
+   * A web page Kiro asks for (`_kiro/openExternalUrl`), for example the sign-in page of an MCP server. Only `http` and
+   * `https` addresses are passed. Kiro's request is answered right after this returns, so it decides at once whether
+   * the page opens or the user is asked, and does the rest without making the answer wait.
+   */
+  externalUrl(url: string): void;
+  /**
+   * The `_meta` of `session/new` and `session/load`: Kiro Studio's client steering document about adding MCP servers
+   * (`{kiro: {steering: [...]}}`), or undefined for none. Not asked for while the organisation has switched MCP servers
+   * off. A fork gets none.
+   */
+  sessionMeta?: () => JsonObject | undefined;
+  /** Where Kiro keeps the sign-ins of MCP servers (`_kiro/secret/*`). Without it Kiro keeps them in memory only. */
+  secrets?: SecretPort;
   clientInfo: { name: string; title?: string; version: string };
   platform?: PlatformKind;
   writeGate?: WriteGate;
@@ -65,6 +82,8 @@ export interface AgentDeps {
   stableAfterMs?: number;
   /** How long a cancel waits for the turn to really start. Kiro ignores a cancel that comes earlier. */
   cancelHoldMs?: number;
+  /** How long {@link KiroAgent.resetMcpServer} waits for Kiro's answer. */
+  mcpResetTimeoutMs?: number;
   /** Read by the connection when it starts. Terminal stays off until the probe has shown what Kiro does with it. */
   terminal?: boolean;
   connection?: {
@@ -86,6 +105,36 @@ export interface SessionSummary {
 }
 
 const DEFAULT_BACKOFF = [1000, 2000, 4000, 8000, 16_000, 30_000];
+
+/**
+ * What {@link KiroAgent.resetMcpServer} came to: `ok`; `unsupported` when the Kiro CLI does not know the method;
+ * `timeout` when it did not answer in time; otherwise Kiro's error, with `governance` when the organisation has
+ * switched MCP servers off.
+ */
+export type McpResetResult = 'ok' | 'unsupported' | 'timeout' | { error: string; governance?: boolean };
+
+/** Kiro waits at most 60 s for a server it resets and then answers; this leaves room for the round trip. */
+const MCP_RESET_TIMEOUT_MS = 75_000;
+const GOVERNANCE_ERROR = /governance|disabled by your organi[sz]ation/i;
+
+/** The broadcasts that belong to the MCP state of one session. */
+type McpBroadcast = Extract<BroadcastEvent, { type: 'mcpStatus' | 'governance' | 'steeringDocuments' }>;
+
+/**
+ * Kiro sends the MCP broadcasts of a new session before the `session/new` response names it. The latest of each kind is
+ * kept for a while, for a few session ids, and applied once the session exists.
+ */
+const EARLY_LIMIT = 20;
+const EARLY_TTL_MS = 60_000;
+interface EarlyBroadcasts {
+  receivedAt: number;
+  latest: Map<McpBroadcast['type'], McpBroadcast>;
+}
+
+/** Kiro lists Kiro Studio's steering document as `client:<sessionId>:kiro-studio-mcp`. */
+const isMcpSteering = (doc: SteeringDocument): boolean =>
+  doc.uri?.startsWith('client:') === true &&
+  (doc.name === MCP_STEERING_NAME || doc.uri.endsWith(`:${MCP_STEERING_NAME}`));
 
 /** Why a prompt cannot go to a session that is not ready. */
 function notReady(t: Translate, status: Exclude<SessionStatus, 'ready'>): string {
@@ -121,8 +170,14 @@ export class KiroAgent {
   private attempt = 0;
   private disposed = false;
   private readonly fsHandler: FsHandler;
+  private readonly secretBridge: SecretBridge | undefined;
   private readonly platform: PlatformKind;
   private readonly t: Translate;
+  /** `features.mcpEnabled` of the latest `_kiro/governance/state`, for whichever session it came. */
+  private lastGovernanceMcp: boolean | undefined;
+  private readonly early = new Map<string, EarlyBroadcasts>();
+  /** The connection whose Kiro CLI answered `_kiro/mcp/resetServer` with "method not found". */
+  private resetUnsupportedOn: KiroConnection | undefined;
 
   constructor(private readonly deps: AgentDeps) {
     this.t = deps.translate ?? identityTranslate;
@@ -142,6 +197,7 @@ export class KiroAgent {
       log: deps.log,
       ...(deps.writeGate === undefined ? {} : { writeGate: deps.writeGate }),
     });
+    this.secretBridge = deps.secrets === undefined ? undefined : new SecretBridge(deps.secrets, deps.log);
     this.dispatcher.broadcasts.on((event) => this.onBroadcast(event));
   }
 
@@ -187,12 +243,14 @@ export class KiroAgent {
         requestPermission: async (params) => await this.permissions.handle(params),
         readTextFile: (params) => this.fsHandler.read(params),
         writeTextFile: (params) => this.fsHandler.write(params),
-        openExternalUrl: (params) => this.openUrl(str(rec(params).url)),
+        openExternalUrl: (params) => this.onExternalUrl(rec(params).url, true),
+        ...(this.secretBridge === undefined ? {} : { secrets: this.secretBridge }),
       },
       features: (): ClientFeatures => ({
         fs: true,
         terminal: this.deps.terminal === true,
         hooks: this.deps.settings.hooksEnabled(),
+        secretStorage: this.secretBridge !== undefined,
       }),
       clientInfo: this.deps.clientInfo,
       ...(this.deps.connection?.timeouts === undefined ? {} : { timeouts: this.deps.connection.timeouts }),
@@ -334,10 +392,12 @@ export class KiroAgent {
     const result = await this.ready.newSession({
       cwd: options.cwd,
       ...(options.additionalDirectories === undefined ? {} : { additionalDirectories: options.additionalDirectories }),
+      ...opt('meta', this.sessionMeta()),
     });
     const sessionId = str(rec(result).sessionId);
     if (sessionId === undefined) throw new Error('The Kiro CLI did not return a session id');
     const session = this.store.create(sessionId, { cwd: options.cwd });
+    this.applyEarly(session);
     // Updates that arrived before this response are older than the result, so they go first.
     this.dispatcher.sessionRegistered(sessionId);
     session.applySessionResult(result);
@@ -428,6 +488,7 @@ export class KiroAgent {
     const existed = this.store.get(sessionId) !== undefined;
     const autonomy = this.wantedAutonomy(this.store.get(sessionId));
     const session = this.store.create(sessionId, { cwd });
+    this.applyEarly(session);
     // Kiro replays the conversation, not our checkpoints: the session keeps them and shows their cards after the replay.
     session.resetForReplay();
     session.cwd = cwd;
@@ -439,6 +500,7 @@ export class KiroAgent {
         ...(options.additionalDirectories === undefined
           ? {}
           : { additionalDirectories: options.additionalDirectories }),
+        ...opt('meta', this.sessionMeta()),
       });
       session.applySessionResult(result);
       session.restoreCheckpointMarkers();
@@ -498,6 +560,7 @@ export class KiroAgent {
     const forkedId = str(rec(result).sessionId);
     if (forkedId === undefined) throw new Error('The Kiro CLI did not return a session id');
     const session = this.store.create(forkedId, { cwd });
+    this.applyEarly(session);
     this.dispatcher.sessionRegistered(forkedId);
     session.applySessionResult(result);
     // The fork works like the session it comes from, or as the user's setting says when that one is not open here.
@@ -655,26 +718,146 @@ export class KiroAgent {
     return this.ready.callExtension(method, params);
   }
 
+  /**
+   * Restarts an MCP server of a session (`_kiro/mcp/resetServer`, which Kiro handles without advertising it). With
+   * `startOAuth` Kiro forgets the server's sign-in and starts a new one, for which it sends `_kiro/openExternalUrl`.
+   *
+   * Kiro refuses a session that does not run the server, so after any other error the server is reset once more
+   * without naming the session. A CLI that does not know the method is remembered until the connection changes, and is
+   * not asked again. Never throws.
+   */
+  async resetMcpServer(sessionId: string, name: string, startOAuth: boolean): Promise<McpResetResult> {
+    let connection: KiroConnection;
+    try {
+      connection = this.ready;
+    } catch (error) {
+      return { error: describeError(error) };
+    }
+    if (this.resetUnsupportedOn === connection) return 'unsupported';
+    const reset = async (params: JsonObject): Promise<McpResetResult> => {
+      try {
+        await connection.callUnadvertised(
+          '_kiro/mcp/resetServer',
+          params,
+          this.deps.mcpResetTimeoutMs ?? MCP_RESET_TIMEOUT_MS,
+        );
+        return 'ok';
+      } catch (error) {
+        if (error instanceof RequestError && error.code === -32601) {
+          this.resetUnsupportedOn = connection;
+          return 'unsupported';
+        }
+        if (error instanceof TimeoutError) return 'timeout';
+        const message = describeError(error);
+        return { error: message, ...(GOVERNANCE_ERROR.test(message) ? { governance: true } : {}) };
+      }
+    };
+    const result = await reset({ sessionId, serverName: name, startOAuth });
+    if (typeof result === 'string' || result.governance === true) return result;
+    this.deps.log.info(`resetting the MCP server ${name} of session ${sessionId} failed: ${result.error}`);
+    return reset({ serverName: name, startOAuth });
+  }
+
   private requireSession(sessionId: string): Session {
     const session = this.store.get(sessionId);
     if (!session) throw new Error(`Unknown session ${sessionId}`);
     return session;
   }
 
-  private onBroadcast(event: BroadcastEvent): void {
-    if (event.type === 'openExternalUrl') void this.openUrl(event.url);
+  /** `_meta` for `session/new` and `session/load`; none while the organisation has switched MCP servers off. */
+  private sessionMeta(): JsonObject | undefined {
+    return this.lastGovernanceMcp === false ? undefined : this.deps.sessionMeta?.();
   }
 
-  private async openUrl(url: string | undefined): Promise<void> {
-    if (url === undefined || !/^https?:\/\//i.test(url)) {
-      this.deps.log.info(`ignored a request to open a non-web address`);
+  private onBroadcast(event: BroadcastEvent): void {
+    switch (event.type) {
+      case 'openExternalUrl':
+        this.onExternalUrl(event.url, false);
+        break;
+      case 'governance': {
+        const allowed = event.features.mcpEnabled;
+        if (allowed !== undefined) this.lastGovernanceMcp = allowed;
+        // The organisation's policy is the same for every session; one without a session id applies to all of them.
+        if (event.sessionId === undefined) for (const session of this.store.all()) this.applyMcp(session, event);
+        else this.routeMcp(event.sessionId, event);
+        break;
+      }
+      case 'mcpStatus':
+      case 'steeringDocuments':
+        if (event.sessionId !== undefined) this.routeMcp(event.sessionId, event);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * `_kiro/openExternalUrl`, as a request (`request` true) or as a notification. Decided at once: a web address goes to
+   * the host, which opens it or asks the user; anything else is refused, and a request is answered with an error.
+   */
+  private onExternalUrl(url: unknown, request: boolean): void {
+    if (!isWebUrl(url)) {
+      this.deps.log.info('refused a request to open an address that is not a web page');
+      if (request) throw RequestError.invalidParams({ field: 'url' }, 'only http and https addresses can be opened');
       return;
     }
     try {
-      await this.deps.openUrl(url);
+      this.deps.externalUrl(url);
     } catch (error) {
-      this.deps.log.info(`could not open ${url}: ${errorMessage(error)}`);
+      this.deps.log.info(`could not hand over a page Kiro asked to open: ${errorMessage(error)}`);
     }
+  }
+
+  private routeMcp(sessionId: string, event: McpBroadcast): void {
+    const session = this.store.get(sessionId);
+    if (session) this.applyMcp(session, event);
+    else this.keepEarly(sessionId, event);
+  }
+
+  private applyMcp(session: Session, event: McpBroadcast): void {
+    switch (event.type) {
+      case 'mcpStatus':
+        session.setMcpRuntime({
+          runtime: parseMcpStatus(event.servers),
+          ...opt('accessMode', event.accessMode),
+          ...opt('filtered', event.filteredServers),
+        });
+        break;
+      case 'governance': {
+        const allowed = event.features.mcpEnabled;
+        if (allowed !== undefined) session.setMcpAllowed(allowed);
+        break;
+      }
+      case 'steeringDocuments':
+        // A failed push carries no documents; it says nothing about which ones Kiro has.
+        if (event.status !== 'failed') session.setClientSteering(event.documents.some(isMcpSteering));
+        break;
+    }
+  }
+
+  private keepEarly(sessionId: string, event: McpBroadcast): void {
+    const now = Date.now();
+    for (const [id, entry] of this.early) if (now - entry.receivedAt > EARLY_TTL_MS) this.early.delete(id);
+    const entry = this.early.get(sessionId) ?? { receivedAt: now, latest: new Map() };
+    entry.receivedAt = now;
+    entry.latest.set(event.type, event);
+    // Set again so that the map stays ordered by the latest arrival, and the one heard from longest ago goes first.
+    this.early.delete(sessionId);
+    this.early.set(sessionId, entry);
+    for (const id of this.early.keys()) {
+      if (this.early.size <= EARLY_LIMIT) break;
+      this.early.delete(id);
+    }
+  }
+
+  /** Right after the session is created: what Kiro sent for it before, and the organisation's policy if it did not. */
+  private applyEarly(session: Session): void {
+    const entry = this.early.get(session.id);
+    this.early.delete(session.id);
+    if (entry !== undefined && Date.now() - entry.receivedAt <= EARLY_TTL_MS)
+      for (const event of entry.latest.values()) this.applyMcp(session, event);
+    if (session.mcp.allowed === undefined && this.lastGovernanceMcp !== undefined)
+      session.setMcpAllowed(this.lastGovernanceMcp);
   }
 }
 

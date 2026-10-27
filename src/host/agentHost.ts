@@ -181,8 +181,13 @@ export class AgentHost implements vscode.Disposable {
       settings,
       fs: new VsCodeFileSystemPort(),
       workspaceRoots: () => (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
-      openUrl: async (url) => {
-        await vscode.env.openExternal(vscode.Uri.parse(url));
+      // Opens every web page Kiro asks for, as before; the MCP sign-in flow will decide which pages open by themselves.
+      externalUrl: (url) => {
+        vscode.env.openExternal(vscode.Uri.parse(url)).then(undefined, (error: unknown) => {
+          protocol.log.info(
+            `could not open a page Kiro asked for: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
       },
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },
       translate: (message, ...args) => vscode.l10n.t(message, ...args),

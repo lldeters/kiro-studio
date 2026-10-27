@@ -44,4 +44,16 @@ describe('redactor', () => {
     expect(homePattern('/')).toBeUndefined();
     expect(createRedactor('/').redactText('/usr/bin')).toBe('/usr/bin');
   });
+
+  it('replaces the extra literals it is given, the longest first, and only those of 8 characters or more', () => {
+    const literals: string[] = ['short', 'sk_live_1234'];
+    const redactor = createRedactor('/home/me', () => literals);
+    expect(redactor.redactText('key sk_live_1234 and short')).toBe('key [redacted] and short');
+    // A key entered later is redacted from then on, also inside a longer one.
+    literals.push('sk_live_1234567890');
+    expect(redactor.redactText('a=sk_live_1234567890 b=sk_live_1234')).toBe('a=[redacted] b=[redacted]');
+    expect(redactor.redactDeep({ nested: [{ text: 'x sk_live_1234 y' }] })).toEqual({
+      nested: [{ text: 'x [redacted] y' }],
+    });
+  });
 });

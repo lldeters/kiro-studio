@@ -1,7 +1,7 @@
 /**
  * Best-effort redaction for protocol logs: secrets by key name, e-mail addresses, JWTs, bearer tokens,
- * AWS access key ids, and the user's home directory in every spelling Kiro puts on the wire.
- * Not a guarantee: logs must still be read before they are shared.
+ * AWS access key ids, the user's home directory in every spelling Kiro puts on the wire, and the keys the user entered
+ * for MCP servers wherever they appear. Not a guarantee: logs must still be read before they are shared.
  */
 
 const SECRET_KEY = /token|secret|password|passwd|authorization|api[-_]?key|cookie|credential/i;
@@ -38,11 +38,29 @@ export interface Redactor {
   redactDeep: (value: unknown, key?: string) => unknown;
 }
 
-export function createRedactor(home: string): Redactor {
+/** Shorter values are not replaced: they would also match ordinary text. */
+const MIN_LITERAL_LENGTH = 8;
+
+/**
+ * `extraLiterals` returns values that must never appear in a log, such as the keys the user entered for MCP servers.
+ * It is asked on every call, so a key entered later is redacted from then on.
+ */
+export function createRedactor(home: string, extraLiterals?: () => readonly string[]): Redactor {
   const homeRe = homePattern(home);
 
+  const withoutLiterals = (text: string): string => {
+    const literals = extraLiterals?.().filter((literal) => literal.length >= MIN_LITERAL_LENGTH) ?? [];
+    // The longest first, so that a value that contains another one is replaced as a whole.
+    let result = text;
+    for (const literal of [...literals].sort((a, b) => b.length - a.length)) {
+      if (result.includes(literal)) result = result.split(literal).join('[redacted]');
+    }
+    return result;
+  };
+
   const redactText = (text: string): string => {
-    const withoutHome = homeRe ? text.replace(homeRe, '~') : text;
+    const withoutKeys = withoutLiterals(text);
+    const withoutHome = homeRe ? withoutKeys.replace(homeRe, '~') : withoutKeys;
     return withoutHome
       .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, '<email>')
       .replace(/eyJ[\w-]{10,}\.[\w-]{10,}\.[\w-]{10,}/g, '<jwt>')

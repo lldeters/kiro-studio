@@ -202,6 +202,24 @@ describe('broadcasts', () => {
     });
   });
 
+  it("keeps the organisation's access mode and the names of the servers its list filtered out", () => {
+    expect(
+      parseBroadcast('_kiro/mcp/status', {
+        sessionId: 's',
+        servers: [],
+        accessMode: 'registry',
+        accessModeFilteredServers: ['playwright', { name: 'fetch' }, 5, {}],
+        registryServers: [{ name: 'github', enabled: true }],
+      }),
+    ).toEqual({
+      type: 'mcpStatus',
+      sessionId: 's',
+      servers: [],
+      accessMode: 'registry',
+      filteredServers: ['playwright', 'fetch'],
+    });
+  });
+
   it('does not require a session id', () => {
     expect(parseBroadcast('_kiro/mcp/status', { servers: [] })).toEqual({ type: 'mcpStatus', servers: [] });
   });
