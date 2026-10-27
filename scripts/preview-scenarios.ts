@@ -173,6 +173,63 @@ function conversation(): HostMessage[] {
   return [init([session, other]), { type: 'session', session: tracker.full(session) }];
 }
 
+/**
+ * A turn that ran while another session worked in the same folder: one file came from no tool call. The input holds a
+ * selection and a command from the terminal, as the editor commands and `#terminal` attach them.
+ */
+function changes(): HostMessage[] {
+  const session = new Session('sess_preview_d', { cwd: '/ws' });
+  session.applySessionResult({
+    sessionId: session.id,
+    configOptions: configOptions({ autopilot: 'off', model: 'auto' }),
+  });
+  session.title = 'Fix the parser';
+  session.beginTurn('Fix the failing parser test.', ['parser.ts:12-30', '$ npm test']);
+  feed(session, u.agent('The blank-line case returned `undefined`; it returns an empty list now.', { messageId: 'y' }));
+  session.endTurn({ stopReason: 'end_turn' });
+  session.addCheckpoint({
+    id: '1',
+    overlapped: true,
+    files: [
+      {
+        path: 'src/parser.ts',
+        status: 'modified',
+        added: 3,
+        removed: 1,
+        binary: false,
+        reverted: false,
+        bySession: true,
+      },
+      {
+        path: 'package-lock.json',
+        status: 'modified',
+        added: 12,
+        removed: 4,
+        binary: false,
+        reverted: false,
+        bySession: false,
+      },
+    ],
+  });
+  return [
+    init([session]),
+    { type: 'session', session: new PatchTracker('posix').full(session) },
+    {
+      type: 'contextPicked',
+      attachments: [
+        {
+          kind: 'selection',
+          path: '/ws/src/parser.ts',
+          startLine: 12,
+          endLine: 30,
+          text: 'export function parseLine() {}',
+        },
+        { kind: 'terminal', command: 'npm test -- parser', output: 'FAIL test/parser.test.ts', exitCode: 1 },
+      ],
+    },
+  ];
+}
+
 /** An idle session with slash commands, for the input menus. */
 function idle(): HostMessage[] {
   const session = new Session('sess_preview_c', { cwd: '/ws' });
@@ -495,6 +552,7 @@ export const SCENARIOS: Record<string, Step[]> = {
   idle: idle(),
   mcp: mcpScenario(),
   'mcp-states': mcpStatesScenario(),
+  changes: changes(),
   empty: [init([])],
   connecting: [init([], { phase: 'starting' })],
   cliMissing: setupOnly('cliMissing'),
