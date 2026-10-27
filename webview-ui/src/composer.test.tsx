@@ -125,6 +125,21 @@ describe('composer', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('survives closing the list where scrollIntoView returns a promise, as in newer Chromium', () => {
+    // The test DOM has no scrollIntoView; this one behaves like Chromium 153's.
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: () => Promise.resolve() });
+    try {
+      render(<Composer session={session()} />);
+      type('/');
+      fireEvent.keyDown(box(), { key: 'ArrowDown' });
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(box().value).toBe('/agent ');
+      expect(screen.queryByRole('listbox')).toBeNull();
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('chooses with the mouse', () => {
     render(<Composer session={session()} />);
     type('/');
