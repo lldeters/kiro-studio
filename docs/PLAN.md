@@ -3,9 +3,11 @@
 Inoffizielle VS-Code-Extension, die die lokal installierte Kiro CLI über das Agent Client Protocol (ACP)
 bedient. Nicht mit AWS oder Kiro verbunden.
 
-**Status: Phase 0 bis 3 sind umgesetzt (Phase 1 siehe Abschnitt 9, Phase 2 Abschnitt 10, Phase 3 Abschnitt 11). Alles ist gebaut,
-getestet und per CI geprüft (Linux, macOS, Windows; VS Code 1.93.0 und stable), aber noch nicht gegen deine echte CLI
-durchgespielt. Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8 bis 11).**
+**Status: Phase 0 bis 5 sind umgesetzt (Phase 1 siehe Abschnitt 9, Phase 2 Abschnitt 10, Phase 3 Abschnitt 11, Phase 4
+Abschnitt 12, Phase 5 Abschnitt 13), dazu MCP-Server aus dem Chat (Abschnitt 15) und die Verbesserungen nach 0.1.0
+(Abschnitt 16). Alles ist gebaut, getestet und per CI geprüft (Linux, macOS, Windows; VS Code 1.93.0 und stable), aber
+noch nicht gegen deine echte CLI durchgespielt. Abnahme und ein paar kurze Probe-Läufe stehen aus (Abschnitte 8 bis
+11).**
 
 Verwandte Dokumente: [ARCHITECTURE.md](ARCHITECTURE.md) (wie die Teile zusammenhängen),
 [protocol-notes.md](protocol-notes.md) (Protokollfakten mit Belegstufe je Aussage).
@@ -618,3 +620,37 @@ Probe-Läufe P1 bis P6 (`protocol-notes.md`, Abschnitt 17) prüfen A25 bis A31, 
 
 Die Punkte stehen in [RELEASING.md](RELEASING.md), Abschnitt 2 („MCP-Server aus dem Chat“), die Probe-Läufe P1 bis P6 in
 `protocol-notes.md`, Abschnitt 17. Danach hebe ich die `[C]` auf `[V]` oder korrigiere sie.
+
+## 16. Nach 0.1.0: Verbesserungen (2026-10-27)
+
+Auf deine Frage, was sich noch verbessern ließe, und dein „setze bitte alles um“. Alles ist getestet (Unit-Tests, CI auf
+Linux, macOS und Windows mit VS Code 1.93 und stable), aber wie bisher nicht gegen deine echte CLI.
+
+### Was gebaut ist
+
+| Bereich | Umgesetzt |
+| --- | --- |
+| Checkpoints und parallele Sitzungen | Ein Checkpoint vergleicht den ganzen Ordner; liefen zwei Sitzungen gleichzeitig, nahm „Zurücknehmen“ der einen still die Änderungen der anderen mit (nachgestellt). Jetzt merkt sich jede Sitzung, welche Dateien ihr Durchlauf nennt (Orte und Diffs der Werkzeugaufrufe, Vorschauen, Schreibzugriffe über `fs/write_text_file`). Eine Datei, die nur eine andere, gleichzeitig laufende Sitzung genannt hat, bleibt deren Checkpoint; beide Karten sagen, dass gleichzeitig gearbeitet wurde. Dateien ohne Werkzeugaufruf (ein Befehl von Kiro, deine eigene Änderung) sind auf der Karte markiert, und „Zurücknehmen“ bietet „Nur Dateien aus Werkzeugaufrufen“ an. |
+| Pfadwächter | Symbolische Links werden aufgelöst, bevor entschieden wird, ob ein Pfad im Arbeitsbereich liegt (vorher kam `link -> ~/.ssh` durch). Namen wie `..cache` gelten nicht mehr als Weg nach draußen. |
+| Checkpoints robuster | Alle Ordner eines Multi-Root-Arbeitsbereichs; `kiroStudio.checkpoints.exclude` (Muster wie in `.gitignore`); `kiroStudio.checkpoints.maxFileSizeMB` (Standard 10) für neue Dateien, mit Hinweis im Chat; je Fenster eigener Index, eigene Ausschlussdatei und eigene Kette (`refs/windows/<id>`), damit sich zwei Fenster auf demselben Ordner nicht stören. |
+| Editor | Kontextmenü „Kiro Studio“ (Auswahl oder Datei zum Chat, Auswahl erklären, Auswahl korrigieren), Explorer und Editor-Tab („Datei zum Chat hinzufügen“), `#selection`, Schnellkorrektur „Mit Kiro beheben“ (`kiroStudio.quickFix`), Tasten Strg+Alt+K und Strg+Alt+N, Befehl „Laufenden Durchlauf stoppen“, ↑/↓ für frühere Nachrichten. Die Debug-Befehle aus Phase 1 stehen nur noch beim Entwickeln in der Befehlspalette. |
+| Windows | `kiro-cli.cmd` (npm, Scoop) wird gefunden und über `cmd.exe` gestartet. Die Integrationstests mit der Ersatz-CLI laufen dadurch auch unter Windows. |
+| Zurückgestellt aus Phase 2 und 3 | `#terminal` (Befehl und Ausgabe über die Shell-Integration von VS Code), „Sitzung löschen“ (wenn `session/delete` angekündigt ist), lange Sitzungen öffnen mit ihren letzten 200 Einträgen und laden ältere beim Hochscrollen nach. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A33 | `session/delete` nimmt `{ sessionId }` (ACP-Entwurf). | „Sitzung löschen“ zeigt eine Fehlermeldung; die Sitzung bleibt in der Liste. |
+| A34 | Die Orte (`locations`), Diffs und Vorschauen der Werkzeugaufrufe nennen die Dateien, die Kiro schreibt (so in den Aufzeichnungen). | Eine Datei, die Kiro schreibt, ohne sie zu nennen, gilt als „nicht aus einem Werkzeugaufruf“; sie bleibt im Checkpoint und lässt sich zurücknehmen, „Nur Dateien aus Werkzeugaufrufen“ ließe sie aus. |
+| A35 | Die Shell-Integration von VS Code ist in deinem Terminal an (Standard bei bash, zsh, fish und PowerShell). | `#terminal` sagt, dass es das Terminal nicht lesen kann, und wie man die Integration einschaltet. |
+
+### Weiter offen, weil es die echte CLI braucht
+
+- **„Zurückspulen bis hier“:** Die CLI kündigt `session/fork` mit `_meta.kiro.messageId` an, aber welche Nachrichten-ID sie
+  erwartet und ob die abgezweigte Sitzung die Nachricht selbst enthält, ist unbekannt. Ein Probe-Lauf mit einem Fork würde
+  es zeigen.
+- **MCP-Server neu starten:** Seit 0.2.0 nutzt die Karte im Chat `_kiro/mcp/resetServer` für die Anmeldung (A28, nicht
+  angekündigt). Ein Knopf „Neu starten“ in der MCP-Ansicht kann darauf aufbauen, sobald A28 auf deiner CLI bestätigt ist.
+- **Steer** (`_session/steer`): von 2.33.1 nicht angekündigt.
+- **Abnahme mit deiner CLI** (Abschnitte 9 bis 13 und 15) und die Probe-Läufe aus Abschnitt 8 bleiben der größte offene Punkt.
