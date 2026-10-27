@@ -37,6 +37,7 @@ export const UI_MESSAGES = [
   'You',
   'Kiro',
   'Kiro is thinking…',
+  'Show earlier messages',
   'Thinking…',
   'Thought process',
   'Working…',

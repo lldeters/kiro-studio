@@ -5,6 +5,7 @@ import { useT } from '../i18n';
 import { formatCredits, formatDuration } from '../../../src/shared/format';
 import { ItemContext } from '../itemContext';
 import { waitingForOutput } from '../thinking';
+import { post } from '../vscode';
 import { CheckpointCard } from './CheckpointCard';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
@@ -31,6 +32,15 @@ export function Transcript({ session }: { session: SessionView }) {
   // Whether the reader is at the bottom. Only the reader's own scrolling changes it, so a diagram or highlighted code
   // that makes the list taller after it was drawn does not lose the position.
   const stick = useRef(true);
+  // A long session comes with its end only; the earlier items are asked for at the top, once per position.
+  const offset = session.itemsOffset ?? 0;
+  const asked = useRef<string>(undefined);
+  const loadOlder = () => {
+    const key = `${session.id}:${offset}`;
+    if (offset === 0 || asked.current === key) return;
+    asked.current = key;
+    post({ type: 'loadOlder', sessionId: session.id, before: offset });
+  };
 
   return (
     <div className="transcript">
@@ -46,6 +56,11 @@ export function Transcript({ session }: { session: SessionView }) {
         }}
         style={{ height: '100%' }}
         initialTopMostItemIndex={{ index: 'LAST', align: 'end' }}
+        // The position of the first item in the transcript: when earlier items come in front, the list keeps its place.
+        firstItemIndex={offset}
+        startReached={loadOlder}
+        components={LIST_PARTS}
+        context={{ earlier: offset > 0, onLoadEarlier: loadOlder }}
         data={rows}
         computeItemKey={(_index, item) => item.id}
         // Follow new text only while the reader is at the bottom; scrolling up stops it.
@@ -129,6 +144,27 @@ const Item = memo(function Item({
       return <TurnUsage credits={item.credits} elapsedMs={item.elapsedMs} />;
   }
 });
+
+interface ListContext {
+  earlier: boolean;
+  onLoadEarlier: () => void;
+}
+
+/** Above the first item of a long session: earlier items come when the reader gets here, or with the button. */
+function Earlier({ context }: { context?: ListContext }) {
+  const t = useT();
+  if (!context?.earlier) return null;
+  return (
+    <div className="row earlier">
+      <button className="secondary" onClick={context.onLoadEarlier}>
+        {t('Show earlier messages')}
+      </button>
+    </div>
+  );
+}
+
+/** The same object on every render, so that the list does not build its header anew each time. */
+const LIST_PARTS = { Header: Earlier };
 
 /** What a finished turn cost and how long it took, under its answer. */
 function TurnUsage({ credits, elapsedMs }: { credits: number | undefined; elapsedMs: number | undefined }) {

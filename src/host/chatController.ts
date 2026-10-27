@@ -16,7 +16,7 @@ import {
   type WebviewMessage,
 } from '../shared/chatProtocol';
 import { UI_MESSAGES } from '../shared/uiMessages';
-import { sessionView, toolView } from '../view/chatPresenter';
+import { olderItemsView, sessionView, toolView } from '../view/chatPresenter';
 import { ChatSync, type SyncInput } from '../view/chatSync';
 import { exportMarkdown } from '../view/exportMarkdown';
 import { resolveAttachments, type SkipReason } from '../view/promptContext';
@@ -231,6 +231,17 @@ export class ChatController implements vscode.Disposable {
         case 'exportSession':
           await this.exportSession(message.sessionId);
           return;
+        case 'loadOlder': {
+          const session = this.host.agent?.store.get(message.sessionId);
+          if (!session || session !== this.host.activeSession) return;
+          sink.send({
+            type: 'olderItems',
+            sessionId: session.id,
+            before: message.before,
+            ...olderItemsView(session, message.before),
+          });
+          return;
+        }
         case 'openDiff':
           await this.openDiff(message.sessionId, message.toolCallId, message.index);
           return;

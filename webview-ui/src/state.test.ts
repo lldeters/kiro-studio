@@ -99,6 +99,44 @@ describe('chat state', () => {
     expect(s.tools).toHaveLength(1);
   });
 
+  it('puts earlier items in front of the end of a long session, and counts patches from the start', () => {
+    const end = [item(301, 'user', 'late'), item(302, 'assistant', 'answer')];
+    let state = run([init, { type: 'session', session: { ...session('s1', end), itemsOffset: 300 } }]);
+    state = reduce(state, {
+      type: 'olderItems',
+      sessionId: 's1',
+      before: 300,
+      offset: 298,
+      items: [item(299, 'user', 'early'), item(300, 'tool', '', { toolCallId: 't9' })],
+      tools: [tool('t9', 1)],
+    });
+    const s = state.sessions.s1!;
+    expect(s.itemsOffset).toBe(298);
+    expect(s.items.map((i) => i.id)).toEqual([299, 300, 301, 302]);
+    expect(s.tools.map((t) => t.toolCallId)).toEqual(['t9']);
+
+    // Position 301 of the transcript is the last item the page has.
+    const patched = reduce(state, {
+      type: 'patch',
+      patch: { sessionId: 's1', itemsFrom: 301, items: [item(302, 'assistant', 'answer, longer')], tools: [] },
+    });
+    expect(patched.sessions.s1!.items.map((i) => i.text)).toEqual(['early', '', 'late', 'answer, longer']);
+  });
+
+  it('ignores earlier items that do not end where the page starts (the session was sent anew meanwhile)', () => {
+    const state = run([init, { type: 'session', session: { ...session('s1', [item(5, 'user')]), itemsOffset: 4 } }]);
+    const stale = {
+      type: 'olderItems' as const,
+      sessionId: 's1',
+      before: 200,
+      offset: 0,
+      items: [item(1, 'user')],
+      tools: [],
+    };
+    expect(reduce(state, stale)).toBe(state);
+    expect(reduce(state, { ...stale, sessionId: 'other' })).toBe(state);
+  });
+
   it('does not touch items when a patch only carries tools or meta', () => {
     const items = [item(1, 'user', 'hi')];
     const state = run([

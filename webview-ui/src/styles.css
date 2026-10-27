@@ -1070,6 +1070,13 @@ button.autonomy.autopilot:hover:not(:disabled) {
   overflow: auto;
 }
 
+/* The top of a long session that came with its end only */
+.row.earlier {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0;
+}
+
 /* Checkpoints */
 .checkpoint {
   border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));

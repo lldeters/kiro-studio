@@ -51,6 +51,28 @@ describe('chat app', () => {
     expect(screen.getByText('My session')).toBeTruthy();
   });
 
+  it('offers the earlier messages of a long session that came with its end only, and asks for them once', async () => {
+    // The list keeps its place with scrollBy when items come in front; jsdom has no layout and no scrollBy.
+    if (!('scrollBy' in Element.prototype)) Object.assign(Element.prototype, { scrollBy: () => undefined });
+    render(<App />);
+    receive(init(), { type: 'session', session: session({ itemsOffset: 400 }) });
+    const button = await screen.findByRole('button', { name: 'Show earlier messages' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(outbox.filter((m) => m.type === 'loadOlder')).toEqual([{ type: 'loadOlder', sessionId: 's1', before: 400 }]);
+
+    receive({
+      type: 'olderItems',
+      sessionId: 's1',
+      before: 400,
+      offset: 0,
+      items: [item(-5, 'user', 'Long ago')],
+      tools: [],
+    });
+    expect(await screen.findByText('Long ago')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Show earlier messages' })).toBeNull();
+  });
+
   it('uses the translations from the host', () => {
     render(<App />);
     receive(init({ strings: { Send: 'Senden', 'Ask Kiro…': 'Frag Kiro …' } }), { type: 'session', session: session() });
