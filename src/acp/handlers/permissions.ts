@@ -9,10 +9,12 @@
  *   waits for the user, as does a request that offers no `allow_once`. The UI shows the request and answers it through {@link answer}; a
  *   dismissed prompt does not answer anything, because "dismissed" must not silently mean "deny" (for "Review
  *   changes" that would reject the whole turn).
+ * - A request that changes MCP servers ({@link mustAskInAutopilot}) waits for the user in Autopilot too.
  */
 import { Emitter } from '../../util/emitter';
 import { rec, str } from '../../util/json';
 import type { ProtocolLog } from '../../util/log';
+import { identityTranslate, type Translate } from '../../util/translate';
 import { approvalDetails, type PendingApproval, type Session, type SessionStore } from '../sessions';
 import { parseOptions, type InteractionOption } from '../types';
 
@@ -42,6 +44,56 @@ interface Pending {
 
 const CANCELLED: PermissionResponse = { outcome: { outcome: 'cancelled' } };
 
+/**
+ * A path below a `.kiro/settings` folder, where Kiro keeps its MCP configuration: `~/.kiro/settings/mcp.json`, the
+ * workspace's `.kiro/settings/mcp.json`, either separator, or the same below `$KIRO_HOME`, Kiro's name for `~/.kiro`.
+ * It may stand anywhere in a command line, after a space or a quote as well as after a separator, and the folder
+ * itself counts (`cd ~/.kiro/settings`).
+ */
+const KIRO_SETTINGS = /(?:(?<![\w-])\.kiro|(?:\$\{?|%)KIRO_HOME\}?%?)[\\/]+settings(?![\w.-])/i;
+
+/**
+ * Kiro's own commands that change MCP servers or powers: `kiro-cli mcp add …`, `"kiro-cli.exe" powers install …`. The
+ * Kiro CLI also installs `kiro-cli-chat`, and `q`, which runs `kiro-cli`. The program name must start a word of the
+ * command line, so that `grep -q mcp` does not count.
+ */
+const MCP_COMMAND =
+  /(?<![\w.-])(?:kiro-cli(?:-chat)?|q)(?:\.exe)?["']?(?:\s+-\S+)*\s+(?:mcp|powers)(?:\s+-\S+)*\s+(?:add|import|remove|rm|install|uninstall)\b/i;
+
+/**
+ * Each text of a tool's input is searched up to this length: a file's content can be long, a path or command is not.
+ * At most so many texts, nested at most so deep, are searched, so that a large input costs little.
+ */
+const MAX_TEXT_CHARS = 4096;
+const MAX_TEXTS = 100;
+const MAX_DEPTH = 5;
+
+/** The strings in a tool's input, in order, each cut to {@link MAX_TEXT_CHARS}. */
+function inputTexts(value: unknown, found: string[] = [], depth = 0): string[] {
+  if (found.length >= MAX_TEXTS) return found;
+  if (typeof value === 'string') found.push(value.slice(0, MAX_TEXT_CHARS));
+  else if (depth < MAX_DEPTH && typeof value === 'object' && value !== null)
+    for (const item of Array.isArray(value) ? value : Object.values(value)) inputTexts(item, found, depth + 1);
+  return found;
+}
+
+/**
+ * Whether Autopilot must leave a permission request to the user because the tool may change MCP servers: it touches
+ * something below `.kiro/settings`, or runs `kiro-cli mcp add` and the like. A server entry can start any program on
+ * the user's computer, so servers are added by Kiro Studio after a dialog that shows what is written, never by an
+ * automatic yes. A command that only reads the file asks too: the keys in it would reach the chat.
+ *
+ * The consent resource, the title and the strings of the tool's input (within the limits above) are searched. A file's
+ * content counts, so a script that would run `kiro-cli mcp add` asks when it is written. Each string is searched as it
+ * is, not as JSON: JSON doubles the backslashes of a Windows path and writes a line break as `\n`, which hides a
+ * command on the next line from `\b`. How Kiro asks for a shell command was never recorded, so this is a best effort;
+ * behind it stand Kiro's own refusal of `.kiro/settings` and the refused write in `fs.ts`.
+ */
+export function mustAskInAutopilot(details: { resource?: string }, title: string, rawInput: unknown): boolean {
+  const texts = [details.resource ?? '', title, ...inputTexts(rawInput)];
+  return texts.some((text) => KIRO_SETTINGS.test(text) || MCP_COMMAND.test(text));
+}
+
 export class PermissionBroker {
   /** Fired when a request needs the user. The UI shows it and calls {@link answer}. */
   readonly requested = new Emitter<ApprovalEvent>();
@@ -49,14 +101,19 @@ export class PermissionBroker {
   readonly settled = new Emitter<ApprovalEvent>();
 
   private readonly pending = new Map<number, Pending>();
+  private readonly t: Translate;
 
   constructor(
     private readonly deps: {
       store: SessionStore;
       settings: PermissionSettings;
       log?: ProtocolLog;
+      /** For the notice when Autopilot leaves a request to the user; English without it. */
+      translate?: Translate;
     },
-  ) {}
+  ) {
+    this.t = deps.translate ?? identityTranslate;
+  }
 
   async handle(params: unknown): Promise<PermissionResponse> {
     const body = rec(params);
@@ -82,14 +139,19 @@ export class PermissionBroker {
       session.isAutopilot &&
       this.deps.settings.autoAllowInAutopilot()
     ) {
-      session.recordAutoApproval({
-        title,
-        optionId: allowOnce.optionId,
-        ...(toolCallId === undefined ? {} : { toolCallId }),
-        ...(details.capability === undefined ? {} : { capability: details.capability }),
-        ...(details.resource === undefined ? {} : { resource: details.resource }),
-      });
-      return { outcome: { outcome: 'selected', optionId: allowOnce.optionId } };
+      // The request may carry the tool's input and paths; the earlier tool call does for certain.
+      const input = [toolCall.rawInput, toolCall.locations, tool?.rawInput, tool?.locations];
+      if (!mustAskInAutopilot(details, title, input)) {
+        session.recordAutoApproval({
+          title,
+          optionId: allowOnce.optionId,
+          ...(toolCallId === undefined ? {} : { toolCallId }),
+          ...(details.capability === undefined ? {} : { capability: details.capability }),
+          ...(details.resource === undefined ? {} : { resource: details.resource }),
+        });
+        return { outcome: { outcome: 'selected', optionId: allowOnce.optionId } };
+      }
+      session.addNotice('info', this.t('Autopilot left this to you: it changes MCP servers.'));
     }
 
     const approval = session.addApproval({

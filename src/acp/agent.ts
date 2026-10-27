@@ -188,6 +188,7 @@ export class KiroAgent {
       store: this.store,
       settings: { autoAllowInAutopilot: () => deps.settings.autoAllowInAutopilot() },
       log: deps.log,
+      translate: this.t,
     });
     this.fsHandler = new FsHandler({
       port: deps.fs,

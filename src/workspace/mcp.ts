@@ -115,13 +115,30 @@ export function findServerEntry(text: string, name: string): JsonObject | undefi
   return isRecord(entry) ? entry : undefined;
 }
 
-/** The panel adds servers switched off, so that nothing runs before the user has looked at them. */
-export function addStdioServer(text: string, name: string, command: string, args: string[] = []): string {
-  return addServerEntry(text, name, { command, args }, { disabled: true });
+/**
+ * The names under `mcpServers`, whatever their entries hold, or undefined when the file is not valid JSON and so cannot
+ * tell which names are taken.
+ */
+export function serverNames(text: string): Set<string> | undefined {
+  if (text.trim() === '') return new Set();
+  const errors: ParseError[] = [];
+  const root: unknown = parse(text, errors, { allowTrailingComma: true });
+  if (errors.length > 0 || !isRecord(root)) return undefined;
+  return new Set(Object.keys(rec(root.mcpServers)));
 }
 
-export function addHttpServer(text: string, name: string, url: string): string {
-  return addServerEntry(text, name, { url }, { disabled: true });
+/**
+ * The panel adds servers switched off, so that nothing runs before the user has looked at them. It never replaces one:
+ * when the name is taken, or the file is not valid JSON, the result is undefined and the panel says why.
+ */
+export function addStdioServer(text: string, name: string, command: string, args: string[] = []): string | undefined {
+  return serverNames(text)?.has(name) === false
+    ? addServerEntry(text, name, { command, args }, { disabled: true })
+    : undefined;
+}
+
+export function addHttpServer(text: string, name: string, url: string): string | undefined {
+  return serverNames(text)?.has(name) === false ? addServerEntry(text, name, { url }, { disabled: true }) : undefined;
 }
 
 /** A name typed by the user as a file or server name: lowercase letters and digits, with dashes between them. */
