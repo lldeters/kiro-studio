@@ -112,8 +112,8 @@ real Kiro session._
 
 ## Known limits
 
-- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 13 and 15)
-  lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
+- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 13, 15
+  and 16) lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
 - Adding MCP servers from the chat is built on reading the shipped code of Kiro CLI 2.34.2, not on a run. A CLI that
   cannot start a sign-in for Kiro Studio says so on the card and asks you to update it.
 - Sessions of a remote Kiro are listed but not driven specially.
