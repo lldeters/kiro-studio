@@ -124,6 +124,7 @@
   "Credits used in this session": "Credits in dieser Sitzung",
   "Debug command: the answer appears in the \"Kiro Studio: Chat (debug)\" output.": "Debug-Befehl: Die Antwort erscheint im Ausgabekanal „Kiro Studio: Chat (debug)“.",
   "Delete": "Löschen",
+  "Delete the session \"{0}\" in Kiro? It cannot be opened again.": "Die Sitzung „{0}“ in Kiro löschen? Sie lässt sich danach nicht mehr öffnen.",
   "Delete this steering file?": "Diese Steering-Datei löschen?",
   "Deny": "Ablehnen",
   "Describe it in a sentence.": "Beschreibe es in einem Satz.",

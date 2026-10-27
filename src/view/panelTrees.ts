@@ -74,6 +74,7 @@ export interface SessionsInput {
   now: number;
   canFork: boolean;
   canRename: boolean;
+  canDelete?: boolean;
 }
 
 export function sessionsTree(input: SessionsInput, t: Translate = identityTranslate): PanelNode[] {
@@ -87,7 +88,13 @@ export function sessionsTree(input: SessionsInput, t: Translate = identityTransl
           : undefined;
     const remote = entry.source === 'remote';
     const open = input.openIds.has(entry.sessionId);
-    const flags = ['session', input.canFork ? 'canFork' : '', input.canRename ? 'canRename' : '', open ? 'isOpen' : '']
+    const flags = [
+      'session',
+      input.canFork ? 'canFork' : '',
+      input.canRename ? 'canRename' : '',
+      input.canDelete === true ? 'canDelete' : '',
+      open ? 'isOpen' : '',
+    ]
       .filter(Boolean)
       .join(' ');
     const description = [status, relativeTime(entry.updatedAt, input.now, t)].filter(Boolean).join(' · ');

@@ -237,6 +237,7 @@ export class KiroPanel implements vscode.Disposable {
         now: Date.now(),
         canFork: capabilities?.session.fork === true,
         canRename: capabilities?.extensionMethods.has('_kiro/session/rename') === true,
+        canDelete: capabilities?.session.delete === true,
       },
       t,
     );
@@ -353,6 +354,7 @@ export class KiroPanel implements vscode.Disposable {
     command('sessions.open', (id, cwd) => this.openSession(String(id), typeof cwd === 'string' ? cwd : undefined));
     command('sessions.fork', (node) => this.forkSession(data(node)));
     command('sessions.rename', (node) => this.renameSession(data(node)));
+    command('sessions.delete', (node) => this.deleteSession(data(node)));
     command('sessions.search', async () => {
       const query = await vscode.window.showInputBox({
         prompt: t('Search sessions by title, folder or agent'),
@@ -461,6 +463,21 @@ export class KiroPanel implements vscode.Disposable {
     if (title === undefined || title.trim() === '') return;
     await this.deps.host.ensureAgent().renameSession(id, title.trim());
     this.sessionModel.upsert([{ sessionId: id, title: title.trim() }]);
+    this.refresh('sessions');
+  }
+
+  private async deleteSession(node: Record<string, string>): Promise<void> {
+    const id = node.sessionId;
+    if (id === undefined) return;
+    const remove = t('Delete');
+    const answer = await vscode.window.showWarningMessage(
+      t('Delete the session "{0}" in Kiro? It cannot be opened again.', node.title?.trim() || id),
+      { modal: true },
+      remove,
+    );
+    if (answer !== remove) return;
+    await this.deps.host.ensureAgent().deleteSession(id);
+    this.sessionModel.remove([id]);
     this.refresh('sessions');
   }
 

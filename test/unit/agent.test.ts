@@ -213,6 +213,19 @@ describe('fork and rename', () => {
     expect(configWrites(h.fake)).toEqual(['autopilot=off', 'autopilot=off']);
   });
 
+  it('deletes a session in Kiro, closing it here first when it is open', async () => {
+    const h = make();
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await h.agent.deleteSession(session.id);
+    expect(h.agent.store.get(session.id)).toBeUndefined();
+    expect(h.fake.requestsOf('session/close').map((m) => m.params)).toEqual([{ sessionId: session.id }]);
+    expect(h.fake.requestsOf('session/delete').map((m) => m.params)).toEqual([{ sessionId: session.id }]);
+
+    await h.agent.deleteSession('an-older-one');
+    expect(h.fake.requestsOf('session/delete')).toHaveLength(2);
+    expect(h.fake.requestsOf('session/close')).toHaveLength(1);
+  });
+
   it('renames only when the agent advertises the method', async () => {
     const without = make();
     const first = await without.agent.newSession({ cwd: '/ws', applyDefaults: false });

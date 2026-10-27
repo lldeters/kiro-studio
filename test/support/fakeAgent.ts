@@ -213,6 +213,9 @@ export class FakeAgent {
         return this.prompt(str(params.sessionId) ?? '', params);
       case 'session/close':
         return {};
+      case 'session/delete':
+        this.sessions.delete(str(params.sessionId) ?? '');
+        return {};
       default:
         throw new RpcError(-32601, `Method not found: ${method}`);
     }

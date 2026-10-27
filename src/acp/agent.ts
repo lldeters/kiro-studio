@@ -571,6 +571,16 @@ export class KiroAgent {
     return session;
   }
 
+  /**
+   * Deletes a session in Kiro. One that is open here is closed first, so that nothing is sent to it afterwards. Throws when
+   * the agent does not offer deleting.
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    await this.start();
+    if (this.store.get(sessionId)) await this.closeSession(sessionId);
+    await this.ready.deleteSession(sessionId);
+  }
+
   /** Renames a session. Only works when the agent advertises `_kiro/session/rename`. */
   async renameSession(sessionId: string, title: string): Promise<void> {
     await this.callExtension('_kiro/session/rename', { sessionId, title });

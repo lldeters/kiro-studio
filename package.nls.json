@@ -78,6 +78,7 @@
   "command.sessions.open": "Open Session",
   "command.sessions.fork": "Fork Session",
   "command.sessions.rename": "Rename Session…",
+  "command.sessions.delete": "Delete Session…",
   "command.specs.refresh": "Refresh Specs",
   "command.specs.new": "New Spec…",
   "command.specs.openView": "Open Spec View",

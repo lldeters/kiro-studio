@@ -363,6 +363,12 @@
         "icon": "$(edit)"
       },
       {
+        "command": "kiroStudio.sessions.delete",
+        "title": "%command.sessions.delete%",
+        "category": "Kiro Studio",
+        "icon": "$(trash)"
+      },
+      {
         "command": "kiroStudio.specs.new",
         "title": "%command.specs.new%",
         "category": "Kiro Studio",
@@ -691,6 +697,10 @@
         {
           "command": "kiroStudio.debug.cancel",
           "when": "kiroStudio.development"
+        },
+        {
+          "command": "kiroStudio.sessions.delete",
+          "when": "false"
         }
       ],
       "view/item/context": [
@@ -743,6 +753,11 @@
           "command": "kiroStudio.sessions.rename",
           "when": "view == kiroStudio.sessions && viewItem =~ /canRename/",
           "group": "1_session@2"
+        },
+        {
+          "command": "kiroStudio.sessions.delete",
+          "when": "view == kiroStudio.sessions && viewItem =~ /canDelete/",
+          "group": "2_danger@1"
         },
         {
           "command": "kiroStudio.steering.delete",
