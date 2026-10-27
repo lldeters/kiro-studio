@@ -219,10 +219,42 @@ describe('hooks tree', () => {
 describe('mcp tree', () => {
   const config: McpConfig = {
     servers: [
-      { name: 'files', transport: 'stdio', target: 'npx files', disabled: false, envNames: ['TOKEN'], autoApprove: [] },
-      { name: 'docs', transport: 'http', target: 'https://x/mcp', disabled: true, envNames: [], autoApprove: [] },
-      { name: 'git', transport: 'stdio', target: 'uvx git', disabled: false, envNames: [], autoApprove: [] },
-      { name: 'slow', transport: 'stdio', target: 'x', disabled: false, envNames: [], autoApprove: [] },
+      {
+        name: 'files',
+        transport: 'stdio',
+        target: 'npx files',
+        disabled: false,
+        envNames: ['TOKEN'],
+        headerNames: [],
+        autoApprove: [],
+      },
+      {
+        name: 'docs',
+        transport: 'http',
+        target: 'https://x/mcp',
+        disabled: true,
+        envNames: [],
+        headerNames: [],
+        autoApprove: [],
+      },
+      {
+        name: 'git',
+        transport: 'stdio',
+        target: 'uvx git',
+        disabled: false,
+        envNames: [],
+        headerNames: [],
+        autoApprove: [],
+      },
+      {
+        name: 'slow',
+        transport: 'stdio',
+        target: 'x',
+        disabled: false,
+        envNames: [],
+        headerNames: [],
+        autoApprove: [],
+      },
     ],
   };
   const base = { workspace: { path: '/ws/.kiro/settings/mcp.json', config }, runtime: [], agentRunning: true };

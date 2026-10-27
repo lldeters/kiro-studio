@@ -5,11 +5,15 @@ import { hookTemplate, parseHook, readHooks } from '../../src/workspace/hooks';
 import { detectFormatting, setJsonValue } from '../../src/workspace/jsonEdit';
 import {
   addHttpServer,
+  addServerEntry,
   addStdioServer,
+  findServerEntry,
+  isValidName,
   parseMcpConfig,
   parseMcpStatus,
   removeServer,
   setServerDisabled,
+  slug,
   splitCommandLine,
 } from '../../src/workspace/mcp';
 import type { DirEntry, FileReader } from '../../src/workspace/reader';
@@ -192,7 +196,7 @@ describe('mcp config', () => {
   // our servers
   "mcpServers": {
     "files": { "command": "npx", "args": ["-y", "files-server"], "env": { "TOKEN": "secret-value" }, "autoApprove": ["read"] },
-    "docs": { "url": "https://example.com/mcp", "disabled": true }
+    "docs": { "url": "https://example.com/mcp", "disabled": true, "headers": { "Authorization": "Bearer secret-value" } }
   }
 }
 `;
@@ -206,6 +210,7 @@ describe('mcp config', () => {
         target: 'npx -y files-server',
         disabled: false,
         envNames: ['TOKEN'],
+        headerNames: [],
         autoApprove: ['read'],
       },
       {
@@ -214,6 +219,7 @@ describe('mcp config', () => {
         target: 'https://example.com/mcp',
         disabled: true,
         envNames: [],
+        headerNames: ['Authorization'],
         autoApprove: [],
       },
     ]);
@@ -249,10 +255,50 @@ describe('mcp config', () => {
         target: 'https://x.example/mcp',
         disabled: true,
         envNames: [],
+        headerNames: [],
         autoApprove: [],
       },
     ]);
     expect(parseMcpConfig(removeServer(added, 'docs')).servers.map((s) => s.name)).toEqual(['files', 'git']);
+  });
+
+  it('adds an entry from the chat switched on, and switched off only when asked to', () => {
+    const on = addServerEntry(config, 'linear', { url: 'https://mcp.linear.app/mcp' });
+    expect(on).toContain('// our servers');
+    expect(on).toContain('"TOKEN": "secret-value"');
+    expect(findServerEntry(on, 'linear')).toEqual({ url: 'https://mcp.linear.app/mcp' });
+    expect(parseMcpConfig(on).servers.find((s) => s.name === 'linear')?.disabled).toBe(false);
+
+    const off = addServerEntry('', 'fetch', { command: 'uvx', args: ['mcp-server-fetch'] }, { disabled: true });
+    expect(findServerEntry(off, 'fetch')).toEqual({ command: 'uvx', args: ['mcp-server-fetch'], disabled: true });
+
+    const github = addServerEntry('', 'github', {
+      url: 'https://api.githubcopilot.com/mcp/',
+      headers: { Authorization: 'Bearer ${KIRO_STUDIO_MCP_GITHUB_GITHUB_TOKEN}' },
+    });
+    expect(parseMcpConfig(github).servers[0]).toMatchObject({ headerNames: ['Authorization'], disabled: false });
+    // Replacing keeps the other servers.
+    const replaced = addServerEntry(on, 'docs', { url: 'https://example.com/v2/mcp' });
+    expect(parseMcpConfig(replaced).servers.map((s) => s.name)).toEqual(['files', 'docs', 'linear']);
+    expect(findServerEntry(replaced, 'docs')).toEqual({ url: 'https://example.com/v2/mcp' });
+  });
+
+  it('finds the raw entry of a server, and nothing for a missing name or a broken file', () => {
+    expect(findServerEntry(config, 'files')).toMatchObject({ env: { TOKEN: 'secret-value' } });
+    expect(findServerEntry(config, 'nope')).toBeUndefined();
+    expect(findServerEntry(config, 'constructor')).toBeUndefined();
+    expect(findServerEntry(config, 'toString')).toBeUndefined();
+    expect(findServerEntry('', 'files')).toBeUndefined();
+    expect(findServerEntry('{ nope', 'files')).toBeUndefined();
+    expect(findServerEntry('{"mcpServers": {"x": "not an entry"}}', 'x')).toBeUndefined();
+  });
+
+  it('makes names from what the user typed', () => {
+    expect(slug('  My Server!  ')).toBe('my-server');
+    expect(slug('Größe ändern')).toBe('gr-e-ndern');
+    expect(isValidName('Linear')).toBe(true);
+    expect(isValidName(' !!! ')).toBe(false);
+    expect(isValidName('')).toBe(false);
   });
 
   it('splits a command line, keeping quoted parts with spaces together', () => {
@@ -283,6 +329,50 @@ describe('mcp config', () => {
 });
 
 describe('mcp status', () => {
+  it('reads the four shapes Kiro CLI 2.34.2 sends, and never the sign-in address', () => {
+    const runtime = parseMcpStatus([
+      { name: 'linear', status: 'connecting', authType: 'oauth' },
+      {
+        name: 'learn',
+        status: 'connected',
+        authType: 'oauth',
+        tools: [
+          { name: 'search', description: 'Search', disabled: false, inputSchema: {} },
+          { name: 'fetch', description: 'Fetch', inputSchema: {} },
+          { name: 'old', description: 'Switched off', disabled: true, inputSchema: {} },
+        ],
+        prompts: [],
+        resources: [],
+        resourceTemplates: [],
+      },
+      {
+        name: 'notion',
+        status: 'failed',
+        authType: 'oauth',
+        failedAuthorization: true,
+        authorizationUrl: 'https://mcp.notion.com/authorize?client_id=abc&redirect_uri=http%3A%2F%2Flocalhost%3A49152',
+        errorMessage: 'Authorization required',
+      },
+      {
+        name: 'slow',
+        status: 'failed',
+        authType: 'oauth',
+        failedAuthorization: false,
+        errorMessage: 'Timed out',
+        errorCode: 'timeout_too_low',
+      },
+      { name: 'off', status: 'disabled' },
+    ]);
+    expect(runtime).toEqual([
+      { name: 'linear', status: 'connecting' },
+      { name: 'learn', status: 'connected', toolCount: 2 },
+      { name: 'notion', status: 'failed', error: 'Authorization required', needsAuth: true },
+      { name: 'slow', status: 'failed', error: 'Timed out', errorCode: 'timeout_too_low' },
+      { name: 'off', status: 'disabled' },
+    ]);
+    expect(JSON.stringify(runtime)).not.toContain('authorize');
+  });
+
   it('reads the usual names and tolerates others', () => {
     expect(
       parseMcpStatus([

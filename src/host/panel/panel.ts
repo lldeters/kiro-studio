@@ -24,10 +24,12 @@ import { setJsonValue } from '../../workspace/jsonEdit';
 import {
   addHttpServer,
   addStdioServer,
+  isValidName,
   parseMcpConfig,
   parseMcpStatus,
   removeServer,
   setServerDisabled,
+  slug,
   splitCommandLine,
   type McpRuntime,
 } from '../../workspace/mcp';
@@ -51,15 +53,8 @@ const data = (node: unknown): Record<string, string> =>
     ? (node.data as Record<string, string>)
     : {};
 
-const slug = (name: string): string =>
-  name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
-
 const validName = (value: string): string | undefined =>
-  slug(value) === '' ? t('Use letters or digits in the name.') : undefined;
+  isValidName(value) ? undefined : t('Use letters or digits in the name.');
 
 export class KiroPanel implements vscode.Disposable {
   readonly trees: Record<PanelViewId, PanelTree>;
