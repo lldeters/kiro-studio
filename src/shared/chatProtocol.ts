@@ -173,6 +173,8 @@ export interface SessionMeta {
   context?: { percentage?: number; summarizationThreshold?: number; tokens?: number };
   lastTurn?: { credits?: number; elapsedMs?: number; stopReason?: string };
   cwd?: string;
+  /** The MCP servers the cards of proposed servers show; omitted while there is nothing to say. */
+  mcp?: McpSessionView;
 }
 
 export interface SessionView extends SessionMeta {
@@ -213,6 +215,8 @@ export interface ChatCapabilities {
   image: boolean;
   /** The CLI advertises `_kiro/session/compact`. */
   compact: boolean;
+  /** `kiro-mcp` blocks in Kiro's answers show as cards with an Add button (the setting `kiroStudio.mcp.addFromChat`). */
+  mcpCards: boolean;
 }
 
 /** The user's Kiro plan, from the CLI's `/usage` report (`kiro/usage.ts`), with what this window spent since. */
@@ -269,6 +273,23 @@ export const WEBVIEW_COMMANDS = [
 ] as const;
 export type WebviewCommand = (typeof WEBVIEW_COMMANDS)[number];
 
+/**
+ * What a button on the card of a proposed MCP server asks the host to do. The message names the server and the answer
+ * it is in, never an address, a command or a configuration: the host reads the proposal from the session itself.
+ */
+export const MCP_ACTIONS = [
+  'add',
+  'signIn',
+  'openSignIn',
+  'copySignIn',
+  'enable',
+  'retry',
+  'continue',
+  'openConfig',
+  'restart',
+] as const;
+export type McpAction = (typeof MCP_ACTIONS)[number];
+
 export type WebviewMessage =
   | { type: 'ready' }
   | { type: 'newSession' }
@@ -292,6 +313,8 @@ export type WebviewMessage =
   | { type: 'revert'; sessionId: string; checkpointId: string; path?: string }
   | { type: 'exportSession'; sessionId: string }
   | { type: 'command'; command: WebviewCommand }
+  /** A button on the card of an MCP server in the assistant answer `itemId`. */
+  | { type: 'mcpAction'; sessionId: string; itemId: number; server: string; action: McpAction }
   /** An error the page caught while drawing; the host writes it to the protocol log. */
   | { type: 'error'; message: string };
 
@@ -336,6 +359,20 @@ function parseAttachments(raw: unknown): AttachmentView[] | undefined {
   return result;
 }
 const KINDS: readonly string[] = ['allow_once', 'allow_always', 'reject_once', 'reject_always'];
+const MAX_SESSION_ID_CHARS = 200;
+/** The names `parseProposal` accepts for a server. */
+const SERVER_NAME = /^[a-z0-9][a-z0-9-]{0,47}$/;
+
+/** Strict, because the card's buttons are the one way the webview can lead to a change of the MCP configuration. */
+function parseMcpAction(raw: Record<string, unknown>): WebviewMessage | undefined {
+  const { sessionId, itemId, server, action } = raw;
+  if (typeof sessionId !== 'string' || sessionId.length === 0 || sessionId.length > MAX_SESSION_ID_CHARS)
+    return undefined;
+  if (typeof itemId !== 'number' || !Number.isInteger(itemId) || itemId < 1) return undefined;
+  if (typeof server !== 'string' || !SERVER_NAME.test(server)) return undefined;
+  if (typeof action !== 'string' || !(MCP_ACTIONS as readonly string[]).includes(action)) return undefined;
+  return { type: 'mcpAction', sessionId, itemId, server, action: action as McpAction };
+}
 
 /** Validates a message from the webview. The host never trusts the shape of what a webview posts. */
 export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
@@ -430,6 +467,8 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
       if (command === undefined || !(WEBVIEW_COMMANDS as readonly string[]).includes(command)) return undefined;
       return { type: 'command', command: command as WebviewCommand };
     }
+    case 'mcpAction':
+      return parseMcpAction(raw);
     default:
       return undefined;
   }

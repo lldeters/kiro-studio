@@ -192,7 +192,7 @@ describe('toolbar', () => {
   it('offers to compact the context only when the CLI advertises it', () => {
     const { rerender } = render(<Toolbar session={session()} />);
     expect(screen.queryByRole('button', { name: 'Compact the context' })).toBeNull();
-    useChat.setState({ capabilities: { image: false, compact: true } });
+    useChat.setState({ capabilities: { image: false, compact: true, mcpCards: false } });
     rerender(<Toolbar session={session()} />);
     fireEvent.click(screen.getByRole('button', { name: 'Compact the context' }));
     expect(outbox).toEqual([{ type: 'compact', sessionId: 's1' }]);

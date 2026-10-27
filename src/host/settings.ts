@@ -34,6 +34,11 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('planUsage.enabled', true);
   }
 
+  /** Kiro proposes MCP servers as cards in the chat, and is told how with every session. */
+  mcpAddFromChat(): boolean {
+    return this.config.get<boolean>('mcp.addFromChat', true);
+  }
+
   specCodeLens(): boolean {
     return this.config.get<boolean>('specs.codeLens', true);
   }

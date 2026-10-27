@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionMeta, SessionView } from '../../src/shared/chatProtocol';
 import { exportMarkdown } from '../../src/view/exportMarkdown';
+import { wrapContext } from '../../src/workspace/mcpInstructions';
 
 const meta: SessionMeta = { status: 'ready', phase: 'idle', autopilot: false, approvals: [], config: [], commands: [] };
 
@@ -69,5 +70,18 @@ describe('exportMarkdown', () => {
     expect(
       exportMarkdown(view, { you: 'Du', kiro: 'Kiro', thinking: 'Denkt', filesChanged: (n) => `${n} Dateien` }),
     ).toContain('## Du');
+  });
+
+  it('leaves out Kiro Studio’s hidden instructions, should Kiro have merged them into a message', () => {
+    const view: SessionView = {
+      id: 's',
+      ...meta,
+      items: [{ id: 1, kind: 'user', text: `Add Linear\n\n${wrapContext('instructions')}`, replay: true }],
+      tools: [],
+    };
+    const markdown = exportMarkdown(view);
+    expect(markdown).toContain('Add Linear');
+    expect(markdown).not.toContain('kiro-studio-context');
+    expect(markdown).not.toContain('instructions');
   });
 });

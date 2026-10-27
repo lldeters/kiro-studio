@@ -41,7 +41,7 @@ const init: HostMessage = {
   activeId: 's1',
   setup: 'ready',
   agent: { phase: 'ready' },
-  capabilities: { image: true, compact: true },
+  capabilities: { image: true, compact: true, mcpCards: false },
 };
 
 const run = (messages: HostMessage[], start: ChatState = initialState) => messages.reduce(reduce, start);
@@ -128,13 +128,13 @@ describe('chat state', () => {
         type: 'status',
         setup: 'notSignedIn',
         agent: { phase: 'failed', message: 'x' },
-        capabilities: { image: false, compact: false },
+        capabilities: { image: false, compact: false, mcpCards: false },
       },
     ]);
     expect(state).toMatchObject({
       setup: 'notSignedIn',
       agent: { phase: 'failed' },
-      capabilities: { image: false, compact: false },
+      capabilities: { image: false, compact: false, mcpCards: false },
     });
   });
 });

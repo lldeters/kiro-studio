@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_ATTACHMENTS,
   MAX_IMAGE_BASE64_CHARS,
+  MCP_ACTIONS,
   WEBVIEW_COMMANDS,
   parseWebviewMessage,
 } from '../../src/shared/chatProtocol';
@@ -30,6 +31,7 @@ describe('messages from the webview', () => {
       { type: 'revert', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
       { type: 'exportSession', sessionId: 's1' },
       { type: 'command', command: 'kiroStudio.restart' },
+      { type: 'mcpAction', sessionId: 's1', itemId: 3, server: 'linear', action: 'add' },
       { type: 'error', message: 'boom' },
     ];
     for (const message of messages) expect(parseWebviewMessage(message)).toEqual(message);
@@ -87,6 +89,51 @@ describe('messages from the webview', () => {
   it('only lets the webview run the whitelisted commands', () => {
     for (const command of WEBVIEW_COMMANDS) expect(parseWebviewMessage({ type: 'command', command })).toBeDefined();
     expect(WEBVIEW_COMMANDS).not.toContain('workbench.action.terminal.new');
+  });
+
+  it('lets no command change the MCP servers; only the buttons of a card can, through the host', () => {
+    expect(WEBVIEW_COMMANDS.filter((command) => command.startsWith('kiroStudio.mcp.'))).toEqual([]);
+  });
+});
+
+describe('buttons on the card of an MCP server', () => {
+  const action = (fields: Record<string, unknown>) =>
+    parseWebviewMessage({ type: 'mcpAction', sessionId: 's1', itemId: 3, server: 'linear', action: 'add', ...fields });
+
+  it('accepts every action', () => {
+    for (const name of MCP_ACTIONS)
+      expect(action({ action: name })).toEqual({
+        type: 'mcpAction',
+        sessionId: 's1',
+        itemId: 3,
+        server: 'linear',
+        action: name,
+      });
+  });
+
+  it('drops an address, a command or a configuration sent with it', () => {
+    expect(action({ url: 'https://evil.example/mcp', command: 'sh', config: { url: 'https://evil.example' } })).toEqual(
+      { type: 'mcpAction', sessionId: 's1', itemId: 3, server: 'linear', action: 'add' },
+    );
+  });
+
+  it.each([
+    { action: 'remove' },
+    { action: undefined },
+    { itemId: 0 },
+    { itemId: 1.5 },
+    { itemId: '3' },
+    { itemId: undefined },
+    { server: 'my server' },
+    { server: 'a/b' },
+    { server: 'Linear' },
+    { server: '-linear' },
+    { server: 'x'.repeat(49) },
+    { sessionId: '' },
+    { sessionId: 'x'.repeat(201) },
+    { sessionId: 7 },
+  ])('rejects %j', (fields) => {
+    expect(action(fields)).toBeUndefined();
   });
 });
 

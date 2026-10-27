@@ -8,9 +8,12 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { KiroAgent } from '../acp/agent';
 import type { BroadcastEvent } from '../acp/dispatcher';
+import { describeError } from '../acp/errors';
+import type { SecretPort } from '../acp/handlers/secrets';
 import { CheckpointService } from '../checkpoints/service';
 import { ShadowRepo } from '../checkpoints/shadowRepo';
 import type { Session } from '../acp/sessions';
+import type { JsonObject } from '../util/json';
 import { currentPlatform, isInside } from '../util/paths';
 import { spawnTransport } from '../acp/transport';
 import { ApprovalUi } from './approvalUi';
@@ -46,8 +49,25 @@ export class AgentHost implements vscode.Disposable {
       storagePath: string;
       /** Tells the user once that checkpoints are off, and why. */
       onCheckpointsUnavailable: (reason: string) => void;
+      /** Where Kiro keeps the sign-ins of MCP servers (`_kiro/secret/*`): VS Code's secret storage. */
+      secrets?: SecretPort;
+      /** The keys the user entered for MCP servers, which the Kiro process gets as environment variables. */
+      keys?: { envForSpawn(): Promise<Record<string, string>> };
     },
   ) {}
+
+  /**
+   * A web page Kiro asks to open. Decided at once, because Kiro waits for the answer; the MCP sign-in flow sets this
+   * (`McpChat.onExternalUrl`). Until then every page opens, as it always did.
+   */
+  onExternalUrl: (url: string) => void = (url) => {
+    vscode.env.openExternal(vscode.Uri.parse(url)).then(undefined, (error: unknown) => {
+      this.deps.protocol.log.info(`could not open a page Kiro asked for: ${describeError(error)}`);
+    });
+  };
+
+  /** The `_meta` of new and loaded sessions: the steering document about MCP servers (`McpChat.sessionMeta`). */
+  sessionMeta: () => JsonObject | undefined = () => undefined;
 
   get agent(): KiroAgent | undefined {
     return this.current;
@@ -67,6 +87,11 @@ export class AgentHost implements vscode.Disposable {
       this.notifyTimer = undefined;
       this.changed.fire();
     }, 40);
+  }
+
+  /** True while a turn runs in any session, which a restart of Kiro would end. */
+  anyBusy(): boolean {
+    return this.current?.store.all().some((session) => session.busy) ?? false;
   }
 
   /** Requests from Kiro that wait for the user. */
@@ -172,23 +197,18 @@ export class AgentHost implements vscode.Disposable {
 
     const { settings, setup, protocol } = this.deps;
     const agent = new KiroAgent({
-      transport: () => {
+      transport: async () => {
         const cli = setup.cliPath;
-        if (cli === undefined) return Promise.reject(new Error(vscode.l10n.t('The Kiro CLI is not set up yet.')));
-        return spawnTransport({ command: cli, args: ACP_ARGS, cwd: this.workspaceRoot(), env: process.env });
+        if (cli === undefined) throw new Error(vscode.l10n.t('The Kiro CLI is not set up yet.'));
+        return spawnTransport({ command: cli, args: ACP_ARGS, cwd: this.workspaceRoot(), env: await this.spawnEnv() });
       },
       log: protocol.log,
       settings,
       fs: new VsCodeFileSystemPort(),
       workspaceRoots: () => (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
-      // Opens every web page Kiro asks for, as before; the MCP sign-in flow will decide which pages open by themselves.
-      externalUrl: (url) => {
-        vscode.env.openExternal(vscode.Uri.parse(url)).then(undefined, (error: unknown) => {
-          protocol.log.info(
-            `could not open a page Kiro asked for: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
-      },
+      externalUrl: (url) => this.onExternalUrl(url),
+      sessionMeta: () => this.sessionMeta(),
+      ...(this.deps.secrets === undefined ? {} : { secrets: this.deps.secrets }),
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },
       translate: (message, ...args) => vscode.l10n.t(message, ...args),
       turnHooks: {
@@ -209,6 +229,19 @@ export class AgentHost implements vscode.Disposable {
     );
     this.notify();
     return agent;
+  }
+
+  /**
+   * VS Code's environment plus the keys the user entered for MCP servers, which mcp.json refers to as `${VAR}`. Kiro
+   * reads them only when it starts, so a new key needs a restart. Without its keys Kiro still starts.
+   */
+  private async spawnEnv(): Promise<NodeJS.ProcessEnv> {
+    try {
+      return { ...process.env, ...(await this.deps.keys?.envForSpawn()) };
+    } catch (error) {
+      this.deps.protocol.log.info(`could not read the keys of MCP servers: ${describeError(error)}`);
+      return process.env;
+    }
   }
 
   /** Stops the agent and starts it again, for example after a setting that is only read at startup changed. */

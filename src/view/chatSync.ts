@@ -17,7 +17,7 @@ import type {
   SetupView,
 } from '../shared/chatProtocol';
 import { currentPlatform, type PlatformKind } from '../util/paths';
-import { PatchTracker, tabView } from './chatPresenter';
+import { PatchTracker, tabView, type Redact } from './chatPresenter';
 
 export interface SyncInput {
   /** Every session of the window, in tab order. */
@@ -44,7 +44,11 @@ export class ChatSync {
   private tracker: PatchTracker | undefined;
   private trackedId: string | undefined;
 
-  constructor(private readonly platform: PlatformKind = currentPlatform()) {}
+  /** `redact` hides secrets in what Kiro wrote that the chat shows besides the transcript (MCP error messages). */
+  constructor(
+    private readonly platform: PlatformKind = currentPlatform(),
+    private readonly redact?: Redact,
+  ) {}
 
   /** The first messages for a page that has just told the host it is ready: its state, then the active session. */
   init(input: SyncInput, extras: InitExtras): HostMessage[] {
@@ -110,7 +114,7 @@ export class ChatSync {
       return [];
     }
     if (this.trackedId !== active.id || !this.tracker) {
-      const tracker = new PatchTracker(this.platform);
+      const tracker = new PatchTracker(this.platform, this.redact);
       const session = tracker.full(active);
       this.tracker = tracker;
       this.trackedId = active.id;

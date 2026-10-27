@@ -12,6 +12,8 @@ import {
 } from '../../src/view/chatPresenter';
 import { SESSION_ID, configOptions, info, permissionRequest, u, update } from '../support/kiro';
 import { approvalDetails } from '../../src/acp/sessions';
+import { createRedactor } from '../../src/util/redact';
+import { wrapContext } from '../../src/workspace/mcpInstructions';
 
 function apply(session: Session, body: Record<string, unknown>): void {
   const parsed = parseSessionNotification(update(session.id, body));
@@ -334,5 +336,72 @@ describe('checkpoints in the view', () => {
     apply(s, u.agent('Replayed answer', { replay: true }));
     s.restoreCheckpointMarkers();
     expect(sessionView(s, 'posix').items.map((i) => i.kind)).toEqual(['assistant', 'checkpoint']);
+  });
+});
+
+describe('MCP servers in the view', () => {
+  const key = 'ghp_0123456789abcdefSECRET';
+  const redact = createRedactor('/home/ada', () => [key]).redactText;
+  const signInUrl = 'https://mcp.linear.app/authorize?client_id=kiro&state=s3cr3t-state';
+
+  it('has no mcp entry while there is nothing to show', () => {
+    expect(sessionView(make(), 'posix', redact).mcp).toBeUndefined();
+  });
+
+  it('shows the servers Kiro reported and the ones added from the chat, without keys or the sign-in address', () => {
+    const s = make();
+    s.setMcpRuntime({
+      runtime: [
+        { name: 'github', status: 'failed', error: `401 for token ${key}` },
+        { name: 'linear', status: 'failed', needsAuth: true },
+      ],
+    });
+    s.updateMcpLocal('linear', {
+      scope: 'user',
+      signIn: { phase: 'waiting', host: 'mcp.linear.app', url: signInUrl, browserOpened: true, at: 1 },
+    });
+    const view = sessionView(s, 'posix', redact);
+    expect(view.mcp).toEqual({
+      allowed: true,
+      servers: [
+        { name: 'github', state: 'failed', error: '401 for token [redacted]' },
+        {
+          name: 'linear',
+          scope: 'user',
+          state: 'signingIn',
+          signInHost: 'mcp.linear.app',
+          punycode: false,
+          browserOpened: true,
+        },
+      ],
+    });
+    const json = JSON.stringify(view);
+    expect(json).not.toContain(key);
+    expect(json).not.toContain('s3cr3t-state');
+    expect(json).not.toContain('authorize');
+  });
+
+  it('shows the lock when the organisation switched MCP servers off, even without servers', () => {
+    const s = make();
+    s.setMcpAllowed(false);
+    expect(sessionView(s, 'posix', redact).mcp).toEqual({ allowed: false, blocked: 'governance', servers: [] });
+  });
+
+  it('sends a change of a server as a meta patch, without items', () => {
+    const s = make();
+    apply(s, u.agent('Here is Linear.'));
+    const tracker = new PatchTracker('posix', redact);
+    tracker.full(s);
+    s.setMcpRuntime({ runtime: [{ name: 'linear', status: 'connected', toolCount: 25 }] });
+    const patch = tracker.diff(s);
+    expect(isPatch(patch) && patch.items).toEqual([]);
+    expect(isPatch(patch) && patch.meta?.mcp?.servers).toEqual([{ name: 'linear', state: 'connected', toolCount: 25 }]);
+    expect(tracker.diff(s)).toBeUndefined();
+  });
+
+  it('never shows the hidden instructions as part of what the user wrote', () => {
+    const s = make();
+    s.beginTurn(`Add the Linear MCP server\n\n${wrapContext('# Kiro Studio: adding MCP servers')}`);
+    expect(sessionView(s, 'posix').items[0]).toMatchObject({ kind: 'user', text: 'Add the Linear MCP server' });
   });
 });
