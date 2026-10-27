@@ -4,6 +4,7 @@ import type { OptionKind } from '../../src/acp/handlers/permissions';
 import type { SecretPort } from '../../src/acp/handlers/secrets';
 import type { JsonObject } from '../../src/util/json';
 import { ProtocolLog, type LogLevel } from '../../src/util/log';
+import type { PlatformKind } from '../../src/util/paths';
 import { createRedactor } from '../../src/util/redact';
 import { sleep } from '../../src/util/async';
 import type { TransportFactory } from '../../src/acp/transport';
@@ -25,6 +26,8 @@ export interface HarnessOptions {
   writeGate?: WriteGate;
   turnHooks?: AgentDeps['turnHooks'];
   translate?: AgentDeps['translate'];
+  /** How paths are read; POSIX by default, the machine's own for a test against a real process. */
+  platform?: PlatformKind;
   /** What `session/new` and `session/load` carry as `_meta`. */
   sessionMeta?: () => JsonObject | undefined;
   /** Replaces recording the pages Kiro asks for in `opened`. */
@@ -110,7 +113,7 @@ export function createHarness(options: HarnessOptions = {}) {
     workspaceRoots: () => [workspace],
     externalUrl: options.externalUrl ?? ((url) => void opened.push(url)),
     clientInfo: { name: 'kiro-studio-test', version: '0.0.0' },
-    platform: 'posix',
+    platform: options.platform ?? 'posix',
     ...(options.writeGate === undefined ? {} : { writeGate: options.writeGate }),
     ...(options.turnHooks === undefined ? {} : { turnHooks: options.turnHooks }),
     ...(options.translate === undefined ? {} : { translate: options.translate }),

@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { spawnTransport } from '../../src/acp/transport';
 import { checkSetup, nodeCliEnvironment } from '../../src/kiro/cli';
+import { currentPlatform } from '../../src/util/paths';
 import { createFakeCli } from '../support/fakeCli';
 import { createHarness, until } from '../support/harness';
 
@@ -47,9 +48,11 @@ describe('fake CLI of the integration tests', () => {
 
   it('writes a file through the client when the prompt says WRITE', async () => {
     const cli = createFakeCli('ready', SCRIPT);
+    // The fake writes the path as the machine spells it, so the agent reads paths the same way.
     const h = createHarness({
       transport: () => () => spawnTransport({ command: cli, args: ['acp'], cwd: process.cwd() }),
       shutdownGraceMs: 2000,
+      platform: currentPlatform(),
     });
     try {
       await h.agent.start();
