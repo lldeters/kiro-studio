@@ -105,6 +105,7 @@ export const UI_MESSAGES = [
   'A folder',
   'The open file',
   'The selected lines of the open file',
+  'A command in the terminal and its output',
   'Errors and warnings',
   'Uncommitted changes',
   'Steering files',

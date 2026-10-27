@@ -52,6 +52,24 @@ describe('resolveAttachments', () => {
     expect(result.labels).toEqual(['a.ts:3-4', 'b.py:7']);
   });
 
+  it('sends a command from the terminal with its exit code and output, and says when only the end is there', async () => {
+    const result = await resolveAttachments(
+      [
+        { kind: 'terminal', command: 'npm test', output: 'FAIL a.test.ts\n\n', exitCode: 1, truncated: true },
+        { kind: 'terminal', command: 'touch x', output: '' },
+      ],
+      deps(),
+    );
+    expect(result.blocks).toEqual([
+      {
+        type: 'text',
+        text: 'A command run in the terminal (exit code 1):\n```\nnpm test\n```\nThe end of its output:\n```\nFAIL a.test.ts\n```',
+      },
+      { type: 'text', text: 'A command run in the terminal:\n```\ntouch x\n```\nIt printed nothing.' },
+    ]);
+    expect(result.labels).toEqual(['$ npm test', '$ touch x']);
+  });
+
   it('does not send a selection from outside the workspace, or one that holds nothing', async () => {
     const result = await resolveAttachments(
       [

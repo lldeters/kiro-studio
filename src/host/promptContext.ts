@@ -11,6 +11,7 @@ import {
   type Problem,
 } from '../view/promptContext';
 import { gitCommand } from '../workspace/gitCommand';
+import { TerminalRecorder } from './terminalOutput';
 
 const EXCLUDE = '**/{node_modules,.git,dist,out,build,target,.venv,__pycache__}/**';
 const MAX_FILES_LISTED = 5000;
@@ -41,6 +42,14 @@ async function pickFolder(): Promise<AttachmentView[]> {
     openLabel: vscode.l10n.t('Attach folder'),
   });
   return (picked ?? []).map((uri) => ({ kind: 'folder', path: uri.fsPath }));
+}
+
+let terminals: TerminalRecorder | undefined;
+
+/** Records the commands of the terminals, for `#terminal`. Called once at activation. */
+export function trackTerminals(): vscode.Disposable {
+  terminals = new TerminalRecorder();
+  return terminals;
 }
 
 /** The file editor used last; see {@link currentFileOf}. */
@@ -158,6 +167,8 @@ export function pickContext(kind: ContextKind): Promise<AttachmentView[]> | Atta
       return currentFile();
     case 'selection':
       return currentSelection();
+    case 'terminal':
+      return terminals?.pick() ?? [];
     case 'steering':
       return pickSteering();
     case 'spec':

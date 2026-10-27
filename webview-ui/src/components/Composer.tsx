@@ -192,7 +192,13 @@ export function Composer({ session }: { session: SessionView }) {
         {attachments.length > 0 && (
           <div className="chips">
             {attachments.map((attachment, index) => (
-              <span className="chip" key={index} title={'path' in attachment ? attachment.path : undefined}>
+              <span
+                className="chip"
+                key={index}
+                title={
+                  'path' in attachment ? attachment.path : 'command' in attachment ? attachment.command : undefined
+                }
+              >
                 {attachment.kind === 'image' ? (
                   <img src={`data:${attachment.mimeType};base64,${attachment.data}`} alt="" className="chip-thumb" />
                 ) : (
@@ -315,6 +321,8 @@ function chipIcon(attachment: AttachmentView): string {
       return 'git-compare';
     case 'selection':
       return 'list-selection';
+    case 'terminal':
+      return 'terminal';
     default:
       return 'file';
   }

@@ -4,7 +4,7 @@ import type { T } from './i18n';
 
 export type ContextAction =
   | { type: 'attach'; kind: 'problems' | 'gitDiff' }
-  | { type: 'pick'; kind: 'file' | 'folder' | 'current' | 'selection' | 'steering' | 'spec' };
+  | { type: 'pick'; kind: 'file' | 'folder' | 'current' | 'selection' | 'terminal' | 'steering' | 'spec' };
 
 export interface MenuItem {
   id: string;
@@ -71,6 +71,13 @@ export function hashItems(t: T): (MenuItem & { keys: string })[] {
       keys: 'git diff gitdiff changes',
       detail: t('Uncommitted changes'),
       action: { type: 'attach', kind: 'gitDiff' },
+    },
+    {
+      id: 'terminal',
+      label: '#terminal',
+      keys: 'terminal shell output command',
+      detail: t('A command in the terminal and its output'),
+      action: { type: 'pick', kind: 'terminal' },
     },
     {
       id: 'steering',
