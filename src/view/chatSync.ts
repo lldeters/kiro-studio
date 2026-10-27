@@ -11,6 +11,7 @@ import type {
   AgentView,
   ChatCapabilities,
   HostMessage,
+  PlanView,
   SessionPatch,
   SessionView,
   SetupView,
@@ -26,6 +27,8 @@ export interface SyncInput {
   setup: SetupView;
   agent: AgentView;
   capabilities: ChatCapabilities;
+  /** The plan overview; undefined while it is off or not checked yet. */
+  plan?: PlanView;
 }
 
 /** What only the first message carries. */
@@ -59,6 +62,7 @@ export class ChatSync {
         setup: input.setup,
         agent: input.agent,
         capabilities: input.capabilities,
+        ...(input.plan === undefined ? {} : { plan: input.plan }),
       },
     ];
     messages.push(...this.sessionMessages(input.active));
@@ -82,7 +86,13 @@ export class ChatSync {
     const statusKey = keyOfStatus(input);
     if (statusKey !== this.statusKey) {
       this.statusKey = statusKey;
-      messages.push({ type: 'status', setup: input.setup, agent: input.agent, capabilities: input.capabilities });
+      messages.push({
+        type: 'status',
+        setup: input.setup,
+        agent: input.agent,
+        capabilities: input.capabilities,
+        ...(input.plan === undefined ? {} : { plan: input.plan }),
+      });
     }
 
     messages.push(...this.sessionMessages(input.active));
@@ -117,5 +127,5 @@ function keyOfTabs(input: SyncInput): string {
 }
 
 function keyOfStatus(input: SyncInput): string {
-  return JSON.stringify([input.setup, input.agent, input.capabilities]);
+  return JSON.stringify([input.setup, input.agent, input.capabilities, input.plan ?? null]);
 }

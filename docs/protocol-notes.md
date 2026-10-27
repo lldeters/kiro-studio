@@ -451,7 +451,15 @@ session, so no MCP server starts. **[T]**
 - Context meter: `context_usage.usagePercentage`; compaction thresholds 80 % (summarise) and 95 % (truncate)
   on `session/load`. No ACP `usage_update`. **[R][T]**
 - Credits per turn: `turn_completion.promptTurnSummaries[0].usage`. One turn that wrote a single file with the `auto`
-  model cost 0.0997 credits and took 4.1 s; the context was at 1.75 % afterwards. **[V]**
+  model cost 0.0997 credits and took 4.1 s; the context was at 1.75 % afterwards. **[V]** Only one summary was seen;
+  Kiro Studio adds up all of them and also reads `usage` given as text. **[P]**
+- The plan (name, monthly credits, reset day, bonus credits): no ACP method (`_kiro/account/getUsage` is not advertised,
+  section 11). The CLI prints it for people with `kiro-cli chat --no-interactive /usage`, a box with `| KIRO FREE`,
+  `████ 100% (resets on 01/01)`, `(0.00 of 50 covered in plan)` and `0.00/100 credits used, expires in 88 days`; older
+  CLIs print `Plan: KIRO PRO MAX | 1 usage breakdowns`. Third party, from the Kiro provider of
+  [CodexBar](https://github.com/steipete/CodexBar/blob/main/docs/kiro.md), which also reports that 2.33.1 keeps an empty
+  session for each such call. Kiro Studio reads it in `kiro/usage.ts`, prefers the numbers to the bar (the sample shows
+  100 % next to 0.00 of 50) and runs it in a folder of its own. Not checked against a real CLI here. **[P]**
 - Session title: top-level `title` on `session_info_update` (`focus_update`), first the raw prompt start, then a
   generated title. **[R]**
 

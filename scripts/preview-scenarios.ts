@@ -1,7 +1,7 @@
 /** Conversations for `npm run preview`, built with the real session store and presenter. */
 import { Session } from '../src/acp/sessions';
 import { parseSessionNotification } from '../src/acp/types';
-import type { HostMessage, SetupView } from '../src/shared/chatProtocol';
+import type { HostMessage, PlanView, SetupView } from '../src/shared/chatProtocol';
 import type { SpecHostMessage } from '../src/shared/specProtocol';
 import { PatchTracker, tabView } from '../src/view/chatPresenter';
 import { specView } from '../src/view/specPresenter';
@@ -15,7 +15,10 @@ function feed(session: Session, ...updates: Record<string, unknown>[]): void {
   }
 }
 
-function init(sessions: Session[], overrides: { setup?: SetupView; phase?: 'starting' | 'ready' } = {}): HostMessage {
+function init(
+  sessions: Session[],
+  overrides: { setup?: SetupView; phase?: 'starting' | 'ready'; plan?: PlanView } = {},
+): HostMessage {
   return {
     type: 'init',
     strings: {},
@@ -24,6 +27,7 @@ function init(sessions: Session[], overrides: { setup?: SetupView; phase?: 'star
     setup: overrides.setup ?? 'ready',
     agent: { phase: overrides.phase ?? 'ready' },
     capabilities: { image: true, compact: true },
+    ...(overrides.plan === undefined ? {} : { plan: overrides.plan }),
   };
 }
 
@@ -181,7 +185,18 @@ function idle(): HostMessage[] {
   session.beginTurn('What does this project do?', ['README.md']);
   feed(session, u.agent('It is a VS Code extension.', { messageId: 'x' }), u.turnCompletion(0.42));
   session.endTurn({ stopReason: 'end_turn' });
-  return [init([session]), { type: 'session', session: new PatchTracker('posix').full(session) }];
+  const plan: PlanView = {
+    state: 'ready',
+    plan: 'KIRO PRO',
+    used: 412.42,
+    limit: 1000,
+    percent: 41.242,
+    resetsOn: '2026-11-01',
+    bonus: { used: 20, limit: 500, expiresInDays: 28 },
+    sinceCheck: 0.42,
+    checkedAt: new Date(2026, 9, 27, 9, 5).getTime(),
+  };
+  return [init([session], { plan }), { type: 'session', session: new PatchTracker('posix').full(session) }];
 }
 
 const setupOnly = (setup: SetupView): HostMessage[] => [init([], { setup })];

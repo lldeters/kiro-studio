@@ -265,6 +265,12 @@
         "category": "Kiro Studio"
       },
       {
+        "command": "kiroStudio.refreshPlanUsage",
+        "title": "%command.refreshPlanUsage%",
+        "category": "Kiro Studio",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "kiroStudio.debug.newSession",
         "title": "%command.debug.newSession%",
         "category": "Kiro Studio"
@@ -760,6 +766,12 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "%config.checkpointsEnabled%"
+        },
+        "kiroStudio.planUsage.enabled": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.planUsageEnabled%"
         },
         "kiroStudio.hooks.enabled": {
           "type": "boolean",

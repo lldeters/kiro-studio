@@ -24,6 +24,7 @@ import { resolveAttachments, type SkipReason } from '../view/promptContext';
 import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
 import type { DiffProvider } from './diffProvider';
+import type { PlanUsageService } from './planUsage';
 import type { SetupController } from './setup';
 
 const FLUSH_MS = 30;
@@ -52,10 +53,12 @@ export class ChatController implements vscode.Disposable {
     private readonly setup: SetupController,
     private readonly diffs: DiffProvider,
     private readonly log?: { info(text: string): void },
+    private readonly plan?: PlanUsageService,
   ) {
     this.subscriptions.push(
       host.onDidChange(() => this.schedule()),
       setup.onDidChange(() => this.schedule()),
+      ...(plan === undefined ? [] : [plan.onDidChange(() => this.schedule())]),
     );
   }
 
@@ -121,12 +124,14 @@ export class ChatController implements vscode.Disposable {
 
   private input(): SyncInput {
     const { setup, agent } = this.view();
+    const plan = this.plan?.view;
     return {
       sessions: this.host.agent?.store.all() ?? [],
       active: this.host.activeSession,
       setup,
       agent,
       capabilities: this.capabilities(),
+      ...(plan === undefined ? {} : { plan }),
     };
   }
 

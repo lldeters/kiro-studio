@@ -216,6 +216,13 @@ Under every answer a quiet line says what the turn cost and how long it took. Ki
 completion into a `usage` item of the transcript, so a reopened conversation shows them too, and the session total is
 the sum of these items.
 
+The plan overview sits at the right of that line and in the status bar (bottom right). ACP cannot report the plan, so
+`host/planUsage.ts` runs `kiro-cli chat --no-interactive /usage` and `kiro/usage.ts` reads the text it prints (see
+protocol notes, section 13): when the connection is first ready in the window, after an answer once the last check is 15
+minutes old, and when the user clicks. Between checks the credits of the window's live answers (`view/planUsage.ts`,
+replayed turns excluded) are added to the monthly credits and the share is marked as an estimate (`≈`). The words come
+from `shared/planText.ts`, used by both places. `kiroStudio.planUsage.enabled` turns it off.
+
 An error while the page is drawn is caught by an error boundary around the app: the page says what happened, sends the
 error to the host for the protocol log, and can draw the chat again, instead of React removing the whole page.
 

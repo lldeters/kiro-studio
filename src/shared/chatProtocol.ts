@@ -175,6 +175,24 @@ export interface ChatCapabilities {
   compact: boolean;
 }
 
+/** The user's Kiro plan, from the CLI's `/usage` report (`kiro/usage.ts`), with what this window spent since. */
+export interface PlanView {
+  /** `loading` also while a check runs after an earlier one; the earlier numbers stay until it is done. */
+  state: 'loading' | 'ready' | 'failed';
+  plan?: string;
+  /** The monthly credits; `used`, and `percent` when computed from it, include `sinceCheck`. */
+  used?: number;
+  limit?: number;
+  percent?: number;
+  /** `YYYY-MM-DD`. */
+  resetsOn?: string;
+  bonus?: { used: number; limit: number; expiresInDays?: number };
+  /** Credits of this window's answers since the last check; while above 0 the numbers are an estimate. */
+  sinceCheck: number;
+  /** When the last check that succeeded was made (ms since 1970). */
+  checkedAt?: number;
+}
+
 export type HostMessage =
   | {
       type: 'init';
@@ -185,9 +203,10 @@ export type HostMessage =
       setup: SetupView;
       agent: AgentView;
       capabilities: ChatCapabilities;
+      plan?: PlanView;
     }
   | { type: 'tabs'; tabs: TabView[]; activeId?: string }
-  | { type: 'status'; setup: SetupView; agent: AgentView; capabilities: ChatCapabilities }
+  | { type: 'status'; setup: SetupView; agent: AgentView; capabilities: ChatCapabilities; plan?: PlanView }
   | { type: 'session'; session: SessionView }
   | { type: 'patch'; patch: SessionPatch }
   /** The answer to `pickContext`; the webview adds these to the draft. */
@@ -205,6 +224,7 @@ export const WEBVIEW_COMMANDS = [
   'kiroStudio.toggleAutonomy',
   'kiroStudio.openWalkthrough',
   'kiroStudio.showProtocolLog',
+  'kiroStudio.refreshPlanUsage',
   'workbench.trust.manage',
 ] as const;
 export type WebviewCommand = (typeof WEBVIEW_COMMANDS)[number];

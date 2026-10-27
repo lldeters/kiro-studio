@@ -6,6 +6,7 @@ import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
 import { DiffProvider } from './host/diffProvider';
 import { KiroPanel, PANEL_VIEWS, type PanelViewId } from './host/panel/panel';
+import { PlanStatusBar, PlanUsageService } from './host/planUsage';
 import { SpecsFeature } from './host/specs/specsFeature';
 import { createProtocolChannel } from './host/logger';
 import { trackCurrentFile } from './host/promptContext';
@@ -64,7 +65,8 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   host = agentHost;
   const debug = new DebugChat(agentHost);
   const diffs = new DiffProvider();
-  const chat = new ChatController(agentHost, setup, diffs, protocol.log);
+  const plan = new PlanUsageService({ host: agentHost, setup, settings, log: protocol.log });
+  const chat = new ChatController(agentHost, setup, diffs, protocol.log, plan);
   const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
   const specs = new SpecsFeature({
     host: agentHost,
@@ -75,11 +77,14 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   // The chat answers a question itself only for the session it shows; another session's question gets a picker.
   agentHost.suppressApprovalPrompt = (sessionId) => chat.visible && agentHost.activeSession?.id === sessionId;
   const statusBar = new StatusBarController(agentHost, setup);
+  const planStatusBar = new PlanStatusBar(plan);
   const view = new StatusView(agentHost, setup, settings);
 
   context.subscriptions.push(
     protocol,
     setup,
+    plan,
+    planStatusBar,
     debug,
     chat,
     diffs,
@@ -109,7 +114,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     }),
   );
 
-  registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat });
+  registerCommands({ context, host: agentHost, setup, settings, protocol, debug, chat, plan });
 
   const firstCheck = setup.check();
   return {

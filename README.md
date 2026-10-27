@@ -27,7 +27,8 @@ real Kiro session._
   as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
   `git diff`, steering files, specs) and pasted or dropped images. Agent, model and effort are picked in the input box;
   Supervised/Autopilot, the context fill (with tokens) and the credits of the session sit below it, and a chip above it
-  opens Kiro's latest changes. Under every answer: the credits it cost and how long it took.
+  opens Kiro's latest changes. Under every answer: the credits it cost and how long it took. At the bottom right, in the
+  chat and in the status bar, an overview of your plan: monthly credits used, the reset day and bonus credits.
 - **Questions from Kiro** are answered in the chat with exactly the options Kiro offered, with the change shown. In
   Autopilot, Kiro Studio allows each request once for you (see [Safety](#privacy-and-safety)); Supervised always asks.
 - **Checkpoints:** every turn that changes files leaves a card with _View changes_ and _Revert_, backed by a separate
@@ -72,6 +73,7 @@ real Kiro session._
 | `kiroStudio.autoAllowInAutopilot`                         | on           | In Autopilot, answer each permission request that offers "allow once" with "allow once". Never a permanent "always". User settings only. |
 | `kiroStudio.checkpoints.enabled`                          | on           | Record what each turn changes, for _View changes_ and _Revert_.                                                                          |
 | `kiroStudio.hooks.enabled`                                | off          | Let Kiro load and run hooks, **including your global ones**. User settings only.                                                         |
+| `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                        |
 | `kiroStudio.specs.codeLens`                               | on           | _Start task_ and _Update tasks_ above the tasks in `tasks.md`.                                                                           |
 | `kiroStudio.defaultMode`, `defaultModel`, `defaultEffort` | empty        | Agent, model and effort to select in new sessions. Empty keeps Kiro's default. The agent: user settings only.                            |
 | `kiroStudio.logging.level`                                | `messages`   | How much of the conversation with the CLI goes to the _Kiro Studio: Protocol_ output channel.                                            |
