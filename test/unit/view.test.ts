@@ -10,7 +10,7 @@ import {
   type StatusInput,
   type UiState,
 } from '../../src/view/statusModel';
-import { formatCredits } from '../../src/shared/format';
+import { formatCredits, formatDuration } from '../../src/shared/format';
 import { statusTree } from '../../src/view/statusTree';
 import { SESSION_ID, sessionResult, u, update } from '../support/kiro';
 
@@ -204,6 +204,16 @@ describe('statusTree', () => {
     expect(formatCredits(0.4217, 'de')).toBe('0,42');
     expect(formatCredits(12, 'de')).toBe('12,00');
     expect(() => formatCredits(1, 'not a language tag')).not.toThrow();
+  });
+
+  it('writes how long something took in seconds, and in minutes from one minute on', () => {
+    const t = (message: string, ...args: (string | number)[]) =>
+      message.replace(/\{(\d+)\}/g, (_, index: string) => String(args[Number(index)]));
+    expect(formatDuration(4106, 'en', t)).toBe('4.1 s');
+    expect(formatDuration(4106, 'de', t)).toBe('4,1 s');
+    expect(formatDuration(59_960, 'en', t)).toBe('1 min 0 s');
+    expect(formatDuration(80_400, 'en', t)).toBe('1 min 20 s');
+    expect(formatDuration(3_600_000, 'en', t)).toBe('60 min 0 s');
   });
 
   it('marks a lost session and a failed connection', () => {

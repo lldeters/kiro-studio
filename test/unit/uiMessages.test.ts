@@ -14,7 +14,8 @@ function files(dir: string, out: string[] = []): string[] {
 
 describe('webview messages', () => {
   const used = new Set<string>();
-  for (const file of files('webview-ui/src')) {
+  // The shared code is bundled into the webview too, and translates with the `t` it is given.
+  for (const file of [...files('webview-ui/src'), ...files('src/shared')]) {
     for (const match of readFileSync(file, 'utf8').matchAll(/\bt\(\s*(['"`])((?:(?!\1)[^\\]|\\.)*)\1/g)) {
       used.add((match[2] ?? '').replace(/\\(['"`])/g, '$1'));
     }

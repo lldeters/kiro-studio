@@ -116,6 +116,20 @@ describe('chat app', () => {
     expect(screen.queryByText('Kiro is thinking…')).toBeNull();
   });
 
+  it('shows what each answer cost and how long it took under it', async () => {
+    document.documentElement.lang = 'en';
+    render(<App />);
+    const usage: ItemView = { id: 3, kind: 'usage', text: '', credits: 0.0997, elapsedMs: 4106, replay: false };
+    const timeOnly: ItemView = { id: 5, kind: 'usage', text: '', elapsedMs: 80_400, replay: false };
+    receive(init(), {
+      type: 'session',
+      session: session({ items: [...session().items, usage, item(4, 'assistant', 'More'), timeOnly] }),
+    });
+    const lines = await screen.findAllByTitle('What this answer cost');
+    expect(lines.map((line) => line.textContent)).toEqual(['0.10 credits · 4.1 s', '1 min 20 s']);
+    document.documentElement.lang = '';
+  });
+
   it('does not say that Kiro is thinking without a turn', () => {
     render(<App />);
     receive(init(), { type: 'session', session: session({ items: [item(1, 'user', 'Why?')] }) });

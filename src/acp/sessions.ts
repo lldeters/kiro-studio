@@ -51,7 +51,15 @@ export interface TranscriptCheckpoint {
   id: number;
   checkpointId: string;
 }
-export type TranscriptItem = TranscriptMessage | TranscriptTool | TranscriptNotice | TranscriptCheckpoint;
+/** What a turn cost, from Kiro's `turn_completion`; also for the turns of a replayed conversation. */
+export interface TranscriptUsage {
+  kind: 'usage';
+  id: number;
+  credits?: number;
+  elapsedMs?: number;
+}
+export type TranscriptItem =
+  TranscriptMessage | TranscriptTool | TranscriptNotice | TranscriptCheckpoint | TranscriptUsage;
 
 export interface CheckpointFile {
   /** Relative to the workspace, with `/` as separator. */
@@ -433,6 +441,15 @@ export class Session {
         if (!replay) this.noteTurnStarted();
         break;
       case 'turn_completion':
+        if (info.credits !== undefined || info.elapsedMs !== undefined) {
+          this.transcript.push({
+            kind: 'usage',
+            id: this.nextItemId++,
+            ...(info.credits === undefined ? {} : { credits: info.credits }),
+            ...(info.elapsedMs === undefined ? {} : { elapsedMs: info.elapsedMs }),
+          });
+          this.changes.emit('transcript');
+        }
         this.lastTurn = {
           usedTools: info.usedTools,
           ...(info.credits === undefined ? {} : { credits: info.credits }),

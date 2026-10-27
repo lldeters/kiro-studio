@@ -30,7 +30,7 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'
 
 export interface ItemView {
   id: number;
-  kind: 'user' | 'assistant' | 'thought' | 'tool' | 'notice' | 'checkpoint';
+  kind: 'user' | 'assistant' | 'thought' | 'tool' | 'notice' | 'checkpoint' | 'usage';
   /** Message text, or the notice text. Empty for tools. */
   text: string;
   /** Tool items: the key into `SessionView.tools`. */
@@ -42,6 +42,9 @@ export interface ItemView {
   subtaskId?: string;
   /** User messages: short names of what was attached. */
   attachments?: string[];
+  /** Usage items: what the turn cost and how long it took. */
+  credits?: number;
+  elapsedMs?: number;
   replay: boolean;
 }
 
@@ -126,7 +129,8 @@ export interface SessionMeta {
   config: ConfigSelectView[];
   commands: CommandView[];
   checkpoints?: CheckpointView[];
-  context?: { percentage?: number; summarizationThreshold?: number };
+  /** `tokens`: what the context holds, the sum of Kiro's breakdown. */
+  context?: { percentage?: number; summarizationThreshold?: number; tokens?: number };
   lastTurn?: { credits?: number; elapsedMs?: number; stopReason?: string };
   cwd?: string;
 }

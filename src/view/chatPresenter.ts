@@ -196,6 +196,15 @@ export function itemView(item: TranscriptItem): ItemView {
       return { id: item.id, kind: 'notice', text: item.text, level: item.level, replay: false };
     case 'checkpoint':
       return { id: item.id, kind: 'checkpoint', text: '', checkpointId: item.checkpointId, replay: false };
+    case 'usage':
+      return {
+        id: item.id,
+        kind: 'usage',
+        text: '',
+        replay: false,
+        ...(item.credits === undefined ? {} : { credits: item.credits }),
+        ...(item.elapsedMs === undefined ? {} : { elapsedMs: item.elapsedMs }),
+      };
     default:
       return {
         id: item.id,
@@ -243,6 +252,7 @@ function configViews(session: Session): ConfigSelectView[] {
 
 export function metaView(session: Session): SessionMeta {
   const usage = session.contextUsage;
+  const tokens = contextTokens(usage?.breakdown);
   const turn = session.lastTurn;
   return {
     status: session.status,
@@ -273,6 +283,7 @@ export function metaView(session: Session): SessionMeta {
             ...(usage.summarizationThreshold === undefined
               ? {}
               : { summarizationThreshold: usage.summarizationThreshold }),
+            ...(tokens === undefined ? {} : { tokens }),
           },
         }),
     ...(turn === undefined
@@ -294,6 +305,27 @@ export function metaView(session: Session): SessionMeta {
           })),
         }),
   };
+}
+
+/**
+ * The tokens in the context: the sum of Kiro's breakdown (context files, tools, memory, answers, prompts, session
+ * files), each `{ tokens, percent }`. A part without its own count is summed from the parts below it (tools are split
+ * into MCP and built-in). Undefined without a breakdown.
+ */
+export function contextTokens(breakdown: unknown): number | undefined {
+  if (typeof breakdown !== 'object' || breakdown === null) return undefined;
+  let total = 0;
+  let found = false;
+  for (const part of Object.values(breakdown as Record<string, unknown>)) {
+    if (typeof part !== 'object' || part === null) continue;
+    const own = (part as { tokens?: unknown }).tokens;
+    const tokens = typeof own === 'number' && Number.isFinite(own) ? own : contextTokens(part);
+    if (tokens !== undefined) {
+      total += tokens;
+      found = true;
+    }
+  }
+  return found ? total : undefined;
 }
 
 function waitingToolIds(session: Session): Set<string> {
@@ -397,7 +429,11 @@ export class PatchTracker {
 }
 
 const sizeOf = (item: ItemView | TranscriptItem | undefined): number =>
-  item === undefined ? -1 : item.kind === 'tool' || item.kind === 'checkpoint' ? 0 : item.text.length;
+  item === undefined
+    ? -1
+    : item.kind === 'tool' || item.kind === 'checkpoint' || item.kind === 'usage'
+      ? 0
+      : item.text.length;
 
 const signature = (tool: ToolCallState, waiting: Set<string>): string =>
   `${tool.rev}:${waiting.has(tool.toolCallId) ? 1 : 0}`;

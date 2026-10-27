@@ -274,6 +274,19 @@ button.secondary:hover:not(:disabled) {
   border-color: var(--vscode-errorForeground);
   color: var(--vscode-errorForeground);
 }
+/* What an answer cost, small and quiet under it */
+.turn-usage {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+  font-variant-numeric: tabular-nums;
+}
+.turn-usage .codicon {
+  font-size: 12px;
+}
 /* Composer: a rounded box with the context chips, the text and a row with context, agent, model, effort and send */
 .composer-wrap {
   flex: none;

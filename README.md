@@ -26,8 +26,8 @@ real Kiro session._
   Kiro's reasoning as it streams (when the CLI sends it), "Kiro is thinking…" until a turn shows something, tool calls
   as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
   `git diff`, steering files, specs) and pasted or dropped images. Agent, model and effort are picked in the input box;
-  Supervised/Autopilot, the context fill and the credits of the last turn sit below it, and a chip above it opens Kiro's
-  latest changes.
+  Supervised/Autopilot, the context fill (with tokens) and the credits of the session sit below it, and a chip above it
+  opens Kiro's latest changes. Under every answer: the credits it cost and how long it took.
 - **Questions from Kiro** are answered in the chat with exactly the options Kiro offered, with the change shown. In
   Autopilot, Kiro Studio allows each request once for you (see [Safety](#privacy-and-safety)); Supervised always asks.
 - **Checkpoints:** every turn that changes files leaves a card with _View changes_ and _Revert_, backed by a separate

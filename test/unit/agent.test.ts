@@ -238,7 +238,7 @@ describe('prompt', () => {
     expect(phases).toEqual(['starting', 'running', 'idle']);
     expect(
       session.transcript.map((i) => (i.kind === 'user' || i.kind === 'assistant' ? `${i.kind}:${i.text}` : i.kind)),
-    ).toEqual(['user:Say hello', 'assistant:Hello world']);
+    ).toEqual(['user:Say hello', 'assistant:Hello world', 'usage']);
     expect(session.lastTurn).toMatchObject({ credits: 0.0997, stopReason: 'end_turn', usedTools: ['fs_write'] });
     expect(session.contextUsage?.percentage).toBe(9.3);
     expect(session.busy).toBe(false);
