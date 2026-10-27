@@ -12,6 +12,7 @@ import {
   parseMcpConfig,
   parseMcpStatus,
   removeServer,
+  serverNames,
   setServerDisabled,
   slug,
   splitCommandLine,
@@ -243,12 +244,12 @@ describe('mcp config', () => {
   });
 
   it('adds servers disabled, to an existing file and to an empty one, and removes one', () => {
-    const added = addStdioServer(config, 'git', 'uvx', ['mcp-server-git']);
+    const added = addStdioServer(config, 'git', 'uvx', ['mcp-server-git']) ?? '';
     expect(parseMcpConfig(added).servers.map((s) => s.name)).toEqual(['files', 'docs', 'git']);
     expect(parseMcpConfig(added).servers[2]).toMatchObject({ target: 'uvx mcp-server-git', disabled: true });
     expect(added).toContain('// our servers');
 
-    expect(parseMcpConfig(addHttpServer('', 'remote', 'https://x.example/mcp')).servers).toEqual([
+    expect(parseMcpConfig(addHttpServer('', 'remote', 'https://x.example/mcp') ?? '').servers).toEqual([
       {
         name: 'remote',
         transport: 'http',
@@ -260,6 +261,23 @@ describe('mcp config', () => {
       },
     ]);
     expect(parseMcpConfig(removeServer(added, 'docs')).servers.map((s) => s.name)).toEqual(['files', 'git']);
+  });
+
+  it('never lets the panel replace a server, and adds nothing to a broken file', () => {
+    expect(serverNames(config)).toEqual(new Set(['files', 'docs']));
+    expect(serverNames('')).toEqual(new Set());
+    expect(serverNames('{"mcpServers": {"x": "not an entry"}}')).toEqual(new Set(['x']));
+    expect(serverNames('{ nope')).toBeUndefined();
+    expect(serverNames('[]')).toBeUndefined();
+
+    expect(addStdioServer(config, 'files', 'evil')).toBeUndefined();
+    expect(addHttpServer(config, 'docs', 'https://evil.example/mcp')).toBeUndefined();
+    // A name is taken whatever its entry holds.
+    expect(addHttpServer('{"mcpServers": {"x": null}}', 'x', 'https://x.example/mcp')).toBeUndefined();
+    expect(addStdioServer('{ nope', 'git', 'uvx')).toBeUndefined();
+    expect(addHttpServer('{ "mcpServers": { ', 'remote', 'https://x.example/mcp')).toBeUndefined();
+    // A name that only looks like an Object member is free.
+    expect(serverNames(addHttpServer(config, 'constructor', 'https://x.example/mcp') ?? '')).toContain('constructor');
   });
 
   it('adds an entry from the chat switched on, and switched off only when asked to', () => {

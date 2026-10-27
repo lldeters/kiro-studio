@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { isMcpConfigPath, MCP_CONFIG_REFUSAL } from '../../src/acp/handlers/fs';
+import { mustAskInAutopilot } from '../../src/acp/handlers/permissions';
 import { arr, rec, type JsonObject } from '../../src/util/json';
 import { SESSION_ID, permissionRequest, turnApprovalRequest, u } from '../support/kiro';
 import type { FakeTurnContext, TurnScript } from '../support/fakeAgent';
@@ -140,6 +142,157 @@ describe('permission requests', () => {
   });
 });
 
+describe('what Autopilot leaves to the user', () => {
+  const LEFT = 'Autopilot left this to you: it changes MCP servers.';
+
+  /** A turn in which Kiro starts one tool and asks for it, as it does in Autopilot. */
+  function guardedTurn(tool: JsonObject, request: JsonObject, answers: JsonObject[]): TurnScript {
+    return async (ctx) => {
+      ctx.startTurn();
+      ctx.update(u.toolCall('tool-1', tool));
+      const reply = await ctx.request('session/request_permission', request);
+      answers.push(rec(reply.result));
+      return 'end_turn';
+    };
+  }
+
+  const shell = (command: string): JsonObject => ({
+    title: 'Run Command',
+    kind: 'execute',
+    rawInput: { command, run_in_background: false },
+    locations: [],
+  });
+  const shellRequest = (extra: JsonObject = {}): JsonObject => {
+    const request = permissionRequest('tool-1', { title: 'Run Command', capability: 'shell', resource: 'command' });
+    return { ...request, toolCall: { ...rec(request.toolCall), ...extra } };
+  };
+
+  it.each([
+    ['its consent resource', {}, permissionRequest('tool-1', { resource: '.kiro/settings/mcp.json' })],
+    ['its title', {}, permissionRequest('tool-1', { title: 'Write ~/.kiro/settings/mcp.json' })],
+    ['the input of the tool call before it', shell('kiro-cli mcp add --name x --command npx'), shellRequest()],
+    [
+      'the input it carries itself',
+      shell('true'),
+      shellRequest({ rawInput: { command: 'cd ~ && kiro-cli mcp add --name evil --url https://evil.example' } }),
+    ],
+    [
+      'the paths of the tool call before it',
+      { rawInput: {}, locations: [{ path: '/home/me/.kiro/settings/mcp.json' }] },
+      permissionRequest('tool-1', { resource: 'mcp.json' }),
+    ],
+  ])('asks even in Autopilot when %s changes MCP servers', async (_name, tool, request) => {
+    const answers: JsonObject[] = [];
+    const h = make({
+      settings: { autonomy: 'autopilot' },
+      fake: { autopilot: 'on', turn: guardedTurn(tool, request, answers) },
+    });
+    const session = await h.agent.newSession({ cwd: '/ws' });
+    const turn = h.agent.prompt(session.id, 'add the server');
+    await until(() => session.approvals.length === 1);
+    expect(answers).toHaveLength(0);
+    expect(session.autoApprovals).toHaveLength(0);
+    expect(session.transcript.filter((i) => i.kind === 'notice').map((i) => i.text)).toEqual([LEFT]);
+    expect(h.agent.permissions.answer(session.id, session.approvals[0]!.id, 'reject_once')).toBe(true);
+    await turn;
+    expect(outcomeOf(answers[0]!)).toEqual({ outcome: 'selected', optionId: 'reject' });
+  });
+
+  it('still allows everything else by itself', async () => {
+    const answers: JsonObject[] = [];
+    const h = make({
+      settings: { autonomy: 'autopilot' },
+      fake: { autopilot: 'on', turn: guardedTurn(shell('kiro-cli mcp list && npm test'), shellRequest(), answers) },
+    });
+    const session = await h.agent.newSession({ cwd: '/ws' });
+    await h.agent.prompt(session.id, 'test it');
+    expect(outcomeOf(answers[0]!)).toEqual({ outcome: 'selected', optionId: 'accept' });
+    expect(session.autoApprovals).toHaveLength(1);
+    expect(session.transcript.some((i) => i.kind === 'notice' && i.text === LEFT)).toBe(false);
+  });
+
+  it('asks in Supervised mode as always, without the notice', async () => {
+    const answers: JsonObject[] = [];
+    const h = make({
+      fake: { turn: guardedTurn({}, permissionRequest('tool-1', { resource: '.kiro/settings/mcp.json' }), answers) },
+    });
+    const session = await h.agent.newSession({ cwd: '/ws' });
+    const turn = h.agent.prompt(session.id, 'x');
+    await until(() => session.approvals.length === 1);
+    expect(session.transcript.some((i) => i.kind === 'notice')).toBe(false);
+    h.agent.permissions.cancelSession(session.id);
+    await turn;
+  });
+
+  it('says why in the language of the window', async () => {
+    const answers: JsonObject[] = [];
+    const h = make({
+      settings: { autonomy: 'autopilot' },
+      translate: (message) => `[de] ${message}`,
+      fake: {
+        autopilot: 'on',
+        turn: guardedTurn({}, permissionRequest('tool-1', { resource: '.kiro/settings/mcp.json' }), answers),
+      },
+    });
+    const session = await h.agent.newSession({ cwd: '/ws' });
+    const turn = h.agent.prompt(session.id, 'x');
+    await until(() => session.approvals.length === 1);
+    expect(session.transcript.some((i) => i.kind === 'notice' && i.text === `[de] ${LEFT}`)).toBe(true);
+    h.agent.permissions.cancelSession(session.id);
+    await turn;
+  });
+
+  it.each([
+    ['~/.kiro/settings/mcp.json', 'Write File', {}],
+    ['c:\\Users\\me\\.kiro\\settings\\mcp.json', 'Write File', {}],
+    ['', 'Run Command', { command: 'cat ~/.kiro/settings' }],
+    ['', 'Run Command', { command: 'cd "$HOME/.kiro/settings" && ls' }],
+    ['', 'Run Command', { command: 'type %USERPROFILE%\\.KIRO\\Settings\\mcp.json' }],
+    ['', 'Run Command', { command: 'cat $KIRO_HOME/settings/mcp.json' }],
+    ['', 'Run Command', { command: 'echo {} > ${KIRO_HOME}/settings/mcp.json' }],
+    ['', 'Run Command', { command: 'kiro-cli mcp add --name x --command npx' }],
+    ['', 'Run Command', { command: '"C:\\Tools\\kiro-cli.exe" mcp import --file x.json' }],
+    ['', 'Run Command', { command: '~/.local/bin/kiro-cli --verbose mcp rm --name x' }],
+    ['', 'Run Command', { command: 'kiro-cli-chat mcp remove --name x' }],
+    ['', 'Run Command', { command: 'q mcp add --name x --url https://x.example' }],
+    ['', 'Run Command', { command: 'KIRO-CLI POWERS INSTALL stripe' }],
+    ['', 'Run Command', { command: 'kiro-cli powers uninstall stripe' }],
+    ['', 'Run Command', { command: 'echo start\nkiro-cli mcp add --name x --command y' }],
+    ['', 'Run Command', { steps: [{ argv: ['sh', '-c', 'kiro-cli mcp add --name x'] }] }],
+    ['', 'Write File', { path: '/ws/setup.sh', text: '#!/bin/sh\nkiro-cli mcp add --name x --command y\n' }],
+    ['', 'kiro-cli mcp add --name x', {}],
+  ])('leaves %j %s %j to the user', (resource, title, rawInput) => {
+    expect(mustAskInAutopilot(resource === '' ? {} : { resource }, title, rawInput)).toBe(true);
+  });
+
+  it.each([
+    ['hello.txt', 'Write File', { path: '/ws/hello.txt', text: 'Hallo' }],
+    ['', 'Run Command', { command: 'kiro-cli mcp list' }],
+    ['', 'Run Command', { command: 'kiro-cli mcp status --name linear' }],
+    ['', 'Run Command', { command: 'kiro-cli chat --help' }],
+    ['', 'Run Command', { command: 'grep -q mcp add.txt' }],
+    ['', 'Run Command', { command: 'npm install @modelcontextprotocol/sdk' }],
+    ['/ws/.kiro/steering/mcp.md', 'Write File', {}],
+    ['/ws/.kiro/specs/settings/design.md', 'Write File', {}],
+    ['/ws/my.kiro/settings/mcp.json', 'Write File', {}],
+    ['/ws/.kiro/settings-old/mcp.json', 'Write File', {}],
+    ['', 'Run Command', { command: 'cat ~/.vscode/mcp.json' }],
+    ['', 'Read File', undefined],
+  ])('lets Autopilot answer %j %s %j', (resource, title, rawInput) => {
+    expect(mustAskInAutopilot(resource === '' ? {} : { resource }, title, rawInput)).toBe(false);
+  });
+
+  it('reads only the start of a long text and a bounded number of texts', () => {
+    const late = 'x'.repeat(5000) + ' kiro-cli mcp add --name x';
+    expect(mustAskInAutopilot({}, 'Write File', { text: late })).toBe(false);
+    const many = Array.from({ length: 200 }, (_, i) => `file-${i}`).concat('kiro-cli mcp add --name x');
+    expect(mustAskInAutopilot({}, 'Run Command', many)).toBe(false);
+    let deep: unknown = 'kiro-cli mcp add --name x';
+    for (let i = 0; i < 10; i++) deep = { inner: deep };
+    expect(mustAskInAutopilot({}, 'Run Command', deep)).toBe(false);
+  });
+});
+
 describe('file access', () => {
   const read = (h: Harness, path: string, extra: JsonObject = {}) =>
     h.fake.request('fs/read_text_file', { sessionId: SESSION_ID, path, ...extra });
@@ -198,6 +351,59 @@ describe('file access', () => {
       code: -32602,
     });
     expect((await read(h, 'kiro-snapshot-v2://x')).error).toMatchObject({ code: -32602 });
+  });
+
+  it("refuses to write Kiro's MCP configuration, which only Kiro Studio writes", async () => {
+    const gated: string[] = [];
+    const h = make({
+      writeGate: (change) => {
+        gated.push(change.path);
+        return Promise.resolve('apply');
+      },
+    });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const entry = '{"mcpServers": {"evil": {"command": "sh"}}}';
+    for (const path of [
+      '/ws/.kiro/settings/mcp.json',
+      '.kiro/settings/mcp.json',
+      '/ws/.KIRO/Settings/MCP.JSON',
+      '/ws/sub/../.kiro/settings/mcp.json',
+      'file:///ws/.kiro/settings/mcp.json',
+    ]) {
+      expect((await write(h, path, entry)).error, path).toMatchObject({ code: -32602, message: MCP_CONFIG_REFUSAL });
+    }
+    expect(MCP_CONFIG_REFUSAL).toBe('Kiro Studio adds MCP servers itself. Propose the server in a kiro-mcp block.');
+    expect(h.writes).toEqual([]);
+    expect(gated).toEqual([]);
+    expect(
+      h.lines.some((l) => l.includes('refused a write to the MCP configuration: /ws/.kiro/settings/mcp.json')),
+    ).toBe(true);
+    // Its neighbours are ordinary files.
+    for (const path of ['/ws/.kiro/settings/other.json', '/ws/docs/mcp.json', '/ws/.kiro/steering/mcp.md']) {
+      expect((await write(h, path, '{}')).error, path).toBeUndefined();
+    }
+    expect(h.writes.map((w) => w.path)).toEqual([
+      '/ws/.kiro/settings/other.json',
+      '/ws/docs/mcp.json',
+      '/ws/.kiro/steering/mcp.md',
+    ]);
+  });
+
+  it.each([
+    ['/home/me/.kiro/settings/mcp.json', true],
+    ['c:\\Users\\me\\.kiro\\settings\\mcp.json', true],
+    ['C:\\WS\\.Kiro\\Settings\\Mcp.Json', true],
+    ['\\\\server\\share\\.kiro\\settings\\mcp.json', true],
+    ['c:\\ws\\.kiro\\settings\\mcp.json.', true],
+    ['c:\\ws\\.kiro\\settings\\mcp.json . ', true],
+    ['c:\\ws\\.kiro\\settings\\mcp.json::$DATA', true],
+    ['/ws/.kiro/settings/mcp.json.bak', false],
+    ['/ws/.kiro/settings/mcp.jsonc', false],
+    ['/ws/.kiro/settings/sub/mcp.json', false],
+    ['/ws/my.kiro/settings/mcp.json', false],
+    ['/ws/.kiro/mcp.json', false],
+  ])('knows whether %j is the MCP configuration', (path, expected) => {
+    expect(isMcpConfigPath(path)).toBe(expected);
   });
 
   it('lets a write gate hold or refuse a write', async () => {

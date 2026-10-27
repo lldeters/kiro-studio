@@ -1,5 +1,6 @@
 {
   "\"{0}\" already exists in {1} with a different setup.": "„{0}“ gibt es in {1} schon mit anderen Einstellungen.",
+  "\"{0}\" already exists in {1}. Choose another name, or remove that server first.": "„{0}“ gibt es in {1} schon. Wähle einen anderen Namen oder entferne zuerst diesen Server.",
   "\"{0}\" is already set up in {1}.": "„{0}“ ist in {1} schon eingerichtet.",
   "\"{0}\" is not a usable name for a spec.": "„{0}“ ist als Name für eine Spec nicht brauchbar.",
   "\"{0}\" was added switched off. Check it, then turn it on.": "„{0}“ wurde ausgeschaltet hinzugefügt. Prüfe es und schalte es dann ein.",
@@ -62,6 +63,7 @@
   "Automatically allowed once (Autopilot): {0}": "Automatisch einmal erlaubt (Autopilot): {0}",
   "Autonomy for new sessions": "Autonomie für neue Sitzungen",
   "Autopilot": "Autopilot",
+  "Autopilot left this to you: it changes MCP servers.": "Autopilot überlässt das dir: Es ändert MCP-Server.",
   "Autopilot: Kiro works without asking. Click to switch to Supervised.": "Autopilot: Kiro arbeitet, ohne zu fragen. Klicke, um zu Supervised zu wechseln.",
   "Available in this session": "In dieser Sitzung verfügbar",
   "Bonus credits: {0} of {1} used": "Bonus-Credits: {0} von {1} verbraucht",

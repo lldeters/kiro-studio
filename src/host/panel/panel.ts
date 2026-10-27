@@ -28,6 +28,7 @@ import {
   parseMcpConfig,
   parseMcpStatus,
   removeServer,
+  serverNames,
   setServerDisabled,
   slug,
   splitCommandLine,
@@ -551,9 +552,18 @@ export class KiroPanel implements vscode.Disposable {
   }
 
   private async addMcpServer(): Promise<void> {
+    if (!this.mayChangeMcp()) return;
     const where = await this.pickScope();
     if (where === undefined) return;
-    const name = await vscode.window.showInputBox({ prompt: t('Name of the MCP server'), validateInput: validName });
+    const file = `${where}/settings/mcp.json`;
+    const before = await this.mcpText(file);
+    if (before === undefined) return;
+    const taken = serverNames(before) ?? new Set<string>();
+    const name = await vscode.window.showInputBox({
+      prompt: t('Name of the MCP server'),
+      validateInput: (value) =>
+        validName(value) ?? (taken.has(slug(value)) ? this.nameTaken(slug(value), file) : undefined),
+    });
     if (name === undefined) return;
     const kind = await vscode.window.showQuickPick(
       [
@@ -563,10 +573,8 @@ export class KiroPanel implements vscode.Disposable {
       { placeHolder: t('How does Kiro reach it?') },
     );
     if (kind === undefined) return;
-    const file = `${where}/settings/mcp.json`;
-    const text = (await reader.readText(file)) ?? '';
     const key = slug(name);
-    let next: string;
+    let entry: (text: string) => string | undefined;
     if (kind.value === 'stdio') {
       const line = await vscode.window.showInputBox({
         prompt: t('Command and arguments'),
@@ -574,7 +582,7 @@ export class KiroPanel implements vscode.Disposable {
       });
       const [command, ...args] = splitCommandLine(line ?? '');
       if (!command) return;
-      next = addStdioServer(text, key, command, args);
+      entry = (text) => addStdioServer(text, key, command, args);
     } else {
       const url = await vscode.window.showInputBox({
         prompt: t('Address of the server'),
@@ -582,7 +590,15 @@ export class KiroPanel implements vscode.Disposable {
         validateInput: (v) => (/^https?:\/\//.test(v) ? undefined : t('Use an http or https address.')),
       });
       if (!url) return;
-      next = addHttpServer(text, key, url);
+      entry = (text) => addHttpServer(text, key, url);
+    }
+    // Read again: the file may have changed while the user was typing, and an existing server is never replaced.
+    const text = await this.mcpText(file);
+    if (text === undefined) return;
+    const next = entry(text);
+    if (next === undefined) {
+      void vscode.window.showWarningMessage(this.nameTaken(key, file));
+      return;
     }
     await this.writeFile(file, next);
     void vscode.window.showInformationMessage(t('"{0}" was added switched off. Check it, then turn it on.', key));
@@ -591,7 +607,7 @@ export class KiroPanel implements vscode.Disposable {
 
   private async toggleMcpServer(node: Record<string, string>): Promise<void> {
     const { path: file, name } = node;
-    if (file === undefined || name === undefined) return;
+    if (file === undefined || name === undefined || !this.mayChangeMcp()) return;
     const text = (await reader.readText(file)) ?? '';
     const server = parseMcpConfig(text).servers.find((s) => s.name === name);
     if (!server) return;
@@ -604,7 +620,7 @@ export class KiroPanel implements vscode.Disposable {
 
   private async removeMcpServer(node: Record<string, string>): Promise<void> {
     const { path: file, name } = node;
-    if (file === undefined || name === undefined) return;
+    if (file === undefined || name === undefined || !this.mayChangeMcp()) return;
     const confirm = t('Remove');
     if (
       (await vscode.window.showWarningMessage(
@@ -651,6 +667,39 @@ export class KiroPanel implements vscode.Disposable {
     items.push({ label: t('All workspaces'), description: '~/.kiro', dir: globalKiroDir() });
     if (items.length === 1) return items[0]?.dir;
     return (await vscode.window.showQuickPick(items, { placeHolder: t('Where should it go?') }))?.dir;
+  }
+
+  /**
+   * MCP servers start programs, so a window that does not trust its folder changes none, in the workspace or in the
+   * home folder. Kiro does not run there either, and the chat refuses the same way.
+   */
+  private mayChangeMcp(): boolean {
+    if (vscode.workspace.isTrusted) return true;
+    void vscode.window.showInformationMessage(t('Kiro Studio does not run in untrusted workspaces.'));
+    return false;
+  }
+
+  /** The text of an MCP file to add to, '' when it does not exist; undefined, after telling the user, when it is broken. */
+  private async mcpText(file: string): Promise<string | undefined> {
+    const text = (await reader.readText(file)) ?? '';
+    if (serverNames(text) !== undefined) return text;
+    const openIt = t('Open');
+    void vscode.window
+      .showWarningMessage(
+        t('{0} is not valid JSON. Open it to fix it.', vscode.workspace.asRelativePath(file, false)),
+        openIt,
+      )
+      .then((choice) => (choice === openIt ? this.openFile(file) : undefined));
+    return undefined;
+  }
+
+  /** What the panel says about a name the file already has: it never replaces a server. */
+  private nameTaken(name: string, file: string): string {
+    return t(
+      '"{0}" already exists in {1}. Choose another name, or remove that server first.',
+      name,
+      vscode.workspace.asRelativePath(file, false),
+    );
   }
 
   private async writeFile(file: string, text: string): Promise<void> {

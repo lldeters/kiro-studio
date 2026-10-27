@@ -2,7 +2,8 @@
  * `fs/read_text_file` and `fs/write_text_file`. Kiro uses them when the client advertises them: it checks that a
  * file exists, writes it through the client, reads it back, and once more after the review.
  *
- * Paths come from the agent, so they are normalised first and must lie inside a root the session may touch.
+ * Paths come from the agent, so they are normalised first and must lie inside a root the session may touch. Kiro's MCP
+ * configuration is never written here ({@link isMcpConfigPath}).
  */
 import { RequestError } from '@agentclientprotocol/sdk';
 import { num, rec, str } from '../../util/json';
@@ -38,6 +39,24 @@ export interface FsDeps {
   writeGate?: WriteGate;
 }
 
+/**
+ * `.kiro/settings/mcp.json` at the end of a path, either separator, any case. Windows also ignores dots and spaces at
+ * the end of a name and reads `mcp.json::$DATA` as the file itself, so those spellings count too.
+ */
+const MCP_CONFIG = /(?:^|[\\/])\.kiro[\\/]+settings[\\/]+mcp\.json[. ]*(?::[^\\/]*)?$/i;
+
+/** What Kiro reads when it tries to write its MCP configuration through the client. English: it is meant for Kiro. */
+export const MCP_CONFIG_REFUSAL = 'Kiro Studio adds MCP servers itself. Propose the server in a kiro-mcp block.';
+
+/**
+ * Whether a resolved path is Kiro's MCP configuration, in the workspace or the home folder. A server entry can start
+ * any program, so only Kiro Studio writes the file, after the user has confirmed the entry in a dialog. Kiro's own file
+ * tool refuses `.kiro/settings` as well; this covers a Kiro that does not.
+ */
+export function isMcpConfigPath(path: string): boolean {
+  return MCP_CONFIG.test(path);
+}
+
 export class FsHandler {
   constructor(private readonly deps: FsDeps) {}
 
@@ -59,6 +78,10 @@ export class FsHandler {
   async write(params: unknown): Promise<Record<string, never>> {
     const body = rec(params);
     const file = this.resolve(body);
+    if (isMcpConfigPath(file)) {
+      this.deps.log?.info(`refused a write to the MCP configuration: ${file}`);
+      throw new RequestError(-32602, MCP_CONFIG_REFUSAL, { path: file });
+    }
     const content = str(body.content);
     if (content === undefined) throw RequestError.invalidParams({ field: 'content' }, 'content is required');
 
