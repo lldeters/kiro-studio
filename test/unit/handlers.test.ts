@@ -235,19 +235,123 @@ describe('what the client does not serve', () => {
 });
 
 describe('opening web pages for Kiro', () => {
-  it('opens http(s) addresses requested as a request or as a notification, and nothing else', async () => {
+  it('answers a request for a web page at once, without waiting for what the page leads to', async () => {
+    const handedOver: string[] = [];
+    const h = make({
+      externalUrl: (url) => {
+        handedOver.push(url);
+        // The host opens the browser (or asks the user) afterwards; the answer must not wait for that.
+        setTimeout(() => h.opened.push(url), 100);
+      },
+    });
+    await h.agent.start();
+    const reply = await h.fake.request('_kiro/openExternalUrl', { url: 'https://example.com/login?x=1' });
+    expect(reply).toEqual({ result: {} });
+    expect(handedOver).toEqual(['https://example.com/login?x=1']);
+    expect(h.opened).toEqual([]);
+  });
+
+  it('refuses a request for an address that is not a web page with an error, and hands nothing over', async () => {
     const h = make();
     await h.agent.start();
-    expect(
-      (await h.fake.request('_kiro/openExternalUrl', { url: 'https://example.com/login?x=1' })).error,
-    ).toBeUndefined();
-    h.fake.notify('_kiro/openExternalUrl', { url: 'http://localhost:8080/callback' });
-    expect((await h.fake.request('_kiro/openExternalUrl', { url: 'javascript:alert(1)' })).error).toBeUndefined();
+    for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'vscode://kiro/x', 'https://', undefined]) {
+      expect((await h.fake.request('_kiro/openExternalUrl', url === undefined ? {} : { url })).error).toMatchObject({
+        code: -32602,
+      });
+    }
+    expect(h.opened).toEqual([]);
+    expect(h.lines.some((l) => l.includes('refused a request to open an address that is not a web page'))).toBe(true);
+  });
+
+  it('routes a notification the same way: web pages are handed over, anything else is dropped', async () => {
+    const h = make();
+    await h.agent.start();
     h.fake.notify('_kiro/openExternalUrl', { url: 'file:///etc/passwd' });
+    h.fake.notify('_kiro/openExternalUrl', { url: 'javascript:alert(1)' });
     h.fake.notify('_kiro/openExternalUrl', {});
-    await until(() => h.opened.length === 2);
+    h.fake.notify('_kiro/openExternalUrl', { url: 'http://localhost:8080/callback' });
+    await until(() => h.opened.length === 1);
     await new Promise((r) => setTimeout(r, 30));
-    expect(h.opened).toEqual(['https://example.com/login?x=1', 'http://localhost:8080/callback']);
+    expect(h.opened).toEqual(['http://localhost:8080/callback']);
+  });
+
+  it('still answers when the host fails to take the page', async () => {
+    const h = make({
+      externalUrl: () => {
+        throw new Error('no window');
+      },
+    });
+    await h.agent.start();
+    expect(await h.fake.request('_kiro/openExternalUrl', { url: 'https://example.com/' })).toEqual({ result: {} });
+    expect(h.lines.some((l) => l.includes('could not hand over a page Kiro asked to open: no window'))).toBe(true);
+  });
+});
+
+describe("keeping Kiro's sign-ins", () => {
+  const capabilities = (h: Harness) =>
+    rec(rec(rec(h.fake.requestsOf('initialize')[0]?.params).clientCapabilities)._meta);
+
+  it('offers the secret storage only when there is one', async () => {
+    const without = make();
+    await without.agent.start();
+    expect(rec(capabilities(without).kiro).secretStorage).toBeUndefined();
+    expect((await without.fake.request('_kiro/secret/get', { key: 'kiro.mcp.a.tokens' })).error).toMatchObject({
+      code: -32601,
+    });
+    await without.agent.dispose();
+
+    const h = make({ secretStorage: true });
+    await h.agent.start();
+    expect(capabilities(h)).toEqual({ kiro: { openExternalUrl: true, secretStorage: true } });
+  });
+
+  it('stores, reads and deletes a value under its own name, and keeps an index of the keys', async () => {
+    const h = make({ secretStorage: true });
+    await h.agent.start();
+    const key = 'kiro.mcp.0123abcd.tokens';
+    expect(await h.fake.request('_kiro/secret/get', { key })).toEqual({ result: {} });
+    expect(await h.fake.request('_kiro/secret/store', { key, value: '{"access_token":"t-1"}' })).toEqual({
+      result: {},
+    });
+    expect(h.secrets.get(`kiroStudio.kiroSecret.${key}`)).toBe('{"access_token":"t-1"}');
+    expect(JSON.parse(h.secrets.get('kiroStudio.kiroSecretKeys') ?? '[]')).toEqual([key]);
+    expect(await h.fake.request('_kiro/secret/get', { key })).toEqual({ result: { value: '{"access_token":"t-1"}' } });
+
+    expect(await h.fake.request('_kiro/secret/delete', { key })).toEqual({ result: {} });
+    expect(h.secrets.has(`kiroStudio.kiroSecret.${key}`)).toBe(false);
+    expect(JSON.parse(h.secrets.get('kiroStudio.kiroSecretKeys') ?? '[]')).toEqual([]);
+    expect(await h.fake.request('_kiro/secret/get', { key })).toEqual({ result: {} });
+  });
+
+  it('keeps every key in the index when Kiro stores several at once', async () => {
+    const h = make({ secretStorage: true });
+    await h.agent.start();
+    const keys = ['kiro.mcp.a.client', 'kiro.mcp.a.tokens', 'kiro.mcp.a.verifier', 'kiro.mcp.a.discovery'];
+    await Promise.all(keys.map((key) => h.fake.request('_kiro/secret/store', { key, value: 'v' })));
+    expect((JSON.parse(h.secrets.get('kiroStudio.kiroSecretKeys') ?? '[]') as string[]).sort()).toEqual(
+      [...keys].sort(),
+    );
+  });
+
+  it.each([
+    ['a missing key', '_kiro/secret/get', {}],
+    ['a key with a space', '_kiro/secret/get', { key: 'kiro mcp' }],
+    ['a key with a slash', '_kiro/secret/delete', { key: '../kiro' }],
+    ['a key longer than 512 characters', '_kiro/secret/store', { key: 'k'.repeat(513), value: 'v' }],
+    ['a value that is not a string', '_kiro/secret/store', { key: 'kiro.mcp.a', value: 5 }],
+    ['a value larger than 64 KB', '_kiro/secret/store', { key: 'kiro.mcp.a', value: 'x'.repeat(64 * 1024 + 1) }],
+  ])('refuses %s with invalid params and stores nothing', async (_name, method, params) => {
+    const h = make({ secretStorage: true });
+    await h.agent.start();
+    expect((await h.fake.request(method, params)).error).toMatchObject({ code: -32602 });
+    expect(h.secrets.size).toBe(0);
+  });
+
+  it('accepts a value of exactly 64 KB', async () => {
+    const h = make({ secretStorage: true });
+    await h.agent.start();
+    const value = 'x'.repeat(64 * 1024);
+    expect((await h.fake.request('_kiro/secret/store', { key: 'kiro.mcp.a', value })).error).toBeUndefined();
   });
 });
 

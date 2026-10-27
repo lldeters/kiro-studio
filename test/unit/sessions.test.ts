@@ -300,6 +300,73 @@ describe('resetForReplay', () => {
   });
 });
 
+describe('MCP servers', () => {
+  it('tells listeners about every change of the MCP state', () => {
+    const s = newSession();
+    const changes: SessionChange[] = [];
+    s.changes.on((c) => changes.push(c));
+    s.setMcpRuntime({
+      runtime: [{ name: 'linear', status: 'connected', toolCount: 3 }],
+      accessMode: 'registry',
+      filtered: ['x'],
+    });
+    s.setMcpAllowed(true);
+    s.setClientSteering(true);
+    s.updateMcpLocal('linear', { scope: 'user', addedAt: 5 });
+    s.noteMcpContextSent(2);
+    expect(changes).toEqual(['mcp', 'mcp', 'mcp', 'mcp', 'mcp']);
+    expect(s.mcp).toMatchObject({
+      runtime: [{ name: 'linear', status: 'connected', toolCount: 3 }],
+      accessMode: 'registry',
+      filtered: ['x'],
+      allowed: true,
+      clientSteering: true,
+      contextSentAtTurn: 2,
+    });
+    // Setting what is already known changes nothing.
+    s.setMcpAllowed(true);
+    s.setClientSteering(true);
+    expect(changes).toHaveLength(5);
+  });
+
+  it('replaces the whole status, so that a server or an access mode Kiro no longer reports is gone', () => {
+    const s = newSession();
+    s.setMcpRuntime({ runtime: [{ name: 'a', status: 'connected' }], accessMode: 'registry', filtered: ['b'] });
+    s.setMcpRuntime({ runtime: [] });
+    expect(s.mcp.runtime).toEqual([]);
+    expect(s.mcp.filtered).toEqual([]);
+    expect(s.mcp).not.toHaveProperty('accessMode');
+  });
+
+  it('merges what Kiro Studio knows of a server, and removes a key set to undefined', () => {
+    const s = newSession();
+    s.updateMcpLocal('linear', { scope: 'user', signIn: { phase: 'starting', at: 1 } });
+    s.updateMcpLocal('linear', { notPickedUp: true });
+    expect(s.mcp.local.get('linear')).toEqual({
+      scope: 'user',
+      notPickedUp: true,
+      signIn: { phase: 'starting', at: 1 },
+    });
+    s.updateMcpLocal('linear', { signIn: undefined, notPickedUp: undefined });
+    expect(s.mcp.local.get('linear')).toEqual({ scope: 'user' });
+  });
+
+  it('keeps the MCP state when the conversation is replayed', () => {
+    const s = newSession();
+    s.setMcpRuntime({ runtime: [{ name: 'linear', status: 'connected' }] });
+    s.setMcpAllowed(true);
+    s.setClientSteering(true);
+    s.updateMcpLocal('linear', { scope: 'workspace', addedAt: 7 });
+    s.resetForReplay();
+    expect(s.mcp).toMatchObject({
+      runtime: [{ name: 'linear', status: 'connected' }],
+      allowed: true,
+      clientSteering: true,
+    });
+    expect(s.mcp.local.get('linear')).toEqual({ scope: 'workspace', addedAt: 7 });
+  });
+});
+
 describe('config options', () => {
   it('replaces the options on an update and counts the version', () => {
     const s = newSession();

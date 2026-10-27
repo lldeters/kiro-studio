@@ -39,7 +39,15 @@ export interface SessionRecordPatch {
 }
 
 export type BroadcastEvent =
-  | { type: 'mcpStatus'; sessionId?: string; servers: unknown[] }
+  | {
+      type: 'mcpStatus';
+      sessionId?: string;
+      servers: unknown[];
+      /** `registry` when the organisation only allows servers from its own list. */
+      accessMode?: string;
+      /** Names of the servers the organisation's list filtered out. */
+      filteredServers?: string[];
+    }
   | { type: 'toolsChanged'; sessionId?: string; tags: ToolTag[] }
   | { type: 'steeringDocuments'; sessionId?: string; status?: string; documents: SteeringDocument[] }
   | { type: 'sessionsChanged'; upserted: SessionRecordPatch[]; deleted: string[] }
@@ -54,8 +62,22 @@ export function parseBroadcast(method: string, params: unknown): BroadcastEvent 
   const body = rec(params);
   const sessionId = opt('sessionId', str(body.sessionId));
   switch (method) {
-    case '_kiro/mcp/status':
-      return { type: 'mcpStatus', ...sessionId, servers: arr(body.servers) };
+    case '_kiro/mcp/status': {
+      // Kiro CLI 2.34.2 lists the filtered servers by name; an entry with a `name` is read too, in case that changes.
+      const filtered = Array.isArray(body.accessModeFilteredServers)
+        ? body.accessModeFilteredServers.flatMap((entry) => {
+            const name = str(entry) ?? str(rec(entry).name);
+            return name === undefined ? [] : [name];
+          })
+        : undefined;
+      return {
+        type: 'mcpStatus',
+        ...sessionId,
+        servers: arr(body.servers),
+        ...opt('accessMode', str(body.accessMode)),
+        ...opt('filteredServers', filtered),
+      };
+    }
     case '_kiro/tools/didChange':
       return {
         type: 'toolsChanged',

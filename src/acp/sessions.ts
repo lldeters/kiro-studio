@@ -8,6 +8,7 @@ import { Emitter, type Unsubscribe } from '../util/emitter';
 import { deferred, type Deferred } from '../util/async';
 import { arr, kiroMeta, opt, rec, str, type JsonObject } from '../util/json';
 import { identityTranslate, type Translate } from '../util/translate';
+import type { McpRuntime } from '../workspace/mcp';
 import {
   parseConfigOptions,
   type AvailableCommand,
@@ -147,6 +148,51 @@ export interface ModeInfo {
   description?: string;
 }
 
+/** What Kiro Studio itself knows about an MCP server of a session, beyond what Kiro reports. */
+export interface McpLocal {
+  /** The file it was added to from the chat. */
+  scope?: 'user' | 'workspace';
+  addedAt?: number;
+  /** Kiro has not reported the server within 20 s of adding it. */
+  notPickedUp?: boolean;
+  /** A key was stored for it; the Kiro process only sees it after a restart. */
+  needsRestart?: boolean;
+  /** Until then, the first "needs sign-in" of the server starts the browser sign-in by itself. */
+  autoSignInUntil?: number;
+  signIn?: {
+    phase: 'starting' | 'waiting' | 'stalled' | 'unfinished' | 'unsupported';
+    host?: string;
+    /** The sign-in page. Host side only: it never goes into the view. */
+    url?: string;
+    browserOpened?: boolean;
+    at: number;
+  };
+}
+
+/** The MCP state of one session: what Kiro reported for it, and what Kiro Studio did with its servers. */
+export interface SessionMcpState {
+  /** Kiro's latest status of the session's servers. */
+  runtime: McpRuntime[];
+  /** `registry` when the organisation only allows servers from its own list. */
+  accessMode?: string;
+  /** Servers the organisation's list filtered out. */
+  filtered: string[];
+  /** False when the organisation switched MCP servers off; undefined until Kiro said. */
+  allowed?: boolean;
+  /** Kiro confirmed that it has Kiro Studio's steering document. */
+  clientSteering: boolean;
+  /** The turn whose prompt last carried the hidden instructions. */
+  contextSentAtTurn?: number;
+  local: Map<string, McpLocal>;
+}
+
+export const emptyMcpState = (): SessionMcpState => ({
+  runtime: [],
+  filtered: [],
+  clientSteering: false,
+  local: new Map(),
+});
+
 export type SessionChange =
   | 'transcript'
   | 'tools'
@@ -160,7 +206,8 @@ export type SessionChange =
   | 'plan'
   | 'checkpoints'
   | 'turn'
-  | 'modes';
+  | 'modes'
+  | 'mcp';
 
 export interface TurnOutcome {
   stopReason?: string;
@@ -195,6 +242,11 @@ export class Session {
   readonly approvals: PendingApproval[] = [];
   readonly checkpoints = new Map<string, CheckpointInfo>();
   readonly autoApprovals: AutoApproval[] = [];
+  /**
+   * The session's MCP servers. Kept by {@link resetForReplay}: Kiro does not replay its status broadcasts, and what Kiro
+   * Studio did with a server (added it, started its sign-in) is not part of the conversation.
+   */
+  readonly mcp: SessionMcpState = emptyMcpState();
   /** Number of replayed events applied (non-zero after `session/load`). */
   replayedEvents = 0;
 
@@ -565,6 +617,7 @@ export class Session {
    * Forgets what was recorded so far. Used before a lost session is loaded again: `session/load` replays the whole
    * conversation, which would otherwise show up twice. The checkpoints are ours and Kiro does not replay them, so they
    * are kept (they can be viewed and reverted all the time); {@link restoreCheckpointMarkers} gives them their cards back.
+   * The MCP state is kept as well, for the same reason.
    */
   resetForReplay(): void {
     this.transcript.length = 0;
@@ -665,6 +718,47 @@ export class Session {
     this.autoApprovals.push({ ...entry, at: this.now() });
     const what = entry.resource === undefined ? entry.title : `${entry.title} ${entry.resource}`;
     this.addNotice('info', this.t('Automatically allowed once (Autopilot): {0}', what));
+  }
+
+  // -------------------------------------------------------------------------------------------------------------
+  // MCP servers
+  // -------------------------------------------------------------------------------------------------------------
+
+  /** Kiro's `_kiro/mcp/status` for this session: every server it runs, and what the organisation's list filtered out. */
+  setMcpRuntime(status: { runtime: McpRuntime[]; accessMode?: string; filtered?: string[] }): void {
+    this.mcp.runtime = status.runtime;
+    if (status.accessMode === undefined) delete this.mcp.accessMode;
+    else this.mcp.accessMode = status.accessMode;
+    this.mcp.filtered = status.filtered ?? [];
+    this.changes.emit('mcp');
+  }
+
+  /** Whether the organisation allows MCP servers (`features.mcpEnabled` of `_kiro/governance/state`). */
+  setMcpAllowed(allowed: boolean): void {
+    if (this.mcp.allowed === allowed) return;
+    this.mcp.allowed = allowed;
+    this.changes.emit('mcp');
+  }
+
+  /** Whether Kiro listed Kiro Studio's steering document for this session. */
+  setClientSteering(confirmed: boolean): void {
+    if (this.mcp.clientSteering === confirmed) return;
+    this.mcp.clientSteering = confirmed;
+    this.changes.emit('mcp');
+  }
+
+  /** Merges what Kiro Studio knows about one server; a key set to `undefined` is removed. */
+  updateMcpLocal(name: string, patch: McpLocal): void {
+    const local: McpLocal = { ...this.mcp.local.get(name), ...patch };
+    for (const key of Object.keys(patch) as (keyof McpLocal)[]) if (patch[key] === undefined) delete local[key];
+    this.mcp.local.set(name, local);
+    this.changes.emit('mcp');
+  }
+
+  /** The prompt of this turn carried the hidden instructions about MCP servers. */
+  noteMcpContextSent(turn: number): void {
+    this.mcp.contextSentAtTurn = turn;
+    this.changes.emit('mcp');
   }
 }
 

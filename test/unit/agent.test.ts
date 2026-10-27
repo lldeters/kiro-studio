@@ -1,10 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { RequestError } from '@agentclientprotocol/sdk';
+import { KiroConnection } from '../../src/acp/connection';
+import { Dispatcher } from '../../src/acp/dispatcher';
 import { ExtensionNotAdvertisedError } from '../../src/acp/errors';
+import { SessionStore } from '../../src/acp/sessions';
 import { sleep } from '../../src/util/async';
-import { rec } from '../../src/util/json';
+import { rec, type JsonObject } from '../../src/util/json';
+import { ProtocolLog } from '../../src/util/log';
+import { createRedactor } from '../../src/util/redact';
 import { SESSION_ID, configOptions, sessionResult, u } from '../support/kiro';
-import { RpcError, type TurnScript } from '../support/fakeAgent';
+import { FakeAgent, RpcError, type TurnScript } from '../support/fakeAgent';
 import { configWrites, createHarness, until, type Harness } from '../support/harness';
 
 let current: Harness | undefined;
@@ -404,6 +409,38 @@ describe('extension methods', () => {
     expect(await h.agent.callExtension('_kiro/session/context', { sessionId: SESSION_ID })).toEqual({ used: 12 });
   });
 
+  it('calls only the allow-listed method without an advertisement, and refuses any other without sending it', async () => {
+    const fake = new FakeAgent();
+    fake.on('_kiro/mcp/resetServer', () => ({ success: true }));
+    const refuse = () => Promise.reject(new Error('not used'));
+    const connection = new KiroConnection({
+      transport: fake.factory,
+      log: new ProtocolLog({ appendLine: () => undefined }, () => 'off', createRedactor('/home/me')),
+      dispatcher: new Dispatcher({ store: new SessionStore() }),
+      handlers: {
+        requestPermission: refuse,
+        readTextFile: refuse,
+        writeTextFile: refuse,
+        openExternalUrl: () => undefined,
+      },
+      features: () => ({ fs: false, terminal: false, hooks: false, secretStorage: false }),
+      clientInfo: { name: 'kiro-studio-test', version: '0.0.0' },
+      shutdownGraceMs: 50,
+    });
+    await connection.start();
+    try {
+      await expect(connection.callUnadvertised('_kiro/session/delete', {}, 1000)).rejects.toBeInstanceOf(
+        ExtensionNotAdvertisedError,
+      );
+      expect(fake.requestsOf('_kiro/session/delete')).toHaveLength(0);
+      expect(await connection.callUnadvertised('_kiro/mcp/resetServer', { serverName: 'linear' }, 1000)).toEqual({
+        success: true,
+      });
+    } finally {
+      await connection.dispose();
+    }
+  });
+
   it('surfaces an error response of the agent', async () => {
     const h = make();
     h.fake.on('_kiro/memory/list', () => {
@@ -575,5 +612,200 @@ describe('load session', () => {
     const h = make();
     h.fake.on('initialize', () => ({ protocolVersion: 1, agentCapabilities: { loadSession: false } }));
     await expect(h.agent.loadSession('sess_old', '/ws')).rejects.toThrow('does not support loading sessions');
+  });
+});
+
+describe('MCP servers of a session', () => {
+  const steering: JsonObject = {
+    kiro: {
+      steering: [{ name: 'kiro-studio-mcp', inclusion: 'always', content: '# Kiro Studio: adding MCP servers' }],
+    },
+  };
+  const metaOf = (h: Harness, method: string) => h.fake.requestsOf(method).map((m) => rec(m.params)._meta);
+
+  it('sends the steering document with a new and a loaded session, and none when there is none', async () => {
+    const withMeta = make({ sessionMeta: () => steering });
+    await withMeta.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await withMeta.agent.loadSession('sess_old', '/ws');
+    expect(metaOf(withMeta, 'session/new')).toEqual([steering]);
+    expect(metaOf(withMeta, 'session/load')).toEqual([steering]);
+    await withMeta.agent.dispose();
+
+    const off = make({ sessionMeta: () => undefined });
+    await off.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await off.agent.loadSession('sess_old', '/ws');
+    expect(off.fake.requestsOf('session/new')[0]?.params).not.toHaveProperty('_meta');
+    expect(off.fake.requestsOf('session/load')[0]?.params).not.toHaveProperty('_meta');
+  });
+
+  it('sends no steering document once the organisation has switched MCP servers off, and none with a fork', async () => {
+    const h = make({ sessionMeta: () => steering });
+    const first = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.notify('_kiro/governance/state', { sessionId: first.id, features: { mcpEnabled: false } });
+    await until(() => first.mcp.allowed === false, 2000, 'the governance state');
+    await h.agent.forkSession(first.id, '/ws');
+    const second = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await h.agent.loadSession('sess_old', '/ws');
+    expect(metaOf(h, 'session/new')).toEqual([steering, undefined]);
+    expect(metaOf(h, 'session/load')).toEqual([undefined]);
+    expect(h.fake.requestsOf('session/fork')[0]?.params).not.toHaveProperty('_meta');
+    // A session Kiro sent no governance state for still knows the organisation's policy.
+    expect(second.mcp.allowed).toBe(false);
+  });
+
+  it('applies the status, governance and steering broadcasts that arrive before the session exists', async () => {
+    const h = make();
+    h.fake.on('session/new', async () => {
+      h.fake.notify('_kiro/mcp/status', {
+        sessionId: SESSION_ID,
+        servers: [{ name: 'linear', status: 'failed', failedAuthorization: true, errorMessage: 'Unauthorized' }],
+        accessMode: 'registry',
+        accessModeFilteredServers: ['playwright'],
+      });
+      h.fake.notify('_kiro/governance/state', { sessionId: SESSION_ID, features: { mcpEnabled: true } });
+      h.fake.notify('_kiro/steering/documents_changed', {
+        sessionId: SESSION_ID,
+        status: 'success',
+        documents: [
+          { name: 'kiro-studio-mcp', uri: `client:${SESSION_ID}:kiro-studio-mcp`, inclusion: 'always' },
+          { name: 'architecture-selection', uri: 'builtin:architecture-selection', inclusion: 'manual' },
+        ],
+      });
+      // The status of another session that is not open here stays out of this one.
+      h.fake.notify('_kiro/mcp/status', { sessionId: 'sess_other', servers: [{ name: 'other', status: 'connected' }] });
+      await sleep(10);
+      return sessionResult(SESSION_ID);
+    });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(session.mcp).toMatchObject({
+      runtime: [{ name: 'linear', status: 'failed', error: 'Unauthorized', needsAuth: true }],
+      accessMode: 'registry',
+      filtered: ['playwright'],
+      allowed: true,
+      clientSteering: true,
+    });
+  });
+
+  it('follows later broadcasts of a session, and only a client document counts as the steering document', async () => {
+    const h = make();
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const changes: string[] = [];
+    session.changes.on((change) => change === 'mcp' && changes.push(change));
+    const documents = (docs: JsonObject[]) =>
+      h.fake.notify('_kiro/steering/documents_changed', { sessionId: session.id, status: 'success', documents: docs });
+
+    // A builtin document with the same name is not Kiro Studio's.
+    documents([{ name: 'kiro-studio-mcp', uri: 'builtin:kiro-studio-mcp' }]);
+    h.fake.notify('_kiro/mcp/status', { sessionId: session.id, servers: [{ name: 'linear', status: 'connecting' }] });
+    await until(() => session.mcp.runtime.length === 1, 2000, 'the status');
+    expect(session.mcp.clientSteering).toBe(false);
+
+    documents([{ name: 'kiro-studio-mcp', uri: `client:${session.id}:kiro-studio-mcp` }]);
+    await until(() => session.mcp.clientSteering, 2000, 'the steering document');
+    // A failed push says nothing about the documents; a later list without the document does.
+    h.fake.notify('_kiro/steering/documents_changed', { sessionId: session.id, status: 'failed', error: 'x' });
+    h.fake.notify('_kiro/mcp/status', {
+      sessionId: session.id,
+      servers: [{ name: 'linear', status: 'connected', tools: [{ name: 'a' }, { name: 'b', disabled: true }] }],
+    });
+    await until(() => session.mcp.runtime[0]?.status === 'connected', 2000, 'the second status');
+    expect(session.mcp.clientSteering).toBe(true);
+    expect(session.mcp.runtime).toEqual([{ name: 'linear', status: 'connected', toolCount: 1 }]);
+    documents([]);
+    await until(() => !session.mcp.clientSteering, 2000, 'the list without the document');
+    expect(changes.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('applies a governance state without a session id to every session', async () => {
+    const h = make();
+    const first = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    const second = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.notify('_kiro/governance/state', { features: { mcpEnabled: false } });
+    await until(() => first.mcp.allowed === false && second.mcp.allowed === false, 2000, 'the governance state');
+  });
+
+  it('keeps what it knows of the MCP servers when a session is loaded again', async () => {
+    const h = make();
+    const session = await h.agent.loadSession('sess_old', '/ws');
+    h.fake.notify('_kiro/mcp/status', { sessionId: session.id, servers: [{ name: 'linear', status: 'connected' }] });
+    await until(() => session.mcp.runtime.length === 1, 2000, 'the status');
+    session.updateMcpLocal('linear', { scope: 'user', addedAt: 1 });
+    await h.agent.restart();
+    expect(session.status).toBe('ready');
+    expect(session.mcp.runtime).toEqual([{ name: 'linear', status: 'connected' }]);
+    expect(session.mcp.local.get('linear')).toEqual({ scope: 'user', addedAt: 1 });
+  });
+});
+
+describe('resetting an MCP server', () => {
+  it('sends the method Kiro does not advertise, with the session and the sign-in flag', async () => {
+    const h = make();
+    h.fake.on('_kiro/mcp/resetServer', () => ({ success: true }));
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toBe('ok');
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer').map((m) => m.params)).toEqual([
+      { sessionId: session.id, serverName: 'linear', startOAuth: true },
+    ]);
+  });
+
+  it('reports a CLI that does not know the method, and does not ask it again until the connection changes', async () => {
+    const h = make();
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toBe('unsupported');
+    expect(await h.agent.resetMcpServer(session.id, 'linear', false)).toBe('unsupported');
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer')).toHaveLength(1);
+    await h.agent.restart();
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toBe('unsupported');
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer')).toHaveLength(2);
+  });
+
+  it('tries once more without the session when Kiro refuses it for the session', async () => {
+    const h = make();
+    h.fake.on('_kiro/mcp/resetServer', (params) => {
+      if (params.sessionId !== undefined) throw new RpcError(-32603, 'Session does not bind MCP server linear');
+      return { success: true };
+    });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toBe('ok');
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer').map((m) => m.params)).toEqual([
+      { sessionId: session.id, serverName: 'linear', startOAuth: true },
+      { serverName: 'linear', startOAuth: true },
+    ]);
+  });
+
+  it("reports Kiro's error after the second try, and the organisation's refusal without one", async () => {
+    const h = make();
+    h.fake.on('_kiro/mcp/resetServer', () => {
+      throw new RpcError(-32603, 'No connected MCP server: linear');
+    });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', false)).toEqual({
+      error: 'No connected MCP server: linear',
+    });
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer')).toHaveLength(2);
+
+    h.fake.on('_kiro/mcp/resetServer', () => {
+      throw new RpcError(-32603, 'MCP governance is disabled by your organization');
+    });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toEqual({
+      error: 'MCP governance is disabled by your organization',
+      governance: true,
+    });
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer')).toHaveLength(3);
+  });
+
+  it('gives up after its time limit, without a second try', async () => {
+    const h = make({ mcpResetTimeoutMs: 50 });
+    h.fake.on('_kiro/mcp/resetServer', () => new Promise(() => undefined));
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(await h.agent.resetMcpServer(session.id, 'linear', true)).toBe('timeout');
+    expect(h.fake.requestsOf('_kiro/mcp/resetServer')).toHaveLength(1);
+  });
+
+  it('reports an error instead of throwing when the agent is not connected', async () => {
+    const h = make();
+    expect(await h.agent.resetMcpServer(SESSION_ID, 'linear', true)).toEqual({
+      error: 'Not connected to the Kiro CLI',
+    });
   });
 });

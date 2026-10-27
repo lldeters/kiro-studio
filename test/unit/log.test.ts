@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { ProtocolLog, summarise, type LogLevel } from '../../src/util/log';
 import { createRedactor } from '../../src/util/redact';
 
-function setup(level: LogLevel) {
+function setup(level: LogLevel, literals: string[] = []) {
   const lines: string[] = [];
+  const state = { level };
   const log = new ProtocolLog(
     { appendLine: (l) => lines.push(l) },
-    () => level,
-    createRedactor('/home/me'),
+    () => state.level,
+    createRedactor('/home/me', () => literals),
     () => new Date('2026-10-23T15:57:16.622Z'),
   );
-  return { lines, log };
+  return { lines, log, state };
 }
 
 describe('summarise', () => {
@@ -62,5 +63,43 @@ describe('ProtocolLog', () => {
     log.info('cli at /home/me/bin');
     expect(lines[0]).toContain('!  opened ~/x');
     expect(lines[1]).toContain('·  cli at ~/bin');
+  });
+
+  it("hides the values of Kiro's stored secrets: in its requests and in our answers to get", () => {
+    const { lines, log } = setup('verbose');
+    log.message(
+      'in',
+      JSON.stringify({ id: 7, method: '_kiro/secret/store', params: { key: 'kiro.mcp.a.tokens', value: 'tok-1' } }),
+    );
+    log.message('in', JSON.stringify({ id: 8, method: '_kiro/secret/get', params: { key: 'kiro.mcp.a.tokens' } }));
+    log.message('out', JSON.stringify({ id: 8, result: { value: 'tok-1' } }));
+    // Another answer with a value is not one of them.
+    log.message('out', JSON.stringify({ id: 9, result: { value: 'plain' } }));
+    expect(lines.join('\n')).not.toContain('tok-1');
+    expect(lines[0]).toContain('"key":"kiro.mcp.a.tokens","value":"[redacted]"');
+    expect(lines[2]).toContain('"result":{"value":"[redacted]"}');
+    expect(lines[3]).toContain('"value":"plain"');
+  });
+
+  it('also hides the answer to a get that arrived while the log was off', () => {
+    const { lines, log, state } = setup('off');
+    log.message('in', JSON.stringify({ id: 'g1', method: '_kiro/secret/get', params: { key: 'k' } }));
+    state.level = 'verbose';
+    log.message('out', JSON.stringify({ id: 'g1', result: { value: 'tok-2' } }));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain('tok-2');
+  });
+
+  it('hides the keys the user entered wherever they appear', () => {
+    const key = 'ghp_0123456789abcdefABCDEF';
+    const { lines, log } = setup('verbose', [key]);
+    log.info(`spawned with ${key}`);
+    log.stderr(`header ${key}`);
+    log.message('in', JSON.stringify({ id: 1, result: { text: `echo ${key}` } }));
+    log.message('in', JSON.stringify({ id: 2, error: { code: -32000, message: `rejected ${key}` } }));
+    log.message('in', `not json ${key}`);
+    expect(lines).toHaveLength(5);
+    expect(lines.join('\n')).not.toContain(key);
+    expect(lines[3]).toContain('error #2 -32000 rejected [redacted]');
   });
 });

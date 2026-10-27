@@ -1,6 +1,8 @@
 import { KiroAgent, type AgentDeps, type AgentSettings } from '../../src/acp/agent';
 import type { FileSystemPort, WriteGate } from '../../src/acp/handlers/fs';
 import type { OptionKind } from '../../src/acp/handlers/permissions';
+import type { SecretPort } from '../../src/acp/handlers/secrets';
+import type { JsonObject } from '../../src/util/json';
 import { ProtocolLog, type LogLevel } from '../../src/util/log';
 import { createRedactor } from '../../src/util/redact';
 import { sleep } from '../../src/util/async';
@@ -21,6 +23,13 @@ export interface HarnessOptions {
   writeGate?: WriteGate;
   turnHooks?: AgentDeps['turnHooks'];
   translate?: AgentDeps['translate'];
+  /** What `session/new` and `session/load` carry as `_meta`. */
+  sessionMeta?: () => JsonObject | undefined;
+  /** Replaces recording the pages Kiro asks for in `opened`. */
+  externalUrl?: (url: string) => void;
+  /** Offers Kiro a secret storage, kept in `secrets` of the harness. */
+  secretStorage?: boolean;
+  mcpResetTimeoutMs?: number;
 }
 
 export interface MutableSettings {
@@ -69,18 +78,33 @@ export function createHarness(options: HarnessOptions = {}) {
     defaultEffort: () => settings.effort,
   };
   const opened: string[] = [];
+  const secrets = new Map<string, string>();
+  const secretPort: SecretPort = {
+    get: (key) => Promise.resolve(secrets.get(key)),
+    store: (key, value) => {
+      secrets.set(key, value);
+      return Promise.resolve();
+    },
+    delete: (key) => {
+      secrets.delete(key);
+      return Promise.resolve();
+    },
+  };
   const agent = new KiroAgent({
     transport: options.transport ? options.transport(fake) : fake.factory,
     log,
     settings: agentSettings,
     fs: fsPort,
     workspaceRoots: () => [workspace],
-    openUrl: (url) => void opened.push(url),
+    externalUrl: options.externalUrl ?? ((url) => void opened.push(url)),
     clientInfo: { name: 'kiro-studio-test', version: '0.0.0' },
     platform: 'posix',
     ...(options.writeGate === undefined ? {} : { writeGate: options.writeGate }),
     ...(options.turnHooks === undefined ? {} : { turnHooks: options.turnHooks }),
     ...(options.translate === undefined ? {} : { translate: options.translate }),
+    ...(options.sessionMeta === undefined ? {} : { sessionMeta: options.sessionMeta }),
+    ...(options.secretStorage === true ? { secrets: secretPort } : {}),
+    ...(options.mcpResetTimeoutMs === undefined ? {} : { mcpResetTimeoutMs: options.mcpResetTimeoutMs }),
     backoffMs: options.backoffMs ?? [5, 5, 5],
     stableAfterMs: 1000,
     cancelHoldMs: options.cancelHoldMs ?? 300,
@@ -96,7 +120,7 @@ export function createHarness(options: HarnessOptions = {}) {
       queueMicrotask(() => agent.permissions.answer(session.id, approval.id, kind));
     });
 
-  return { agent, fake, files, writes, lines, log, settings, opened, autoAnswer, workspace };
+  return { agent, fake, files, writes, lines, log, settings, opened, secrets, autoAnswer, workspace };
 }
 
 export type Harness = ReturnType<typeof createHarness>;

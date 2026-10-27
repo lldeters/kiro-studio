@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { emptyMcpState, type McpLocal, type SessionMcpState } from '../../src/acp/sessions';
 import { createRedactor } from '../../src/util/redact';
-import { emptyMcpState, mcpSessionView, type McpLocal, type SessionMcpState } from '../../src/view/mcpView';
+import { mcpSessionView } from '../../src/view/mcpView';
 import type { McpRuntime } from '../../src/workspace/mcp';
 
 const redact = createRedactor('/home/ada').redactText;

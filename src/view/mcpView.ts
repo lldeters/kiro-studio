@@ -1,60 +1,13 @@
 /**
  * The MCP servers of a session as the chat shows them on the cards of proposed servers (`SessionMeta.mcp`). Pure: the
- * host keeps the state, this decides what each card says.
- *
- * The state types are defined here until the session store keeps them (`Session.mcp`); they then move to
- * `src/acp/sessions.ts`, which must not import from this layer.
+ * session keeps the state (`Session.mcp`), this decides what each card says.
  */
+import type { McpLocal, SessionMcpState } from '../acp/sessions';
 import type { McpCardState, McpServerView, McpSessionView } from '../shared/chatProtocol';
 import { hasPunycode } from '../shared/mcpCatalog';
 import type { McpRuntime } from '../workspace/mcp';
 
 const MAX_ERROR_CHARS = 300;
-
-/** What Kiro Studio itself knows about a server of a session, beyond what Kiro reports. */
-export interface McpLocal {
-  /** The file it was added to from the chat. */
-  scope?: 'user' | 'workspace';
-  addedAt?: number;
-  /** Kiro has not reported the server within 20 s of adding it. */
-  notPickedUp?: boolean;
-  /** A key was stored for it; the Kiro process only sees it after a restart. */
-  needsRestart?: boolean;
-  /** Until then, the first "needs sign-in" of the server starts the browser sign-in by itself. */
-  autoSignInUntil?: number;
-  signIn?: {
-    phase: 'starting' | 'waiting' | 'stalled' | 'unfinished' | 'unsupported';
-    host?: string;
-    /** The sign-in page. Host side only: it never goes into the view. */
-    url?: string;
-    browserOpened?: boolean;
-    at: number;
-  };
-}
-
-/** The MCP state of one session. */
-export interface SessionMcpState {
-  /** Kiro's latest status of the session's servers. */
-  runtime: McpRuntime[];
-  /** `registry` when the organisation only allows servers from its own list. */
-  accessMode?: string;
-  /** Servers the organisation's list filtered out. */
-  filtered: string[];
-  /** False when the organisation switched MCP servers off; undefined until Kiro said. */
-  allowed?: boolean;
-  /** Kiro confirmed that it has Kiro Studio's steering document. */
-  clientSteering: boolean;
-  /** The turn whose prompt last carried the hidden instructions. */
-  contextSentAtTurn?: number;
-  local: Map<string, McpLocal>;
-}
-
-export const emptyMcpState = (): SessionMcpState => ({
-  runtime: [],
-  filtered: [],
-  clientSteering: false,
-  local: new Map(),
-});
 
 function shortError(error: string, redact: (text: string) => string): string {
   const text = redact(error).trim();
