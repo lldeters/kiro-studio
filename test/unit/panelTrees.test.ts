@@ -67,6 +67,9 @@ describe('sessions tree', () => {
     expect(first?.contextValue).toBe('session canFork canRename isOpen');
     expect(second?.contextValue).toBe('session canFork canRename');
     expect(sessionsTree({ ...input, canFork: false })[0]?.contextValue).toBe('session isOpen');
+    expect(sessionsTree({ ...input, canFork: false, canDelete: true })[0]?.contextValue).toBe(
+      'session canDelete isOpen',
+    );
   });
 
   it('filters by the query', () => {

@@ -43,7 +43,7 @@ real Kiro session._
   _Add…_ shows in a VS Code dialog exactly what is written where. Servers from Kiro Studio's list of known ones are
   written as listed; anything else is marked. You sign in in the browser from the card, and API keys go into a password
   field and VS Code's secret storage, never into a file.
-- **Kiro panel:** your earlier sessions (open, search, fork where the CLI allows it), and your specs, steering files,
+- **Kiro panel:** your earlier sessions (open, search, fork and delete where the CLI allows it), and your specs, steering files,
   hooks, MCP servers and custom agents, read from `.kiro` and `~/.kiro`, with the actions to create, switch on and off,
   and remove them. Edits keep your comments and formatting.
 - **Specs:** an assistant starts a spec (feature with requirements or design first, bug fix, quick spec) in the right

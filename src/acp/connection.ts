@@ -300,6 +300,19 @@ export class KiroConnection {
     );
   }
 
+  /**
+   * `session/delete` (still unstable in ACP, so it is sent by name): removes a session from Kiro's list for good. Only
+   * when the agent advertises it. The parameters follow the ACP draft: just the session.
+   */
+  deleteSession(sessionId: string): Promise<unknown> {
+    if (!this._capabilities?.session.delete) throw new Error('The Kiro CLI does not support deleting sessions');
+    return withTimeout(
+      this.agent.request<unknown, unknown>('session/delete', { sessionId }),
+      this.timeouts.extension,
+      'session/delete',
+    );
+  }
+
   /** Resolves with the stop reason when the turn is over; the turn lasts as long as this promise is pending. */
   async prompt(sessionId: string, prompt: acp.ContentBlock[]): Promise<{ stopReason: string }> {
     const request: acp.PromptRequest = { sessionId, prompt };

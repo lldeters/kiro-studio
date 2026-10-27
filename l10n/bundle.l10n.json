@@ -124,6 +124,7 @@
   "Credits used in this session": "Credits used in this session",
   "Debug command: the answer appears in the \"Kiro Studio: Chat (debug)\" output.": "Debug command: the answer appears in the \"Kiro Studio: Chat (debug)\" output.",
   "Delete": "Delete",
+  "Delete the session \"{0}\" in Kiro? It cannot be opened again.": "Delete the session \"{0}\" in Kiro? It cannot be opened again.",
   "Delete this steering file?": "Delete this steering file?",
   "Deny": "Deny",
   "Describe it in a sentence.": "Describe it in a sentence.",

@@ -78,6 +78,7 @@
   "command.sessions.open": "Sitzung öffnen",
   "command.sessions.fork": "Sitzung abzweigen",
   "command.sessions.rename": "Sitzung umbenennen …",
+  "command.sessions.delete": "Sitzung löschen …",
   "command.specs.refresh": "Specs aktualisieren",
   "command.specs.new": "Neue Spec…",
   "command.specs.openView": "Spec-Ansicht öffnen",
