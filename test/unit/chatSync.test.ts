@@ -108,6 +108,19 @@ describe('host and page together', () => {
     expect(sync.update(base([a, b], a))).toEqual([]);
   });
 
+  it('brings the plan overview to the page, and takes it away when it is turned off', () => {
+    const sync = new ChatSync('posix');
+    const plan = { state: 'loading', sinceCheck: 0 } as const;
+    let state = run(initialState, sync.init({ ...base([a], a), plan }, extras));
+    expect(state.plan).toEqual(plan);
+    const checked = { state: 'ready', percent: 12, sinceCheck: 0, checkedAt: 1 } as const;
+    state = run(state, sync.update({ ...base([a], a), plan: checked }));
+    expect(state.plan).toEqual(checked);
+    expect(sync.update({ ...base([a], a), plan: { ...checked } })).toEqual([]);
+    state = run(state, sync.update(base([a], a)));
+    expect(state.plan).toBeUndefined();
+  });
+
   it('sends only what grew while the active session streams', () => {
     const sync = new ChatSync('posix');
     let state = run(initialState, sync.init(base([a, b], a), extras));

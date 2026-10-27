@@ -4,11 +4,16 @@ import { formatCredits, formatNumber } from '../../../src/shared/format';
 import { useT } from '../i18n';
 import { useChat } from '../store';
 import { post } from '../vscode';
+import { PlanMeter } from './PlanMeter';
 
-/** The line under the input box: Supervised or Autopilot, how full the context is, the credits of the session. */
+/**
+ * The line under the input box: Supervised or Autopilot, how full the context is, the credits of the session, and at
+ * the right the plan overview.
+ */
 export function Toolbar({ session }: { session: SessionView }) {
   const t = useT();
   const canCompact = useChat((s) => s.capabilities.compact);
+  const plan = useChat((s) => s.plan);
   const busy = session.phase !== 'idle';
   const usable = session.status === 'ready';
   const percentage = session.context?.percentage;
@@ -57,6 +62,7 @@ export function Toolbar({ session }: { session: SessionView }) {
         </span>
       )}
       <span className="toolbar-spacer" />
+      {plan && <PlanMeter plan={plan} />}
       {canCompact && (
         <button
           className="icon-button"

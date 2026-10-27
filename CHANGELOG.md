@@ -10,6 +10,10 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   reports credits per answer, not tokens.
 - The line under the input box shows the credits of the whole session instead of the last answer, and the context fill
   names the tokens in the context when Kiro reports them.
+- An overview of your Kiro plan at the bottom right, in the chat and in the status bar: the share of the monthly credits
+  used, the reset day and the bonus credits. It is read from `kiro-cli chat --no-interactive /usage` when the connection
+  is first ready, after answers at most every 15 minutes and on a click; in between, the credits of your answers are
+  added. Turn it off with `kiroStudio.planUsage.enabled`.
 
 ### Fixed
 

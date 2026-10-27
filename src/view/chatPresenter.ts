@@ -201,7 +201,7 @@ export function itemView(item: TranscriptItem): ItemView {
         id: item.id,
         kind: 'usage',
         text: '',
-        replay: false,
+        replay: item.replay,
         ...(item.credits === undefined ? {} : { credits: item.credits }),
         ...(item.elapsedMs === undefined ? {} : { elapsedMs: item.elapsedMs }),
       };

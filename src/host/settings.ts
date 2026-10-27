@@ -30,6 +30,10 @@ export class Settings implements AgentSettings {
     return this.config.get<boolean>('hooks.enabled', false);
   }
 
+  planUsageEnabled(): boolean {
+    return this.config.get<boolean>('planUsage.enabled', true);
+  }
+
   specCodeLens(): boolean {
     return this.config.get<boolean>('specs.codeLens', true);
   }

@@ -57,6 +57,8 @@ export interface TranscriptUsage {
   id: number;
   credits?: number;
   elapsedMs?: number;
+  /** A turn of the history that `session/load` replayed; its credits were spent before. */
+  replay: boolean;
 }
 export type TranscriptItem =
   TranscriptMessage | TranscriptTool | TranscriptNotice | TranscriptCheckpoint | TranscriptUsage;
@@ -447,6 +449,7 @@ export class Session {
             id: this.nextItemId++,
             ...(info.credits === undefined ? {} : { credits: info.credits }),
             ...(info.elapsedMs === undefined ? {} : { elapsedMs: info.elapsedMs }),
+            replay,
           });
           this.changes.emit('transcript');
         }

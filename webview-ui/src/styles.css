@@ -1319,3 +1319,63 @@ body[data-view='spec'] {
 :is(body.vscode-high-contrast, body.vscode-high-contrast-light) .composer textarea:focus-visible {
   outline: none;
 }
+
+/* The plan overview at the right of the line under the input, opening upwards */
+.plan-meter {
+  position: relative;
+}
+.status-item.plan.warn {
+  color: var(--vscode-editorWarning-foreground);
+}
+.plan-card {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, var(--vscode-panel-border)));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+  font-size: var(--vscode-font-size);
+  white-space: normal;
+}
+.plan-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.plan-bar {
+  --ring: var(--kiro-ring);
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--ring) var(--fill), color-mix(in srgb, currentColor 20%, transparent) 0);
+}
+.plan-bar.warn {
+  --ring: var(--vscode-editorWarning-foreground);
+}
+.plan-line {
+  margin-top: 2px;
+}
+.plan-status {
+  margin-top: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+.plan-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 2px 8px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+.plan-refresh:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}

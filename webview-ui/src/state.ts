@@ -3,6 +3,7 @@ import type {
   AttachmentView,
   ChatCapabilities,
   HostMessage,
+  PlanView,
   SessionPatch,
   SessionView,
   SetupView,
@@ -28,6 +29,8 @@ export interface ChatState {
   setup: SetupView;
   agent: AgentView;
   capabilities: ChatCapabilities;
+  /** The plan overview; undefined while it is off or not checked yet. */
+  plan: PlanView | undefined;
   /** Only the active session is kept; the host sends a session in full when it becomes active. */
   sessions: Record<string, SessionView>;
   /** Attachments the host picked for the draft; the composer takes them and clears the list. */
@@ -43,6 +46,7 @@ export const initialState: ChatState = {
   setup: 'checking',
   agent: { phase: 'stopped' },
   capabilities: { image: false, compact: false },
+  plan: undefined,
   sessions: {},
   picked: [],
   announcement: undefined,
@@ -81,6 +85,7 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
         setup: message.setup,
         agent: message.agent,
         capabilities: message.capabilities,
+        plan: message.plan,
         sessions: {},
       };
     case 'tabs': {
@@ -89,7 +94,13 @@ export function reduce(state: ChatState, message: HostMessage): ChatState {
       return { ...state, tabs: message.tabs, activeId: message.activeId, sessions };
     }
     case 'status':
-      return { ...state, setup: message.setup, agent: message.agent, capabilities: message.capabilities };
+      return {
+        ...state,
+        setup: message.setup,
+        agent: message.agent,
+        capabilities: message.capabilities,
+        plan: message.plan,
+      };
     case 'session':
       // The host sends a full session only for the one on show, so it is the active one whatever the tab list said last.
       return { ...state, activeId: message.session.id, sessions: { [message.session.id]: message.session } };

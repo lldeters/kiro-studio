@@ -24,7 +24,7 @@ export interface CliEnvironment {
   readonly env: NodeJS.ProcessEnv;
   readonly homedir: string;
   isExecutable(file: string): boolean;
-  exec(command: string, args: readonly string[], timeoutMs: number): Promise<ExecResult>;
+  exec(command: string, args: readonly string[], timeoutMs: number, options?: { cwd?: string }): Promise<ExecResult>;
 }
 
 export function nodeCliEnvironment(): CliEnvironment {
@@ -41,12 +41,17 @@ export function nodeCliEnvironment(): CliEnvironment {
         return false;
       }
     },
-    exec(command, args, timeoutMs) {
+    exec(command, args, timeoutMs, options = {}) {
       return new Promise((resolve) => {
         execFile(
           command,
           [...args],
-          { timeout: timeoutMs, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+          {
+            timeout: timeoutMs,
+            windowsHide: true,
+            maxBuffer: 8 * 1024 * 1024,
+            ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+          },
           (error, stdout, stderr) => {
             // A program stopped at the timeout has no exit code; it is told apart from one that failed.
             const failure = error as { code?: unknown; killed?: boolean } | null;

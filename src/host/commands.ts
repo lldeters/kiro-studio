@@ -9,6 +9,7 @@ import type { ChatController } from './chatController';
 import { openChatInEditor } from './chatView';
 import type { DebugChat } from './debugChat';
 import type { ProtocolChannel } from './logger';
+import type { PlanUsageService } from './planUsage';
 import { showQuickMenu } from './quickMenu';
 import type { SetupController } from './setup';
 import type { Settings } from './settings';
@@ -21,10 +22,11 @@ export interface CommandDeps {
   protocol: ProtocolChannel;
   debug: DebugChat;
   chat: ChatController;
+  plan: PlanUsageService;
 }
 
 export function registerCommands(deps: CommandDeps): void {
-  const { context, host, setup, settings, protocol, debug, chat } = deps;
+  const { context, host, setup, settings, protocol, debug, chat, plan } = deps;
   const t = vscode.l10n.t;
 
   /** Runs a command body and shows its error instead of letting VS Code print a stack trace. */
@@ -51,6 +53,7 @@ export function registerCommands(deps: CommandDeps): void {
   command('kiroStudio.checkSetup', () => setup.check());
   command('kiroStudio.showProtocolLog', () => protocol.channel.show(true));
   command('kiroStudio.answerPending', () => host.showPendingApproval());
+  command('kiroStudio.refreshPlanUsage', () => plan.refresh());
   command('kiroStudio.openWalkthrough', () =>
     vscode.commands.executeCommand(
       'workbench.action.openWalkthrough',

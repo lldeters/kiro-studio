@@ -224,6 +224,53 @@ describe('toolbar', () => {
     document.documentElement.lang = '';
   });
 
+  it('shows no plan until the host sends one, then its share at the right and the overview on a click', () => {
+    document.documentElement.lang = 'en-US';
+    const { rerender } = render(<Toolbar session={session()} />);
+    expect(screen.queryByRole('button', { name: /%/ })).toBeNull();
+    useChat.setState({
+      plan: {
+        state: 'ready',
+        plan: 'KIRO FREE',
+        used: 46,
+        limit: 50,
+        percent: 92,
+        resetsOn: '2026-11-01',
+        sinceCheck: 1,
+        checkedAt: new Date(2026, 9, 27, 9, 5).getTime(),
+      },
+    });
+    rerender(<Toolbar session={session()} />);
+    const meter = screen.getByRole('button', { name: '≈ 92%' });
+    expect(meter.className).toContain('warn');
+    expect(meter.title.split('\n')).toEqual([
+      'Kiro plan: KIRO FREE',
+      'Monthly credits: 46.00 of 50 used (92%)',
+      'Resets on November 1, 2026',
+      'This window used 1.00 credits since the last check.',
+      'Checked at 09:05 AM.',
+    ]);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(meter);
+    expect(screen.getByRole('dialog', { name: 'Kiro plan' }).textContent).toContain('Resets on November 1, 2026');
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    expect(outbox).toEqual([{ type: 'command', command: 'kiroStudio.refreshPlanUsage' }]);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Check again' }), { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(meter);
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    document.documentElement.lang = '';
+  });
+
+  it('cannot check the plan again while a check runs', () => {
+    useChat.setState({ plan: { state: 'loading', sinceCheck: 0 } });
+    render(<Toolbar session={session()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Kiro plan' }));
+    expect(screen.getByRole('dialog').textContent).toContain('Checking your Kiro plan…');
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Check again' }).disabled).toBe(true);
+  });
+
   it('is disabled for a lost session', () => {
     render(<Toolbar session={session({ status: 'lost' })} />);
     expect(screen.getByRole<HTMLButtonElement>('button', { name: /Supervised/ }).disabled).toBe(true);
