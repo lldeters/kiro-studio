@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- Choosing an entry of the `/` or `#` list (a command, or a file from the picker, also after cancelling it) left the chat
+  empty. Newer Chromium, as in current VS Code, returns a promise from `scrollIntoView`, which the list handed to React as
+  its clean-up; React threw when the list closed and removed the whole page.
+
 ## [0.1.0] - 2026-10-25
 
 First preview. Built in five phases (see [docs/PLAN.md](docs/PLAN.md)).

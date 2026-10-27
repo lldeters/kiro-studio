@@ -14,8 +14,12 @@ export function SuggestMenu({
   onChoose: (item: MenuItem) => void;
 }) {
   const active = useRef<HTMLDivElement>(null);
-  // (`scrollIntoView` is missing in the test DOM)
-  useEffect(() => active.current?.scrollIntoView?.({ block: 'nearest' }), [selected]);
+  // A body, not an expression: newer Chromium returns a promise from `scrollIntoView`, and an effect that returns
+  // anything but a clean-up function makes React throw when the menu closes, which emptied the whole chat.
+  // (`scrollIntoView` is missing in the test DOM.)
+  useEffect(() => {
+    void active.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [selected]);
 
   return (
     <div className="suggest" id={id} role="listbox">
