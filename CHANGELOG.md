@@ -9,6 +9,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 - Choosing an entry of the `/` or `#` list (a command, or a file from the picker, also after cancelling it) left the chat
   empty. Newer Chromium, as in current VS Code, returns a promise from `scrollIntoView`, which the list handed to React as
   its clean-up; React threw when the list closed and removed the whole page.
+- An error while the chat is drawn no longer leaves it empty: the chat says what happened, writes the error to the
+  protocol log and offers to show the chat again.
 
 ## [0.1.0] - 2026-10-25
 

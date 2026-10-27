@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { HostMessage } from '../../src/shared/chatProtocol';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useChat } from './store';
 import { post } from './vscode';
 import '@vscode/codicons/dist/codicon.css';
@@ -20,7 +21,9 @@ if (root && document.body.dataset['view'] === 'spec') {
   if (root)
     createRoot(root).render(
       <StrictMode>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </StrictMode>,
     );
 

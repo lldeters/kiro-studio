@@ -227,11 +227,14 @@ export type WebviewMessage =
   | { type: 'viewChanges'; sessionId: string; checkpointId: string; path?: string }
   | { type: 'revert'; sessionId: string; checkpointId: string; path?: string }
   | { type: 'exportSession'; sessionId: string }
-  | { type: 'command'; command: WebviewCommand };
+  | { type: 'command'; command: WebviewCommand }
+  /** An error the page caught while drawing; the host writes it to the protocol log. */
+  | { type: 'error'; message: string };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const MAX_COPY_CHARS = 1_000_000;
+const MAX_ERROR_CHARS = 4_000;
 const CONTEXT_KINDS: readonly string[] = ['file', 'folder', 'current', 'steering', 'spec'];
 
 /** Missing means no attachments; anything malformed rejects the whole message. */
@@ -353,6 +356,10 @@ export function parseWebviewMessage(raw: unknown): WebviewMessage | undefined {
     case 'copy': {
       const text = str('text');
       return text === undefined || text.length > MAX_COPY_CHARS ? undefined : { type: 'copy', text };
+    }
+    case 'error': {
+      const message = str('message');
+      return message === undefined ? undefined : { type: 'error', message: message.slice(0, MAX_ERROR_CHARS) };
     }
     case 'command': {
       const command = str('command');

@@ -211,6 +211,9 @@ the box a line shows Supervised/Autopilot, how full the context is, the credits 
 above it a chip shows what the last turn with changes changed (turns without changes leave no checkpoint) and opens
 those changes.
 
+An error while the page is drawn is caught by an error boundary around the app: the page says what happened, sends the
+error to the host for the protocol log, and can draw the chat again, instead of React removing the whole page.
+
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.
 

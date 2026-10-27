@@ -30,8 +30,15 @@ describe('messages from the webview', () => {
       { type: 'revert', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
       { type: 'exportSession', sessionId: 's1' },
       { type: 'command', command: 'kiroStudio.restart' },
+      { type: 'error', message: 'boom' },
     ];
     for (const message of messages) expect(parseWebviewMessage(message)).toEqual(message);
+  });
+
+  it('keeps an error report from the page short, and refuses one without text', () => {
+    const long = parseWebviewMessage({ type: 'error', message: 'x'.repeat(10_000) });
+    expect(long?.type === 'error' && long.message.length).toBe(4000);
+    expect(parseWebviewMessage({ type: 'error' })).toBeUndefined();
   });
 
   it('treats a send without attachments as one with none', () => {

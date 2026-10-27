@@ -211,6 +211,12 @@ button.secondary:hover:not(:disabled) {
   align-items: center;
   gap: 8px;
 }
+.banner.crash {
+  border-left-color: var(--vscode-errorForeground);
+}
+.banner.crash .codicon-error {
+  color: var(--vscode-errorForeground);
+}
 .banner-actions {
   display: flex;
   flex-wrap: wrap;
