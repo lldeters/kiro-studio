@@ -14,6 +14,8 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   the chat, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts a session while the
   chat has the focus. _Stop the Running Turn_ is a command.
 - ↑ and ↓ in the empty input bring back the earlier messages of the session.
+- On Windows a `kiro-cli.cmd` (an npm or Scoop shim) is found on the `PATH` and can be chosen as the CLI; it is started
+  through `cmd.exe`. The integration tests with the stand-in CLI therefore run on Windows too.
 - Checkpoints record every folder of a multi-root workspace, not only the first; with several folders a file is shown
   after its folder's name.
 - `kiroStudio.checkpoints.exclude` leaves more files out of checkpoints (`.gitignore` syntax), and

@@ -78,7 +78,7 @@ export function registerCommands(deps: CommandDeps): void {
       canSelectFolders: false,
       openLabel: t('Use this Kiro CLI'),
       title: t('Choose the kiro-cli executable'),
-      ...(process.platform === 'win32' ? { filters: { [t('Programs')]: ['exe'] } } : {}),
+      ...(process.platform === 'win32' ? { filters: { [t('Programs')]: ['exe', 'cmd', 'bat'] } } : {}),
     });
     const file = picked?.[0];
     if (!file) return;

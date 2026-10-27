@@ -11,7 +11,7 @@ import { createHarness, until } from '../support/harness';
 
 const SCRIPT = path.resolve(__dirname, '../integration/fixtures/fake-kiro.cjs');
 
-describe.skipIf(process.platform === 'win32')('fake CLI of the integration tests', () => {
+describe('fake CLI of the integration tests', () => {
   it.each([
     ['ready', 'ready'],
     ['signedout', 'notSignedIn'],

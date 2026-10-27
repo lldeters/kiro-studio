@@ -30,9 +30,6 @@ export interface KiroStudioApi {
   readonly firstCheck: Promise<void>;
 }
 
-/** The fake CLI is started through a shell script, which Node cannot spawn directly on Windows. */
-export const canRunFakeCli = process.platform !== 'win32';
-
 const FAKE_CLI_SCRIPT = path.resolve(__dirname, '../../../test/integration/fixtures/fake-kiro.cjs');
 
 /** Writes a `kiro-cli` that behaves as the scenario says and returns its path. */

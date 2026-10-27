@@ -5,6 +5,8 @@
 import { spawn, execFile, type ChildProcessByStdio } from 'node:child_process';
 import { Readable, Writable } from 'node:stream';
 import { StringDecoder } from 'node:string_decoder';
+import { launchSpec } from '../util/launch';
+import { currentPlatform } from '../util/paths';
 
 export interface ExitInfo {
   code: number | null;
@@ -42,13 +44,15 @@ export interface SpawnSpec {
 export function spawnTransport(spec: SpawnSpec): Promise<Transport> {
   return new Promise((resolve, reject) => {
     const posix = process.platform !== 'win32';
+    const launch = launchSpec(spec.command, spec.args, currentPlatform());
     // On POSIX the child leads its own process group so that the whole tree can be signalled.
-    const child: PipedChild = spawn(spec.command, [...spec.args], {
+    const child: PipedChild = spawn(launch.command, launch.args, {
       cwd: spec.cwd,
       env: spec.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
       detached: posix,
+      shell: launch.shell,
     });
 
     const exited = new Promise<ExitInfo>((done) => {

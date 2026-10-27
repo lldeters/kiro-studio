@@ -116,7 +116,6 @@ real Kiro session._
   lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
 - Adding MCP servers from the chat is built on reading the shipped code of Kiro CLI 2.34.2, not on a run. A CLI that
   cannot start a sign-in for Kiro Studio says so on the card and asks you to update it.
-- The scripted stand-in for the CLI is a shell script, so the integration tests that use it are skipped on Windows.
 - Sessions of a remote Kiro are listed but not driven specially.
 
 ## More
