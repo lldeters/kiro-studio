@@ -45,7 +45,7 @@ export const initialState: ChatState = {
   activeId: undefined,
   setup: 'checking',
   agent: { phase: 'stopped' },
-  capabilities: { image: false, compact: false },
+  capabilities: { image: false, compact: false, mcpCards: false },
   plan: undefined,
   sessions: {},
   picked: [],

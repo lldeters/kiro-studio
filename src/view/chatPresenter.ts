@@ -18,6 +18,12 @@ import type {
   ToolView,
 } from '../shared/chatProtocol';
 import { currentPlatform, normalizeAgentPath, type PlatformKind } from '../util/paths';
+import { stripContext } from '../workspace/mcpInstructions';
+import { mcpSessionView } from './mcpView';
+
+/** Hides secrets in text Kiro wrote, such as an MCP server's error message: the protocol log's redactor. */
+export type Redact = (text: string) => string;
+const unchanged: Redact = (text) => text;
 
 const MAX_INPUT_CHARS = 4_000;
 const MAX_OUTPUT_CHARS = 8_000;
@@ -209,7 +215,8 @@ export function itemView(item: TranscriptItem): ItemView {
       return {
         id: item.id,
         kind: item.kind,
-        text: item.text,
+        // Kiro Studio's hidden instructions are sent with a message, never shown as part of it.
+        text: item.kind === 'user' ? stripContext(item.text) : item.text,
         replay: item.replay,
         ...(item.attachments === undefined ? {} : { attachments: item.attachments }),
         ...(item.subtaskId === undefined ? {} : { subtaskId: item.subtaskId }),
@@ -250,10 +257,20 @@ function configViews(session: Session): ConfigSelectView[] {
     }));
 }
 
-export function metaView(session: Session): SessionMeta {
+/**
+ * The MCP servers for the cards of proposed servers, left out while there is nothing to show: no server, and nothing
+ * the organisation blocks.
+ */
+function mcpMeta(session: Session, redact: Redact): SessionMeta['mcp'] {
+  const view = mcpSessionView(session.mcp, redact);
+  return view.servers.length > 0 || !view.allowed || view.blocked !== undefined ? view : undefined;
+}
+
+export function metaView(session: Session, redact: Redact = unchanged): SessionMeta {
   const usage = session.contextUsage;
   const tokens = contextTokens(usage?.breakdown);
   const turn = session.lastTurn;
+  const mcp = mcpMeta(session, redact);
   return {
     status: session.status,
     phase: session.phase,
@@ -304,6 +321,7 @@ export function metaView(session: Session): SessionMeta {
             files: c.files.map((f) => ({ ...f })),
           })),
         }),
+    ...(mcp === undefined ? {} : { mcp }),
   };
 }
 
@@ -332,11 +350,15 @@ function waitingToolIds(session: Session): Set<string> {
   return new Set(session.approvals.flatMap((a) => (a.toolCallId === undefined ? [] : [a.toolCallId])));
 }
 
-export function sessionView(session: Session, platform: PlatformKind = currentPlatform()): SessionView {
+export function sessionView(
+  session: Session,
+  platform: PlatformKind = currentPlatform(),
+  redact: Redact = unchanged,
+): SessionView {
   const waiting = waitingToolIds(session);
   return {
     id: session.id,
-    ...metaView(session),
+    ...metaView(session, redact),
     items: session.transcript.map(itemView),
     tools: [...session.tools.values()].map((t) => toolView(t, waiting.has(t.toolCallId), platform)),
   };
@@ -365,18 +387,21 @@ export class PatchTracker {
   private meta = '';
   private sentFull = false;
 
-  constructor(private readonly platform: PlatformKind = currentPlatform()) {}
+  constructor(
+    private readonly platform: PlatformKind = currentPlatform(),
+    private readonly redact: Redact = unchanged,
+  ) {}
 
   /** The whole session; the webview replaces what it has. */
   full(session: Session): SessionView {
-    const view = sessionView(session, this.platform);
+    const view = sessionView(session, this.platform, this.redact);
     this.itemsSent = view.items.length;
     this.lastItemSize = sizeOf(view.items[view.items.length - 1]);
     this.lastItemId = view.items[view.items.length - 1]?.id;
     this.tools.clear();
     const waiting = waitingToolIds(session);
     for (const tool of session.tools.values()) this.tools.set(tool.toolCallId, signature(tool, waiting));
-    this.meta = JSON.stringify(metaView(session));
+    this.meta = JSON.stringify(metaView(session, this.redact));
     this.sentFull = true;
     return view;
   }
@@ -412,7 +437,7 @@ export class PatchTracker {
       this.lastItemId = last?.id;
     }
 
-    const metaView_ = metaView(session);
+    const metaView_ = metaView(session, this.redact);
     const metaJson = JSON.stringify(metaView_);
     const metaChanged = metaJson !== this.meta;
     this.meta = metaJson;

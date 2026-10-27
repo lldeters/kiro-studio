@@ -1,5 +1,6 @@
 /** A session as a Markdown document, for saving or sharing. Built from the same view the chat shows. */
 import type { SessionView, ToolView } from '../shared/chatProtocol';
+import { stripContext } from '../workspace/mcpInstructions';
 
 export interface ExportLabels {
   you: string;
@@ -41,7 +42,8 @@ export function exportMarkdown(session: SessionView, labels: ExportLabels = ENGL
     flushTools();
     switch (item.kind) {
       case 'user':
-        out.push(`## ${labels.you}`, item.text);
+        // Kiro Studio's hidden instructions are no part of what the user wrote.
+        out.push(`## ${labels.you}`, stripContext(item.text));
         if (item.attachments?.length) out.push(item.attachments.map((a) => `\`${a}\``).join(', '));
         break;
       case 'assistant':

@@ -120,7 +120,7 @@ const init = (extra: Partial<Extract<HostMessage, { type: 'init' }>> = {}): Host
   activeId: 's1',
   setup: 'ready',
   agent: { phase: 'ready' },
-  capabilities: { image: true, compact: true },
+  capabilities: { image: true, compact: true, mcpCards: false },
   ...extra,
 });
 

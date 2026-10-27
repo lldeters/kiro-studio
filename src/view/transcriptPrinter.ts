@@ -4,6 +4,7 @@
  * this; until then it makes the connection testable without a UI.
  */
 import type { Session, ToolCallState } from '../acp/sessions';
+import { stripContext } from '../workspace/mcpInstructions';
 
 export interface TextOutput {
   append(text: string): void;
@@ -23,6 +24,9 @@ export class TranscriptPrinter {
     for (const item of session.transcript) {
       switch (item.kind) {
         case 'user':
+          // Kiro Studio's hidden instructions are no part of what the user wrote.
+          this.text(item.id, item.kind, stripContext(item.text), item.replay);
+          break;
         case 'assistant':
         case 'thought':
           this.text(item.id, item.kind, item.text, item.replay);

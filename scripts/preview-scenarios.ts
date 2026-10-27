@@ -26,7 +26,7 @@ function init(
     ...(sessions[0] ? { activeId: sessions[0].id } : {}),
     setup: overrides.setup ?? 'ready',
     agent: { phase: overrides.phase ?? 'ready' },
-    capabilities: { image: true, compact: true },
+    capabilities: { image: true, compact: true, mcpCards: false },
     ...(overrides.plan === undefined ? {} : { plan: overrides.plan }),
   };
 }

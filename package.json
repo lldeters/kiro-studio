@@ -773,6 +773,12 @@
           "scope": "application",
           "markdownDescription": "%config.planUsageEnabled%"
         },
+        "kiroStudio.mcp.addFromChat": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "markdownDescription": "%config.mcpAddFromChat%"
+        },
         "kiroStudio.hooks.enabled": {
           "type": "boolean",
           "default": false,

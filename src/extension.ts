@@ -5,6 +5,8 @@ import { ChatViewProvider } from './host/chatView';
 import { registerCommands } from './host/commands';
 import { DebugChat } from './host/debugChat';
 import { DiffProvider } from './host/diffProvider';
+import { McpChat } from './host/mcpChat';
+import { McpKeys } from './host/mcpKeys';
 import { KiroPanel, PANEL_VIEWS, type PanelViewId } from './host/panel/panel';
 import { PlanStatusBar, PlanUsageService } from './host/planUsage';
 import { SpecsFeature } from './host/specs/specsFeature';
@@ -49,7 +51,10 @@ let host: AgentHost | undefined;
 
 export function activate(context: vscode.ExtensionContext): KiroStudioApi {
   const settings = new Settings();
-  const protocol = createProtocolChannel(settings);
+  // The keys the user enters for MCP servers; the protocol log hides them wherever they appear.
+  const keys = new McpKeys(context.secrets, context.globalState);
+  const protocol = createProtocolChannel(settings, () => keys.literals());
+  keys.load().catch((error: unknown) => protocol.log.info(`could not read the keys of MCP servers: ${String(error)}`));
   const setup = new SetupController(settings);
   const agentHost = new AgentHost({
     settings,
@@ -61,12 +66,18 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
       void vscode.window.showInformationMessage(
         vscode.l10n.t('Checkpoints are off: {0}. Without them you cannot revert what Kiro changed.', reason),
       ),
+    secrets: context.secrets,
+    keys,
   });
   host = agentHost;
+  const mcp = new McpChat({ host: agentHost, keys, settings, log: protocol.log, redact: protocol.redactor.redactText });
+  // Pages Kiro asks to open, and the steering document of new sessions, belong to adding MCP servers from the chat.
+  agentHost.onExternalUrl = (url) => mcp.onExternalUrl(url);
+  agentHost.sessionMeta = () => mcp.sessionMeta();
   const debug = new DebugChat(agentHost);
   const diffs = new DiffProvider();
   const plan = new PlanUsageService({ host: agentHost, setup, settings, log: protocol.log });
-  const chat = new ChatController(agentHost, setup, diffs, protocol.log, plan);
+  const chat = new ChatController(agentHost, setup, diffs, protocol.log, plan, mcp);
   const panel = new KiroPanel({ context, host: agentHost, settings, chat, diffs });
   const specs = new SpecsFeature({
     host: agentHost,
@@ -82,6 +93,8 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
 
   context.subscriptions.push(
     protocol,
+    keys,
+    mcp,
     setup,
     plan,
     planStatusBar,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Session } from '../../src/acp/sessions';
 import { parseSessionNotification } from '../../src/acp/types';
 import { TranscriptPrinter } from '../../src/view/transcriptPrinter';
+import { wrapContext } from '../../src/workspace/mcpInstructions';
 import { SESSION_ID, u, update } from '../support/kiro';
 
 function setup() {
@@ -57,5 +58,11 @@ describe('TranscriptPrinter', () => {
     printer.sync(session);
     printer.sync(session);
     expect(output()).toBe('[replay] > Earlier\n[warning] Lost the connection\n? waiting for you: Write File (a.txt)\n');
+  });
+
+  it('leaves out Kiro Studio’s hidden instructions in a replayed message', () => {
+    const { apply, output } = setup();
+    apply(u.user(`Add Linear\n\n${wrapContext('instructions')}`, { replay: true, messageId: 'm1' }));
+    expect(output()).toBe('[replay] > Add Linear\n');
   });
 });

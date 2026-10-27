@@ -27,7 +27,7 @@ const base = (sessions: Session[], active: Session | undefined): SyncInput => ({
   active,
   setup: 'ready',
   agent: { phase: 'ready' },
-  capabilities: { image: false, compact: false },
+  capabilities: { image: false, compact: false, mcpCards: false },
 });
 
 const run = (state: ChatState, messages: HostMessage[]): ChatState => messages.reduce(reduce, state);
@@ -171,5 +171,21 @@ describe('host and page together', () => {
     Object.defineProperty(broken, 'transcript', { value: [], configurable: true });
     state = run(state, sync.update(base([a, broken], broken)));
     expect(shown(state)?.id).toBe('c');
+  });
+});
+
+describe('MCP servers between host and page', () => {
+  it('brings a new status of a server to the page as part of the session', () => {
+    const s = session('m', 'MCP', 'Here is Linear.');
+    const sync = new ChatSync('posix', (text) => text.replace('hunter2-secret', '[redacted]'));
+    let state = run(initialState, sync.init(base([s], s), { strings: {} }));
+    expect(shown(state)?.mcp).toBeUndefined();
+
+    s.setMcpRuntime({ runtime: [{ name: 'linear', status: 'failed', error: 'bad key hunter2-secret' }] });
+    const messages = sync.update(base([s], s));
+    expect(messages.map((m) => m.type)).toEqual(['patch']);
+    state = run(state, messages);
+    expect(shown(state)?.mcp?.servers).toEqual([{ name: 'linear', state: 'failed', error: 'bad key [redacted]' }]);
+    expect(JSON.stringify(messages)).not.toContain('hunter2-secret');
   });
 });

@@ -26,7 +26,7 @@ const session = (extra: Partial<SessionView> = {}): SessionView => ({
 });
 
 beforeEach(() => {
-  useChat.setState({ ...initialState, drafts: {}, capabilities: { image: true, compact: false } });
+  useChat.setState({ ...initialState, drafts: {}, capabilities: { image: true, compact: false, mcpCards: false } });
   outbox.length = 0;
 });
 afterEach(cleanup);
@@ -264,7 +264,7 @@ describe('composer', () => {
   });
 
   it('does not take images when the agent does not accept them', () => {
-    useChat.setState({ capabilities: { image: false, compact: false } });
+    useChat.setState({ capabilities: { image: false, compact: false, mcpCards: false } });
     render(<Composer session={session()} />);
     const file = new File(['x'], 'shot.png', { type: 'image/png' });
     fireEvent.paste(box(), { clipboardData: { files: [file], getData: () => '' } });

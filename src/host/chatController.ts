@@ -6,7 +6,7 @@
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { describeError } from '../acp/errors';
-import { currentPlatform, isInsideAny, normalizeAgentPath } from '../util/paths';
+import { currentPlatform, isInsideAny, normalizeAgentPath, type PlatformKind } from '../util/paths';
 import {
   parseWebviewMessage,
   type AgentView,
@@ -24,7 +24,9 @@ import { resolveAttachments, type SkipReason } from '../view/promptContext';
 import { contextDeps, pickContext } from './promptContext';
 import type { AgentHost } from './agentHost';
 import type { DiffProvider } from './diffProvider';
+import type { McpChat } from './mcpChat';
 import type { PlanUsageService } from './planUsage';
+import { Settings } from './settings';
 import type { SetupController } from './setup';
 
 const FLUSH_MS = 30;
@@ -34,9 +36,15 @@ class Sink {
   ready = false;
   /** False while the sidebar view or tab is hidden. */
   visible = true;
-  readonly sync = new ChatSync();
+  readonly sync: ChatSync;
 
-  constructor(readonly webview: vscode.Webview) {}
+  constructor(
+    readonly webview: vscode.Webview,
+    platform: PlatformKind,
+    redact: ((text: string) => string) | undefined,
+  ) {
+    this.sync = new ChatSync(platform, redact);
+  }
 
   send(message: HostMessage): void {
     void this.webview.postMessage(message);
@@ -54,11 +62,16 @@ export class ChatController implements vscode.Disposable {
     private readonly diffs: DiffProvider,
     private readonly log?: { info(text: string): void },
     private readonly plan?: PlanUsageService,
+    private readonly mcp?: McpChat,
   ) {
     this.subscriptions.push(
       host.onDidChange(() => this.schedule()),
       setup.onDidChange(() => this.schedule()),
       ...(plan === undefined ? [] : [plan.onDidChange(() => this.schedule())]),
+      // Whether Kiro's MCP proposals show as cards.
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (Settings.changed(event, 'mcp.addFromChat')) this.schedule();
+      }),
     );
   }
 
@@ -77,7 +90,7 @@ export class ChatController implements vscode.Disposable {
 
   /** Connects a webview. The returned disposable detaches it again. */
   attach(webview: vscode.Webview): vscode.Disposable {
-    const sink = new Sink(webview);
+    const sink = new Sink(webview, currentPlatform(), this.mcp?.redact);
     this.sinks.add(sink);
     const listener = webview.onDidReceiveMessage((raw: unknown) => {
       const message = parseWebviewMessage(raw);
@@ -119,6 +132,7 @@ export class ChatController implements vscode.Disposable {
     return {
       image: capabilities?.prompt.image ?? false,
       compact: capabilities?.extensionMethods.has('_kiro/session/compact') ?? false,
+      mcpCards: this.mcp?.cardsEnabled ?? false,
     };
   }
 
@@ -222,6 +236,9 @@ export class ChatController implements vscode.Disposable {
           return;
         case 'command':
           await vscode.commands.executeCommand(message.command);
+          return;
+        case 'mcpAction':
+          await this.mcp?.act(message);
           return;
         case 'error':
           this.log?.info(`The chat page ran into an error: ${message.message}`);
@@ -396,9 +413,12 @@ export class ChatController implements vscode.Disposable {
       );
       for (const skipped of context.skipped)
         session.addNotice('warning', skippedMessage(skipped.reason, skipped.label));
+      // A request for an MCP server in a session whose steering document Kiro did not confirm gets the instructions
+      // as a hidden block after the attachments.
+      const blocks = [...context.blocks, ...(this.mcp?.fallbackBlocks(session, text) ?? [])];
       // The prompt settles when the turn is over; errors become notices in the session, so it throws only when the turn
       // could not begin (one is running, the session is not connected), and then nothing was sent.
-      agent.prompt(sessionId, { text, blocks: context.blocks, labels: context.labels }).catch((error: unknown) => {
+      agent.prompt(sessionId, { text, blocks, labels: context.labels }).catch((error: unknown) => {
         session.addNotice('error', describeError(error));
         giveBack();
       });

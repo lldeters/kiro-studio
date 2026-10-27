@@ -37,6 +37,7 @@
   "config.planUsageEnabled": "Show how much of your Kiro plan is used, in the status bar and in the chat. Kiro Studio asks the Kiro CLI (`kiro-cli chat --no-interactive /usage`) when the connection is first ready, after an answer once the last check is 15 minutes old, and when you click the overview. The CLI may keep an empty chat session for each check; they are filed under a folder of their own in the system's temporary folder.",
   "config.autoAllowInAutopilot": "In Autopilot, answer every permission request of Kiro that offers \"allow once\" with \"allow once\" automatically. A persistent \"always\" option is never chosen automatically, the end-of-turn review is still yours, every automatic answer is logged, and Supervised mode always asks. Kiro's own deny rules still apply, because Kiro does not ask for those. User settings only.",
   "config.hooksEnabled": "Let Kiro load and run hooks from `.kiro/hooks` and `~/.kiro/hooks`. This includes your global hooks, which may run commands. User settings only.",
+  "config.mcpAddFromChat": "Let Kiro suggest MCP servers in the chat as cards you can add with a click. The instructions cost about 900 tokens per answer. User settings only.",
   "config.specsCodeLens": "Show \"Start task\" and \"Update tasks\" above the tasks in a spec's `tasks.md`.",
   "config.defaultMode": "Agent (mode) id to select in new sessions, for example `vibe`. Empty keeps Kiro's default.",
   "config.defaultModel": "Model id to select in new sessions, for example `auto`. Empty keeps Kiro's default.",
