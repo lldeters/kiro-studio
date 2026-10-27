@@ -2,7 +2,7 @@
 import { act, cleanup, render } from '@testing-library/react';
 import axe from 'axe-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { HostMessage, SessionView, ToolView } from '../../src/shared/chatProtocol';
+import type { HostMessage, McpServerView, SessionView, ToolView } from '../../src/shared/chatProtocol';
 import type { SpecView } from '../../src/shared/specProtocol';
 import { parseTasks, taskProgress } from '../../src/workspace/tasks';
 import { App } from './App';
@@ -147,6 +147,61 @@ describe('accessibility of the chat', () => {
         toggle.click();
     });
     expect(container.querySelectorAll('.tool-body, .checkpoint-files').length).toBeGreaterThan(0);
+    expect(await violations(container)).toEqual([]);
+  });
+
+  it('has no violations with an MCP server card in every state', async () => {
+    const states: McpServerView[] = [
+      { name: 'connecting', state: 'connecting' },
+      { name: 'not-picked-up', state: 'notPickedUp' },
+      { name: 'needs-sign-in', state: 'needsSignIn' },
+      { name: 'signing-in', state: 'signingIn', signInHost: 'xn--lnear-6ve.app', punycode: true, browserOpened: false },
+      { name: 'stalled', state: 'signInStalled' },
+      { name: 'unfinished', state: 'signInUnfinished' },
+      { name: 'unsupported', state: 'signInUnsupported' },
+      { name: 'connected', state: 'connected', toolCount: 25 },
+      { name: 'failed', state: 'failed', error: 'spawn ENOENT' },
+      { name: 'off', state: 'off' },
+      { name: 'needs-restart', state: 'needsRestart' },
+      { name: 'blocked', state: 'blocked' },
+      { name: 'unknown', state: 'unknown', rawStatus: 'paused' },
+    ];
+    const block = (json: string): string => `\`\`\`kiro-mcp\n${json}\n\`\`\``;
+    const proposals = [
+      ...states.map((server) => block(`{"name":"${server.name}","url":"https://mcp.${server.name}.example/mcp"}`)),
+      block('{"name":"linear","title":"Linear","url":"https://mcp.linear.app/mcp"}'),
+      block('{"name":"github","url":"https://evil.example/mcp"}'),
+      block('{"name":"files","command":"npx","args":["-y","files-mcp"],"source":"https://example.com/files"}'),
+      block('{"name": "broken",'),
+    ];
+    const session: SessionView = {
+      id: 's1',
+      status: 'ready',
+      phase: 'running',
+      autopilot: false,
+      approvals: [],
+      config: [],
+      commands: [],
+      mcp: { allowed: true, servers: states },
+      items: [
+        { id: 1, kind: 'user', text: 'Add the servers', replay: false },
+        ...proposals.map((text, index) => ({ id: index + 2, kind: 'assistant' as const, text, replay: false })),
+        // The last answer still streams: its card is the placeholder.
+        { id: 100, kind: 'assistant', text: block('{"name":"later"}'), replay: false },
+      ],
+      tools: [],
+    };
+    const { container } = render(<App />);
+    receive(init({ capabilities: { image: true, compact: true, mcpCards: true } }), { type: 'session', session });
+    expect(container.querySelectorAll('.mcp-card[data-server]')).toHaveLength(states.length + 3);
+    expect(container.querySelector('.mcp-card.preparing')).not.toBeNull();
+    expect(container.querySelector('.mcp-invalid')).not.toBeNull();
+    expect(await violations(container)).toEqual([]);
+    act(() => {
+      for (const toggle of container.querySelectorAll<HTMLButtonElement>('.mcp-config button[aria-expanded="false"]'))
+        toggle.click();
+    });
+    expect(container.querySelectorAll('.mcp-config pre').length).toBe(states.length + 3);
     expect(await violations(container)).toEqual([]);
   });
 

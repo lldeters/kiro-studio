@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { ThemedToken } from 'shiki/core';
+import { isProposalLanguage } from '../../../src/shared/mcpProposal';
 import { cachedHighlight, highlight, resolveLanguage } from '../highlight';
 import { useT } from '../i18n';
+import { ItemContext } from '../itemContext';
+import { useChat } from '../store';
 import { post } from '../vscode';
+import { McpProposalCard } from './McpProposalCard';
 import { MermaidBlock } from './MermaidBlock';
 
 /** Tokens of one line as spans. The code is never put into the page as HTML. */
@@ -38,9 +42,14 @@ export function CodeBlock({ code, language, streaming }: { code: string; languag
   const [lines, setLines] = useState<ThemedToken[][] | undefined>(() => cachedHighlight(text, language));
   const [copied, setCopied] = useState(false);
   const isMermaid = language?.trim().toLowerCase() === 'mermaid';
+  // A server Kiro proposes, in one of its answers, while the setting lets such blocks be cards.
+  const item = useContext(ItemContext);
+  const cards = useChat((state) => state.capabilities.mcpCards);
+  const isCard = item !== undefined && cards && isProposalLanguage(language?.trim());
+  const plain = isMermaid || isCard;
 
   useEffect(() => {
-    if (isMermaid) return;
+    if (plain) return;
     let current = true;
     void highlight(text, language).then((result) => {
       if (current) setLines(result);
@@ -48,11 +57,11 @@ export function CodeBlock({ code, language, streaming }: { code: string; languag
     return () => {
       current = false;
     };
-  }, [text, language, isMermaid]);
+  }, [text, language, plain]);
 
   if (isMermaid) return <MermaidBlock code={text} streaming={streaming === true} />;
 
-  return (
+  const view = (
     <div className="code-block">
       <div className="code-header">
         <span className="code-lang">{resolveLanguage(language) ?? language ?? ''}</span>
@@ -74,4 +83,7 @@ export function CodeBlock({ code, language, streaming }: { code: string; languag
       </pre>
     </div>
   );
+  // A block the card cannot take as a proposal (one Kiro left open, say) stays this code view.
+  if (isCard) return <McpProposalCard code={text} streaming={streaming === true} {...item} fallback={view} />;
+  return view;
 }
