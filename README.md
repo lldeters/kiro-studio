@@ -24,11 +24,17 @@ real Kiro session._
 
 - **Chat** in the sidebar or an editor tab, with sessions as tabs. Streaming Markdown, highlighted code, Mermaid diagrams,
   Kiro's reasoning as it streams (when the CLI sends it), "Kiro is thinking…" until a turn shows something, tool calls
-  as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, problems,
-  `git diff`, steering files, specs) and pasted or dropped images. Agent, model and effort are picked in the input box;
-  Supervised/Autopilot, the context fill (with tokens) and the credits of the session sit below it, and a chip above it
-  opens Kiro's latest changes. Under every answer: the credits it cost and how long it took. At the bottom right, in the
-  chat and in the status bar, an overview of your plan: monthly credits used, the reset day and bonus credits.
+  as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, the selected lines, problems,
+  `git diff`, steering files, specs) and pasted or dropped images. ↑ and ↓ in the empty input bring back earlier
+  messages. Agent, model and effort are picked in the input box; Supervised/Autopilot, the context fill (with tokens) and
+  the credits of the session sit below it, and a chip above it opens Kiro's latest changes. Under every answer: the
+  credits it cost and how long it took. At the bottom right, in the chat and in the status bar, an overview of your plan:
+  monthly credits used, the reset day and bonus credits.
+- **From the editor:** _Kiro Studio_ in the editor's context menu adds the selected lines or the file to the chat, or
+  asks Kiro to explain or fix the selection; the explorer adds files and folders. Errors and warnings offer _Fix with
+  Kiro_ among their quick fixes. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd>)
+  adds the selection, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts a
+  session while the chat has the focus.
 - **Questions from Kiro** are answered in the chat with exactly the options Kiro offered, with the change shown. In
   Autopilot, Kiro Studio allows each request once for you (see [Safety](#privacy-and-safety)); Supervised always asks.
 - **Checkpoints:** every turn that changes files leaves a card with _View changes_ and _Revert_, backed by a separate
@@ -82,6 +88,7 @@ real Kiro session._
 | `kiroStudio.mcp.addFromChat`                              | on           | Let Kiro suggest MCP servers as cards you add with a click (about 900 tokens per answer). User settings only.                            |
 | `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                        |
 | `kiroStudio.specs.codeLens`                               | on           | _Start task_ and _Update tasks_ above the tasks in `tasks.md`.                                                                           |
+| `kiroStudio.quickFix`                                     | on           | _Fix with Kiro_ among the quick fixes of an error or warning.                                                                            |
 | `kiroStudio.defaultMode`, `defaultModel`, `defaultEffort` | empty        | Agent, model and effort to select in new sessions. Empty keeps Kiro's default. The agent: user settings only.                            |
 | `kiroStudio.logging.level`                                | `messages`   | How much of the conversation with the CLI goes to the _Kiro Studio: Protocol_ output channel.                                            |
 

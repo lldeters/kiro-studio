@@ -69,12 +69,14 @@ describe('composerMenu', () => {
       'file',
       'folder',
       'current',
+      'selection',
       'problems',
       'gitDiff',
       'steering',
       'spec',
     ]);
     expect(all).toMatchObject({ start: 8, end: 9 });
+    expect(computeMenu('#sel', 4, commands, identityT)?.items.map((i) => i.id)).toEqual(['selection']);
     expect(computeMenu('#git', 4, commands, identityT)?.items.map((i) => i.id)).toEqual(['gitDiff']);
     expect(computeMenu('#sp', 3, commands, identityT)?.items.map((i) => i.id)).toEqual(['spec']);
     expect(computeMenu('#fo', 3, commands, identityT)?.items.map((i) => i.id)).toEqual(['folder']);
@@ -109,6 +111,66 @@ describe('dropped files', () => {
 describe('composer', () => {
   const box = () => screen.getByPlaceholderText<HTMLTextAreaElement>('Ask Kiro…');
   const type = (text: string) => fireEvent.change(box(), { target: { value: text, selectionStart: text.length } });
+
+  it('goes through the earlier messages of the session with up and down, as a terminal does', () => {
+    const items = ['first', 'second\nwith two lines', 'third'].map((text, i) => ({
+      id: i + 1,
+      kind: 'user' as const,
+      text,
+      replay: false,
+    }));
+    render(
+      <Composer
+        session={session({ items: [...items, { id: 9, kind: 'assistant', text: 'answer', replay: false }] })}
+      />,
+    );
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('third');
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('second\nwith two lines');
+    // From the end of a message of two lines, up first moves within it.
+    box().setSelectionRange(box().value.length, box().value.length);
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('second\nwith two lines');
+    box().setSelectionRange(0, 0);
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('first');
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('first'); // nothing older
+    fireEvent.keyDown(box(), { key: 'ArrowDown' });
+    box().setSelectionRange(box().value.length, box().value.length);
+    fireEvent.keyDown(box(), { key: 'ArrowDown' });
+    expect(box().value).toBe('third');
+    fireEvent.keyDown(box(), { key: 'ArrowDown' });
+    expect(box().value).toBe('');
+  });
+
+  it('leaves the arrows alone once the recalled message is changed, and in a box with text of its own', () => {
+    const items = [{ id: 1, kind: 'user' as const, text: 'earlier', replay: false }];
+    render(<Composer session={session({ items })} />);
+    type('my own text');
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('my own text');
+    type('');
+    fireEvent.keyDown(box(), { key: 'ArrowUp' });
+    expect(box().value).toBe('earlier');
+    type('earlier, changed');
+    fireEvent.keyDown(box(), { key: 'ArrowDown' });
+    expect(box().value).toBe('earlier, changed');
+  });
+
+  it('shows an attached selection as file and lines', () => {
+    useChat.setState({
+      drafts: {
+        s1: {
+          text: '',
+          attachments: [{ kind: 'selection', path: '/ws/src/a.ts', startLine: 3, endLine: 9, text: 'x' }],
+        },
+      },
+    });
+    render(<Composer session={session()} />);
+    expect(screen.getByText('a.ts:3-9')).toBeTruthy();
+  });
 
   it('shows the commands for "/" and inserts the chosen one with the keyboard', () => {
     render(<Composer session={session()} />);

@@ -154,6 +154,10 @@ export class ChatController implements vscode.Disposable {
         strings: Object.fromEntries(UI_MESSAGES.map((message) => [message, vscode.l10n.t(message)])),
       }),
     );
+    if (this.waitingContext.length > 0) {
+      sink.send({ type: 'contextPicked', attachments: this.waitingContext });
+      this.waitingContext = [];
+    }
   }
 
   private flush(sink: Sink): void {
@@ -407,6 +411,39 @@ export class ChatController implements vscode.Disposable {
     await this.host.newSession();
   }
 
+  /** Attachments from a command outside the chat, waiting for a chat page that is still loading. */
+  private waitingContext: AttachmentView[] = [];
+
+  /**
+   * Adds attachments to the draft of the session on screen, from a command outside the chat (the editor's selection,
+   * files from the explorer). The chat is shown, and a session started when there is none.
+   */
+  async addContext(attachments: AttachmentView[]): Promise<void> {
+    if (attachments.length === 0) return;
+    if (!this.host.activeSession) await this.host.newSession();
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
+    const shown = [...this.sinks].filter((sink) => sink.ready && sink.visible);
+    if (shown.length === 0) this.waitingContext.push(...attachments);
+    for (const sink of shown) sink.send({ type: 'contextPicked', attachments });
+  }
+
+  /**
+   * Sends a prompt from a command outside the chat (_Explain_, _Fix with Kiro_): in the session on screen when it is
+   * free, else in a new one, and shows the chat so that the answer can be followed.
+   */
+  async ask(text: string, attachments: AttachmentView[]): Promise<void> {
+    let session = this.host.activeSession;
+    if (!session || session.status !== 'ready' || session.busy) session = await this.host.newSession();
+    await vscode.commands.executeCommand('kiroStudio.chat.focus');
+    await this.send(undefined, session.id, text, attachments);
+  }
+
+  /** Stops the turn of the session on screen. */
+  async cancelActive(): Promise<void> {
+    const session = this.host.activeSession;
+    if (session?.busy) await this.host.agent?.cancel(session.id);
+  }
+
   /** Sessions whose prompt is being put together (reading `git diff` can take a moment); a second send waits out. */
   private readonly preparing = new Set<string>();
 
@@ -414,11 +451,20 @@ export class ChatController implements vscode.Disposable {
    * Sends what the user wrote. The page empties its input at once; whatever keeps the message from going out (a turn
    * that started meanwhile, a lost connection, an attachment that could not be read) gives it back, so nothing is lost.
    */
-  private async send(sink: Sink, sessionId: string, text: string, attachments: AttachmentView[]): Promise<void> {
+  private async send(
+    sink: Sink | undefined,
+    sessionId: string,
+    text: string,
+    attachments: AttachmentView[],
+  ): Promise<void> {
     const agent = this.host.agent;
     const session = agent?.store.get(sessionId);
     if (!agent || !session || (text.trim() === '' && attachments.length === 0)) return;
-    const giveBack = () => sink.send({ type: 'draftReturned', sessionId, text, attachments });
+    // A prompt from a command has no page of its own; every page puts it into the session's draft.
+    const giveBack = () => {
+      const message: HostMessage = { type: 'draftReturned', sessionId, text, attachments };
+      for (const target of sink ? [sink] : [...this.sinks].filter((s) => s.ready)) target.send(message);
+    };
     if (this.preparing.has(sessionId) || session.busy || session.status !== 'ready') {
       giveBack();
       return;

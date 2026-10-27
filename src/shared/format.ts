@@ -1,4 +1,4 @@
-/** Numbers as the window's language writes them. Shared by the host and the webviews. */
+/** Numbers and names as the chat shows them. Shared by the host and the webviews. */
 
 /** A number as the language writes it; an unknown language tag falls back to the default. */
 export function formatNumber(value: number, locale?: string, options: Intl.NumberFormatOptions = {}): string {
@@ -28,4 +28,10 @@ export function formatDuration(
 /** Credits with two decimals: "0.42" in English, "0,42" in German. An unknown language tag falls back to the default. */
 export function formatCredits(credits: number, locale?: string): string {
   return formatNumber(credits, locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** A selection as `a.ts:3` or `a.ts:3-9`, for the transcript and the chips. */
+export function selectionLabel(item: { path: string; startLine: number; endLine: number }): string {
+  const name = item.path.split(/[\\/]/).filter(Boolean).pop() ?? item.path;
+  return `${name}:${item.startLine === item.endLine ? item.startLine : `${item.startLine}-${item.endLine}`}`;
 }

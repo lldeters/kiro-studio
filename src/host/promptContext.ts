@@ -1,7 +1,7 @@
 /** The VS Code side of attachments: pickers for what to attach, and the readers `resolveAttachments` needs. */
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import type { AttachmentView, ContextKind } from '../shared/chatProtocol';
+import { MAX_SELECTION_CHARS, type AttachmentView, type ContextKind } from '../shared/chatProtocol';
 import { currentPlatform } from '../util/paths';
 import {
   currentFileOf,
@@ -45,14 +45,57 @@ async function pickFolder(): Promise<AttachmentView[]> {
 
 /** The file editor used last; see {@link currentFileOf}. */
 let lastFile: string | undefined;
+let lastEditor: vscode.TextEditor | undefined;
 
 /** Remembers the file editor used last, for `#current` from a chat in an editor tab. Called once at activation. */
 export function trackCurrentFile(): vscode.Disposable {
   const remember = (editor: vscode.TextEditor | undefined): void => {
-    if (editor?.document.uri.scheme === 'file') lastFile = editor.document.uri.fsPath;
+    if (editor?.document.uri.scheme !== 'file') return;
+    lastFile = editor.document.uri.fsPath;
+    lastEditor = editor;
   };
   remember(vscode.window.activeTextEditor);
   return vscode.window.onDidChangeActiveTextEditor(remember);
+}
+
+/**
+ * The selected lines of a file editor as an attachment: what is selected, or the line of the cursor when nothing is.
+ * Whole lines, so that Kiro sees complete statements; the text is taken from the editor, unsaved changes included.
+ */
+export function selectionOf(editor: {
+  document: vscode.TextDocument;
+  selection: vscode.Range;
+}): AttachmentView | undefined {
+  const { document, selection } = editor;
+  if (document.uri.scheme !== 'file') return undefined;
+  const start = selection.start.line;
+  // A selection that ends at the start of a line does not take that line.
+  const end = selection.end.line > start && selection.end.character === 0 ? selection.end.line - 1 : selection.end.line;
+  const text = document.getText(new vscode.Range(start, 0, end, document.lineAt(end).text.length));
+  if (text.length > MAX_SELECTION_CHARS) {
+    void vscode.window.showWarningMessage(
+      vscode.l10n.t('The selection is too long to attach; attach the file instead.'),
+    );
+    return undefined;
+  }
+  return { kind: 'selection', path: document.uri.fsPath, startLine: start + 1, endLine: end + 1, text };
+}
+
+/** The editor `#selection` means: the active one, or the file editor used last while it is still on screen. */
+function selectionEditor(): vscode.TextEditor | undefined {
+  const active = vscode.window.activeTextEditor;
+  if (active?.document.uri.scheme === 'file') return active;
+  return lastEditor && vscode.window.visibleTextEditors.includes(lastEditor) ? lastEditor : undefined;
+}
+
+function currentSelection(): AttachmentView[] {
+  const editor = selectionEditor();
+  const selection = editor && selectionOf(editor);
+  if (!selection) {
+    if (!editor) void vscode.window.showInformationMessage(vscode.l10n.t('There is no open file to attach.'));
+    return [];
+  }
+  return [selection];
 }
 
 function currentFile(): AttachmentView[] {
@@ -113,6 +156,8 @@ export function pickContext(kind: ContextKind): Promise<AttachmentView[]> | Atta
       return pickFolder();
     case 'current':
       return currentFile();
+    case 'selection':
+      return currentSelection();
     case 'steering':
       return pickSteering();
     case 'spec':

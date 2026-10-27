@@ -4,7 +4,7 @@ import type { T } from './i18n';
 
 export type ContextAction =
   | { type: 'attach'; kind: 'problems' | 'gitDiff' }
-  | { type: 'pick'; kind: 'file' | 'folder' | 'current' | 'steering' | 'spec' };
+  | { type: 'pick'; kind: 'file' | 'folder' | 'current' | 'selection' | 'steering' | 'spec' };
 
 export interface MenuItem {
   id: string;
@@ -50,6 +50,13 @@ export function hashItems(t: T): (MenuItem & { keys: string })[] {
       keys: 'current open active',
       detail: t('The open file'),
       action: { type: 'pick', kind: 'current' },
+    },
+    {
+      id: 'selection',
+      label: '#selection',
+      keys: 'selection selected lines',
+      detail: t('The selected lines of the open file'),
+      action: { type: 'pick', kind: 'selection' },
     },
     {
       id: 'problems',

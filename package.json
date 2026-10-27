@@ -213,6 +213,36 @@
         "icon": "$(add)"
       },
       {
+        "command": "kiroStudio.addSelectionToChat",
+        "title": "%command.addSelectionToChat%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.addFileToChat",
+        "title": "%command.addFileToChat%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.explainSelection",
+        "title": "%command.explainSelection%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.fixSelection",
+        "title": "%command.fixSelection%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.fixProblem",
+        "title": "%command.fixProblem%",
+        "category": "Kiro Studio"
+      },
+      {
+        "command": "kiroStudio.stopTurn",
+        "title": "%command.stopTurn%",
+        "category": "Kiro Studio"
+      },
+      {
         "command": "kiroStudio.showQuickMenu",
         "title": "%command.showQuickMenu%",
         "category": "Kiro Studio"
@@ -633,6 +663,34 @@
         {
           "command": "kiroStudio.specs.updateTasks",
           "when": "false"
+        },
+        {
+          "command": "kiroStudio.fixProblem",
+          "when": "false"
+        },
+        {
+          "command": "kiroStudio.addSelectionToChat",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "kiroStudio.explainSelection",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "kiroStudio.fixSelection",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "kiroStudio.debug.newSession",
+          "when": "kiroStudio.development"
+        },
+        {
+          "command": "kiroStudio.debug.sendPrompt",
+          "when": "kiroStudio.development"
+        },
+        {
+          "command": "kiroStudio.debug.cancel",
+          "when": "kiroStudio.development"
         }
       ],
       "view/item/context": [
@@ -731,8 +789,67 @@
           "when": "view == kiroStudio.agents && viewItem == agentMode",
           "group": "inline"
         }
+      ],
+      "editor/context": [
+        {
+          "submenu": "kiroStudio.editor",
+          "group": "kiroStudio@1",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "kiroStudio.editor": [
+        {
+          "command": "kiroStudio.addSelectionToChat",
+          "group": "1_chat@1"
+        },
+        {
+          "command": "kiroStudio.addFileToChat",
+          "group": "1_chat@2"
+        },
+        {
+          "command": "kiroStudio.explainSelection",
+          "group": "2_ask@1"
+        },
+        {
+          "command": "kiroStudio.fixSelection",
+          "group": "2_ask@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "kiroStudio.addFileToChat",
+          "group": "kiroStudio@1",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "kiroStudio.addFileToChat",
+          "group": "kiroStudio@1",
+          "when": "resourceScheme == file"
+        }
       ]
     },
+    "keybindings": [
+      {
+        "command": "kiroStudio.addSelectionToChat",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorTextFocus && editorHasSelection && resourceScheme == file"
+      },
+      {
+        "command": "kiroStudio.openChat",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "!editorTextFocus || !editorHasSelection || resourceScheme != file"
+      },
+      {
+        "command": "kiroStudio.newSession",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "focusedView == kiroStudio.chat || activeWebviewPanelId == kiroStudio.chatPanel"
+      }
+    ],
     "configuration": {
       "title": "Kiro Studio",
       "properties": {
@@ -806,6 +923,11 @@
           "default": true,
           "markdownDescription": "%config.specsCodeLens%"
         },
+        "kiroStudio.quickFix": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "%config.quickFix%"
+        },
         "kiroStudio.defaultMode": {
           "type": "string",
           "default": "",
@@ -873,6 +995,12 @@
             }
           }
         ]
+      }
+    ],
+    "submenus": [
+      {
+        "id": "kiroStudio.editor",
+        "label": "%submenu.editor%"
       }
     ]
   },

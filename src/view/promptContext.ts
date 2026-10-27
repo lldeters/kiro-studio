@@ -6,6 +6,7 @@
 import { pathToFileURL } from 'node:url';
 import type { PromptBlock } from '../acp/prompt';
 import type { AttachmentView } from '../shared/chatProtocol';
+import { selectionLabel } from '../shared/format';
 import { isInsideAny, normalizeAgentPath, type PlatformKind } from '../util/paths';
 
 export interface ContextDeps {
@@ -76,6 +77,17 @@ export interface ResolvedContext {
 
 const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
+/** A fence longer than any run of backticks in the text, so that the text cannot end the block. */
+function codeFence(text: string): string {
+  const longest = Math.max(0, ...[...text.matchAll(/`+/g)].map((m) => m[0].length));
+  return '`'.repeat(Math.max(3, longest + 1));
+}
+
+/** The file's extension as the language of the block (`ts`, `py`), which Markdown readers understand. */
+function languageOf(path: string): string {
+  return /\.([A-Za-z0-9]+)$/.exec(path)?.[1]?.toLowerCase() ?? '';
+}
+
 export async function resolveAttachments(
   items: readonly AttachmentView[],
   deps: ContextDeps,
@@ -99,6 +111,25 @@ export async function resolveAttachments(
             type: 'resource_link',
             uri: pathToFileURL(path, { windows: deps.platform === 'win32' }).href,
             name: baseName(path),
+          });
+          result.labels.push(label);
+        }
+        break;
+      }
+      case 'selection': {
+        const path = normalizeAgentPath(item.path, deps.platform, deps.base);
+        const label = selectionLabel(item);
+        if (path === undefined || !isInsideAny(deps.roots, path, deps.platform)) {
+          result.skipped.push({ reason: 'outside', label });
+        } else if (item.text.trim() === '') {
+          result.skipped.push({ reason: 'empty', label });
+        } else {
+          const lines =
+            item.startLine === item.endLine ? `line ${item.startLine}` : `lines ${item.startLine}-${item.endLine}`;
+          const fence = codeFence(item.text);
+          result.blocks.push({
+            type: 'text',
+            text: `Selected ${lines} of ${path}:\n${fence}${languageOf(path)}\n${item.text.replace(/\n$/, '')}\n${fence}`,
           });
           result.labels.push(label);
         }

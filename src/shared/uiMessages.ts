@@ -104,6 +104,7 @@ export const UI_MESSAGES = [
   'Files from the workspace',
   'A folder',
   'The open file',
+  'The selected lines of the open file',
   'Errors and warnings',
   'Uncommitted changes',
   'Steering files',

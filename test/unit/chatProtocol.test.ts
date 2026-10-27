@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_ATTACHMENTS,
   MAX_IMAGE_BASE64_CHARS,
+  MAX_SELECTION_CHARS,
   MCP_ACTIONS,
   WEBVIEW_COMMANDS,
   parseWebviewMessage,
@@ -24,6 +25,7 @@ describe('messages from the webview', () => {
       { type: 'copy', text: 'x' },
       { type: 'compact', sessionId: 's1' },
       { type: 'pickContext', kind: 'steering' },
+      { type: 'pickContext', kind: 'selection' },
       { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 0 },
       { type: 'viewChanges', sessionId: 's1', checkpointId: '2' },
       { type: 'viewChanges', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
@@ -141,10 +143,13 @@ describe('attachments', () => {
   const send = (attachments: unknown) => parseWebviewMessage({ type: 'send', sessionId: 's1', text: 't', attachments });
   const image = { kind: 'image', mimeType: 'image/png', data: 'AAAA', name: 'a.png' };
 
-  it('accepts files, folders, problems, the git diff and images', () => {
+  const selection = { kind: 'selection', path: 'a.ts', startLine: 2, endLine: 4, text: 'two\nthree\nfour' };
+
+  it('accepts files, folders, selections, problems, the git diff and images', () => {
     const attachments = [
       { kind: 'file', path: 'a.ts' },
       { kind: 'folder', path: 'src' },
+      selection,
       { kind: 'problems' },
       { kind: 'gitDiff' },
       image,
@@ -171,6 +176,11 @@ describe('attachments', () => {
     [{ ...image, data: 42 }],
     [{ ...image, data: 'x'.repeat(MAX_IMAGE_BASE64_CHARS + 1) }],
     [{ ...image, name: undefined }],
+    [{ ...selection, startLine: 0 }],
+    [{ ...selection, startLine: 1.5 }],
+    [{ ...selection, endLine: 1 }],
+    [{ ...selection, text: undefined }],
+    [{ ...selection, text: 'x'.repeat(MAX_SELECTION_CHARS + 1) }],
   ])('rejects %j', (attachments) => {
     expect(send(attachments)).toBeUndefined();
   });

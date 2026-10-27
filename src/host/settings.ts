@@ -38,6 +38,11 @@ export class Settings implements AgentSettings {
     return typeof mb === 'number' && Number.isFinite(mb) && mb > 0 ? Math.round(mb * 1024 * 1024) : 0;
   }
 
+  /** Offer _Fix with Kiro_ among the quick fixes of a problem. */
+  quickFix(): boolean {
+    return this.config.get<boolean>('quickFix', true);
+  }
+
   hooksEnabled(): boolean {
     return this.config.get<boolean>('hooks.enabled', false);
   }

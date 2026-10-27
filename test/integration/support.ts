@@ -22,6 +22,7 @@ export interface KiroStudioApi {
     description: string,
   ): Promise<void>;
   readonly lastUserMessage: string | undefined;
+  readonly lastUserAttachments: readonly string[];
   readonly activeBusy: boolean;
   readonly activeMode: string | undefined;
   readonly openSpecViews: number;
