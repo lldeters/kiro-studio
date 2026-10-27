@@ -34,6 +34,9 @@ sinnvoll, deshalb lief die echte Probe bei dir. Außerdem blockiert die Netzwerk
    [T3 Code, PR 14693](https://github.com/pingdotgg/t3code/pull/14693) (MIT-Lizenz). Drittquelle, Oktober 2026,
    Identity-Center-Login. Alle 671 geprüften eingehenden Nachrichten bestehen die SDK-Schemas (Werkzeug: `npm run validate-wire`).
 4. Quelltext von `@agentclientprotocol/sdk` 2.0.1.
+5. Der ausgelieferte Code der `kiro-cli` **2.34.2** (Linux-Build vom 2026-10-26, V3-Engine `@kiro/agent` 0.66.62),
+   statisch gelesen und **nicht ausgeführt**: Tag `[C]`. Daraus stammen die MCP-Fakten für „MCP-Server aus dem Chat“
+   (Abschnitt 15); die Probe-Läufe P1 bis P6 prüfen sie.
 
 Wo deine CLI abweicht, gilt deine CLI. Was noch fehlt, steht als `[P]` in den Notizen (Abschnitt 17 dort).
 
@@ -172,7 +175,7 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 | --- | --- | --- | --- |
 | R1 | ~~Kiro verlangt `protocolVersion: 2`.~~ **Geschlossen:** Kiro akzeptiert und beantwortet 1 `[V]`. | – | Das stabile SDK genügt. |
 | R2 | Das SDK verwirft eine unbekannte `session/update` still. | Verlorene Updates, Zustand falsch. | Umleitung auf Stream-Ebene (eingebaut in die Probe, in Phase 1 als Test). |
-| R3 | `_kiro/*`-Angebot unterscheidet sich je CLI-Version. | Funktionen fehlen oder brechen. | Alles über `extensionMethods` und beobachtete Broadcasts freischalten, nie über die Version; UI mit Leerzustand je Funktion. |
+| R3 | `_kiro/*`-Angebot unterscheidet sich je CLI-Version. | Funktionen fehlen oder brechen. | Alles über `extensionMethods` und beobachtete Broadcasts freischalten, nie über die Version; UI mit Leerzustand je Funktion. **Eine Ausnahme:** `_kiro/mcp/resetServer` ruft Kiro Studio auf, obwohl die CLI es nicht ankündigt (`[C]`, Annahme A28). Es ist die einzige Methode auf einer festen Liste (`callUnadvertised`); antwortet die CLI `-32601`, merkt sich Kiro Studio das für die Verbindung, und die Karte bittet, die Kiro CLI zu aktualisieren. |
 | R4 | Unklar, wie Kiro auf eine verzögerte oder verweigerte `fs/write_text_file`-Antwort und auf „Reject changes“ reagiert. (Dass Kiro `fs/*` nutzt, ist bestätigt `[V]`.) | Hunk-Review vor dem Schreiben funktioniert evtl. nur eingeschränkt. | Lauf `--review reject`; Allow/Deny mit Diff-Vorschau und Schatten-Repo als Rückfallebene (Entscheidung E2). |
 | R5 | Protokollfakten stammen teils aus Drittquellen und einer älteren CLI. | Falsche Annahmen. | Belegstufen in den Notizen; Probe auf deiner CLI; Integrationstests gegen die echte CLI als manueller Schritt. |
 | R6 | Spät und ungeordnet eintreffende Config-Updates, wirkungslose frühe Writes. | Falscher Modell-/Effort-Stand. | Schreibreihenfolge und Verwerfen veralteter Antworten im Session-Store, mit Tests. |
@@ -206,6 +209,18 @@ Themes (hell, dunkel, High Contrast), Barrierefreiheit, Performance bei langen C
 - **E4 – Hooks: Opt-in.** Kiro Studio aktiviert Hooks nur, wenn du es einschaltest (Einstellung `kiroStudio.hooks.enabled`,
   Standard aus), mit Hinweis, dass dann auch deine globalen Hooks laufen. Details in Phase 3.
 - **E5 – Lizenz: Apache-2.0.** `LICENSE` und `package.json` sind angelegt.
+- **E6 – MCP-Server aus dem Chat (entschieden am 2026-10-27).** Ein Server, den du im Chat nach einem nativen Dialog
+  bestätigst, der die volle Adresse bzw. den vollen Befehl und die Datei zeigt, wird **eingeschaltet** geschrieben.
+  Programme, die nicht in der Liste von Kiro Studio stehen, sind standardmäßig ausgeschaltet („Ausgeschaltet hinzufügen“
+  zuerst). Das „+“ im Panel legt Server weiter ausgeschaltet an (Abschnitt 11). Dazu gehören drei Voreinstellungen:
+  - **Schlüssel**, die du eingibst, kommen in den geschützten Speicher von VS Code und unter eigenen Namen
+    (`KIRO_STUDIO_MCP_<SERVER>_<NAME>`) in die Umgebung des `kiro-cli`-Prozesses, nie in Dateien, den Chat, die Webview
+    oder das Log. In `mcp.json` steht nur `${KIRO_STUDIO_MCP_…}`. Nachteil: Befehle, die Kiro ausführt, erben die Variable.
+  - **Ort:** Standard ist die Benutzerdatei `~/.kiro/settings/mcp.json`; „Nur zu diesem Workspace hinzufügen“ gibt es,
+    wenn ein vertrauenswürdiger Ordner offen ist (nur der erste Ordner, nicht für Programme außerhalb der Liste).
+  - **Anleitung für Kiro:** ein Client-Steering-Dokument mit `inclusion: "always"` (etwa 900 Token pro Antwort), solange
+    `kiroStudio.mcp.addFromChat` an ist (Standard an). Der versteckte `resource`-Block am Prompt ist nur der Ersatz,
+    solange Kiro das Dokument nicht bestätigt hat.
 
 ### Offen
 
@@ -370,8 +385,9 @@ Sechs Ansichten im Kiro-Studio-Container (unter dem Chat), gelesen aus den `.kir
   dazu die eingebauten Dokumente aus dem Broadcast; neue Datei, löschen (in den Papierkorb), „Kiro schreiben lassen“.
 - **Hooks:** Dateien mit Ereignis und Muster, ein-/ausschalten, neu; **laufen nur mit Opt-in** (Entscheidung E4), die Ansicht
   bietet den Schalter an und warnt, dass dann auch deine globalen Hooks laufen.
-- **MCP:** Server aus `mcp.json` (Arbeitsbereich und `~/.kiro`) mit Live-Status; hinzufügen (immer zuerst ausgeschaltet),
-  ein-/ausschalten, entfernen. Werte von `env` werden nie gelesen oder angezeigt, nur die Namen.
+- **MCP:** Server aus `mcp.json` (Arbeitsbereich und `~/.kiro`) mit Live-Status; hinzufügen (immer zuerst ausgeschaltet;
+  aus dem Chat hinzugefügte Server sind eingeschaltet, Entscheidung E6, Abschnitt 15), ein-/ausschalten, entfernen. Werte
+  von `env` werden nie gelesen oder angezeigt, nur die Namen.
 - **Agents:** die Agents der aktiven Sitzung (anklicken = verwenden) und deine eigenen Agent-Dateien; neu anlegen.
 
 Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfolge, Einrückung bleiben).
@@ -383,7 +399,7 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
 | Spec-Assistent „Neue Spec“ | Phase 4 | gehört zum Spec-Workflow; Phase 3 zeigt und öffnet Specs. |
 | Sitzung löschen | nicht umgesetzt | `session/delete` ist angekündigt, die Parameter sind ungeprüft. |
 | Hook-Zustand live aus `_kiro/hooks/*` | Liste aus den Dateien | Die Nachrichten nach dem Opt-in sind nicht beobachtet `[P]`; die Ansicht aktualisiert sich bei jeder solchen Nachricht, zeigt aber nur Dateien. |
-| MCP-Server neu starten | nicht umgesetzt | `_kiro/mcp/resetServer` wird nicht angekündigt `[V]`. |
+| MCP-Server neu starten | nicht umgesetzt | `_kiro/mcp/resetServer` wird nicht angekündigt `[V]`. (Seit Abschnitt 15 nutzt der Chat es für die Anmeldung, `[C]`, A28; im Panel weiterhin nicht.) |
 | `~/.kiro` beobachten | liest beim Einblenden und Aktualisieren | VS Code beobachtet Ordner außerhalb des Arbeitsbereichs nicht verlässlich. |
 | Powers, Wissensbasis, Memory | nicht im Plan, nicht umgesetzt | Die Methoden sind angekündigt, aber nicht Teil der Aufgabe. |
 
@@ -395,14 +411,15 @@ Dateiänderungen werden formatierungserhaltend geschrieben (Kommentare, Reihenfo
 | A14 | `session/fork` nimmt `{ sessionId, cwd, mcpServers: [] }` (ACP-Entwurf) und antwortet wie `session/new`. | „Abzweigen“ zeigt eine Fehlermeldung. Es erscheint nur, wenn die CLI die Fähigkeit ankündigt. |
 | A15 | `_kiro/session/rename` nimmt `{ sessionId, title }`. | Die 2.33.1 kündigt die Methode gar nicht an; „Umbenennen“ erscheint dort nicht. |
 | A16 | Formate von `.kiro.hook`, Agent-JSON, `mcp.json` und der Steering-Frontmatter entsprechen dem, was die Kiro-IDE schreibt; `tasks.md` hat Checkbox-Zeilen (seit Phase 4 siehe A19). | Dateien, die nicht passen, erscheinen trotzdem in der Liste, mit Fehlertext bzw. ohne Fortschritt. |
-| A17 | Einträge von `_kiro/mcp/status` haben Name und Status (unter üblichen Schlüsseln); beobachtet wurde nur die leere Liste. | Server ohne erkennbaren Status zeigen „nicht gestartet“; die Konfiguration bleibt sichtbar. |
+| A17 | Einträge von `_kiro/mcp/status` haben Name und Status (unter üblichen Schlüsseln); beobachtet wurde nur die leere Liste. Abgelöst durch die Formen aus dem 2.34.2-Code, A27. | Server ohne erkennbaren Status zeigen „nicht gestartet“; die Konfiguration bleibt sichtbar. |
 | A18 | Eingebaute Steering-Dokumente tragen im Broadcast eine `uri` mit `builtin:`; Dateien des Nutzers erkenne ich an den Dateien selbst. | Eingebaute Dokumente erscheinen nicht, oder Dateien doppelt; die Dateiansicht bleibt richtig. |
 
 ### Voreinstellungen, die ich gewählt habe
 
 - Die Ansichten „Sitzungen“ ist offen, die anderen fünf sind eingeklappt.
 - Sitzungen: nur dieser Arbeitsbereich (Umschalter in der Titelleiste).
-- Ein neuer MCP-Server wird **ausgeschaltet** angelegt, ein neuer Hook ebenfalls.
+- Ein neuer MCP-Server wird **ausgeschaltet** angelegt, ein neuer Hook ebenfalls. (Gilt für das Panel; aus dem Chat nach dem
+  Dialog eingeschaltet, Entscheidung E6.)
 - Der Agent startet nicht beim Einblenden der Ansicht „Sitzungen“; sie wartet, bis eine Sitzung läuft.
 
 ### Abnahme bei dir
@@ -531,3 +548,73 @@ zurückgenommen: Der Chat bleibt die erste Ansicht der Seitenleiste „Kiro Stud
 Editor-Tab bleibt über *Open Chat in Editor* möglich. Erhalten bleibt nur die Korrektur „Reverted one file“ statt „Reverted 1 files“.
 Falls das Thema wiederkommt: Der Versuch steht im Verlauf (`git show 379d145`).
 
+## 15. MCP-Server aus dem Chat: Stand, Abweichungen und Annahmen
+
+### Was gebaut ist
+
+- **Kiro lernt das Format:** Solange `kiroStudio.mcp.addFromChat` an ist (Standard), schickt Kiro Studio bei `session/new`
+  und `session/load` ein Client-Steering-Dokument `kiro-studio-mcp` mit (`_meta.kiro.steering`, `inclusion: "always"`,
+  etwa 900 Token). Es sagt Kiro: einen Satz schreiben, dann je Server einen Codeblock mit der Sprache `kiro-mcp` und
+  einem JSON-Objekt; für die 22 Server der Liste genau die bekannte Adresse; nie ein Token, nie `mcp.json` selbst ändern,
+  nie `kiro-cli mcp` ausführen. Bestätigt Kiro das Dokument nicht (Broadcast mit `uri: client:…`), hängt Kiro Studio denselben Text als
+  versteckten `resource`-Block an eine Nachricht, die nach einer MCP-Bitte aussieht (höchstens einmal in 10 Nachrichten).
+- **Die Karte:** Im Chat wird der Block zur Karte mit Titel, Kennzeichen (bekannter Server, nicht in der Liste, Adresse
+  weicht ab, Programm auf diesem Computer), Adresse bzw. vollem Befehl, Anmeldeart oder benötigten Schlüsseln, Quelle,
+  „Konfiguration anzeigen“ und einem Zustand mit Knöpfen (Verbinde…, im Browser anmelden, verbunden mit Werkzeugzahl und
+  *Fortsetzen*, fehlgeschlagen, ausgeschaltet, Neustart nötig, gesperrt durch die Organisation). Während Kiro schreibt,
+  steht ein Platzhalter da; ein ungültiger Block zeigt den Code und den Grund.
+- **Hinzufügen:** Der Knopf schickt nur Sitzung, Eintrag, Servername und Aktion. Der Host liest den Vorschlag neu aus
+  Kiros Antwort, prüft ihn erneut und zeigt einen nativen Dialog mit Adresse bzw. Befehl, Datei, Herkunft und dem
+  Supervised/Autopilot-Hinweis. Bekannte Server werden aus der Liste geschrieben; weicht Kiros Adresse ab, fragt erst ein
+  eigener Dialog. Danach: Prüfung auf ungespeicherte Editoren, kaputtes JSON und vorhandene Namen (Ersetzen oder „-2“),
+  Schlüssel im Passwortfeld (falls nötig), Schreiben mit erhaltenen Kommentaren, ein Hinweis im Chat.
+- **Danach:** Kiro übernimmt die Datei in laufenden Sitzungen (`[C]`); nach 20 s ohne Status bietet die Karte „Kiro neu
+  starten“ und „Neue Sitzung starten“ an. Braucht der Server eine Anmeldung, öffnet sich der Browser einmal von selbst
+  (innerhalb von 120 s nach dem Hinzufügen), sonst über *Im Browser anmelden* (`_kiro/mcp/resetServer` mit `startOAuth`,
+  dann `_kiro/openExternalUrl`). Ein neuer Schlüssel braucht einen Neustart von Kiro: sofort, wenn keine Sitzung arbeitet,
+  sonst über den Knopf. Anmeldungen überleben Neustarts, weil Kiro Studio Kiro den geschützten Speicher von VS Code
+  anbietet (`_kiro/secret/*`).
+- **Schutz:** Seiten, die Kiro öffnen will, öffnen sich nur innerhalb von 90 s nach einer Anmeldung von selbst, sonst
+  fragt eine Benachrichtigung. Im Autopilot werden Freigaben, die `.kiro/settings` oder `kiro-cli mcp add` und Ähnliches
+  betreffen, nicht automatisch erteilt. Kiros Schreibzugriffe über `fs/*` auf `.kiro/settings/mcp.json` lehnt Kiro Studio
+  ab. Das Panel ändert MCP-Server nur in vertrauenswürdigen Workspaces und überschreibt keinen vorhandenen Namen mehr.
+
+### Abweichungen von der Spezifikation (und warum)
+
+| Geplant | Umgesetzt | Grund |
+| --- | --- | --- |
+| Integrationstest mit geskriptetem MCP-Verhalten im Fake-Agenten | nicht umgesetzt | Braucht VS Code und wäre gegen eine geratene CLI geschrieben; die Entscheidungen sind rein und einzeln getestet, die Dialoge hängen an einem austauschbaren Port. Nach den Probe-Läufen nachholen. |
+| Panel: bei vorhandenem Namen „Ersetzen“ anbieten | Das Panel lehnt ab („gibt es schon“) | Kleiner und sicher; aus dem Chat gibt es Ersetzen bzw. „-2“. |
+| „Schon eingerichtet“ nach dem Dialog | ohne Dialog, nur der Hinweis | Es wird nichts geschrieben, also gibt es nichts zu bestätigen; fehlende Schlüssel werden trotzdem abgefragt. |
+| Autopilot-Wächter mit 4 KB von `JSON.stringify(rawInput)` | jede Zeichenkette der Eingabe einzeln, dazu `locations`, `kiro-cli-chat`, `q`, `$KIRO_HOME` | JSON verdoppelt Backslashes unter Windows und versteckt Zeilenumbrüche; so trifft der Wächter mehr Schreibweisen. Bewusst auch Fehlalarme (ein Dokument, das den Pfad nennt). |
+| Probe P6 mit `${PROBE_TOKEN}` | mit `${KIRO_STUDIO_MCP_PROBE_ENV_TOKEN}` | Genau die Form, die Kiro Studio schreibt. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+A25 bis A31 stammen aus dem Code der 2.34.2 `[C]`, A32 ist offen `[P]`; auf deiner 2.33.1 kann es anders sein. Die
+Probe-Läufe P1 bis P6 (`protocol-notes.md`, Abschnitt 17) prüfen A25 bis A31, die Abnahme A32.
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A25 | Die installierte CLI nimmt `_meta.kiro.steering` bei `session/new` und `session/load` an und meldet das Dokument mit `uri: client:…` (P2). | Das Dokument wird nie bestätigt; die Anleitung kommt dann als versteckter `resource`-Block an Nachrichten, die nach einer MCP-Bitte aussehen. Ignoriert Kiro auch den, schlägt Kiro keine Karte vor und antwortet wie bisher. |
+| A26 | Kiro übernimmt eine Änderung an `mcp.json` in laufenden Sitzungen und meldet den Server per `_kiro/mcp/status` (P3). | Nach 20 s zeigt die Karte „Kiro hat den Server noch nicht übernommen.“ mit „Kiro neu starten“ und „Neue Sitzung starten“. |
+| A27 | Die Einträge von `_kiro/mcp/status` haben die Formen `connecting`, `connected` (mit `tools`), `failed` (mit `failedAuthorization`, `errorMessage`) und `disabled`; der Status kommt je Sitzung (P1). Löst A17 ab. | Ein unbekannter Zustand erscheint roh („Unbekannter Zustand: …“); eine Anmeldung wird dann nicht von selbst angeboten, „mcp.json öffnen“ bleibt. |
+| A28 | `_kiro/mcp/resetServer { sessionId, serverName, startOAuth }` funktioniert, obwohl die CLI es nicht ankündigt (P4). | Bei `-32601` zeigt die Karte „Diese Kiro CLI kann keine Anmeldung aus Kiro Studio starten. Aktualisiere die Kiro CLI.“ Der Server bleibt eingetragen. |
+| A29 | `_kiro/openExternalUrl` ist eine Anfrage mit nur `{ url }` (ohne Servernamen), Kiro wartet auf die Antwort, und ein Fehler bricht die Anmeldung ab (P4). | Kommt die Adresse als Notification, nimmt Kiro Studio denselben Weg. Kommt gar nichts, zeigt die Karte nach 20 s „Kiro hat keine Anmeldeseite angefordert.“ mit „Erneut versuchen“. |
+| A30 | `${VAR}` in `mcp.json` wird aus der Umgebung des `kiro-cli`-Prozesses ersetzt (P6). | Der Server bekommt den Text `${KIRO_STUDIO_MCP_…}` statt des Schlüssels und lehnt ab (meist 401); die Karte zeigt den Fehler. Der Schlüssel landet trotzdem nie in einer Datei. |
+| A31 | Bietet der Client `secretStorage` an, legt Kiro seine MCP-Anmeldungen über `_kiro/secret/*` ab und liest sie nach einem Neustart wieder (P5). | Nach jedem Neustart von Kiro ist die Anmeldung weg wie bisher; „Im Browser anmelden“ auf der Karte holt sie zurück. |
+| A32 | Eine Freigabeanfrage für einen Shell-Befehl nennt den Befehl im Titel, in `rawInput` oder im vorigen `tool_call` (Form ungeprüft `[P]`). | Der Autopilot erlaubt einen `kiro-cli mcp add` dann einmal automatisch wie jede andere Anfrage (mit Hinweis im Chat). Kiros eigene Pfadregel sperrt Schreibzugriffe seines Datei-Werkzeugs auf `.kiro/settings` trotzdem, und Kiro Studio lehnt `fs/*`-Schreibzugriffe auf `mcp.json` ab. |
+
+### Voreinstellungen, die ich gewählt habe
+
+- `kiroStudio.mcp.addFromChat`: **an**, nur in den Benutzereinstellungen.
+- Eine Liste von 22 Servern (Stand 2026-10-27, je mit Quelle). Slack, Asana, HubSpot, Box, Figma und Vercel fehlen
+  absichtlich: Sie erlauben die Anmeldung im Browser für Kiro nicht.
+- Der Browser öffnet sich einmal von selbst, direkt nach dem Hinzufügen (innerhalb von 120 s); sonst gibt es den Knopf.
+- Kiro hat 20 s, um einen neuen Server zu melden; danach bietet die Karte Neustart und neue Sitzung an.
+- *Fortsetzen* schickt einen sichtbaren Prompt („Der MCP-Server „…“ ist jetzt verbunden. …“), nur wenn die Sitzung frei ist.
+
+### Abnahme bei dir
+
+Die Punkte stehen in [RELEASING.md](RELEASING.md), Abschnitt 2 („MCP-Server aus dem Chat“), die Probe-Läufe P1 bis P6 in
+`protocol-notes.md`, Abschnitt 17. Danach hebe ich die `[C]` auf `[V]` oder korrigiere sie.

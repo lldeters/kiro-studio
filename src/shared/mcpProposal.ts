@@ -11,9 +11,9 @@
 
 export const PROPOSAL_LANGUAGE = 'kiro-mcp';
 
-export const MAX_BLOCK_CHARS = 8_000;
-export const MAX_URL_CHARS = 2_048;
-export const MAX_SECRETS = 4;
+const MAX_BLOCK_CHARS = 8_000;
+const MAX_URL_CHARS = 2_048;
+const MAX_SECRETS = 4;
 const MAX_NAME_CHARS = 48;
 const MAX_TITLE_CHARS = 60;
 const MAX_LABEL_CHARS = 80;

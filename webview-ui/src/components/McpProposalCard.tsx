@@ -220,7 +220,7 @@ interface CardButton {
   title?: string;
 }
 
-/** The buttons of each state (spec §6). Continue and Restart Kiro wait until Kiro has finished its turn. */
+/** The buttons of each state. Continue and Restart Kiro wait until Kiro has finished its turn. */
 function buttonsFor(
   state: CardState,
   server: McpServerView | undefined,

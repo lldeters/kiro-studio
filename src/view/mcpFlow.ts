@@ -120,7 +120,7 @@ export function mcpReactions(input: ReactionInput): McpReaction[] {
 // ---------------------------------------------------------------------------------------------------------------
 
 /** A copy of the hidden instructions goes with at most one prompt in this many. */
-export const CONTEXT_EVERY_TURNS = 10;
+const CONTEXT_EVERY_TURNS = 10;
 /** True to send the hidden instructions as text, should Kiro turn out to ignore embedded resources (probe P2). */
 const CONTEXT_AS_TEXT = false;
 const CONTEXT_URI = 'kiro-studio://instructions/mcp';

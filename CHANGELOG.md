@@ -14,6 +14,25 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   used, the reset day and the bonus credits. It is read from `kiro-cli chat --no-interactive /usage` when the connection
   is first ready, after answers at most every 15 minutes and on a click; in between, the credits of your answers are
   added. Turn it off with `kiroStudio.planUsage.enabled`.
+- Add MCP servers from the chat: ask Kiro in your own words ("add the Linear MCP server"), and its answer shows a card.
+  _Add…_ opens a VS Code dialog that shows exactly what is written where: the address or the full command, and the file
+  (`~/.kiro/settings/mcp.json`, or this workspace only). Servers from Kiro Studio's list of 22 known ones are written as
+  listed; others are marked as not in the list, and an address that differs from the known one needs your choice.
+- Sign in from the card: the browser opens right after adding (or on _Sign in in browser_), with _Open sign-in page
+  again_ and _Copy link_ while Kiro waits. _Continue_ asks Kiro to carry on once the server is connected.
+- API keys a server needs are asked for in a password field and kept in VS Code's secret storage, never in a file or the
+  chat. Kiro gets them as environment variables when it starts, so it restarts once to use a new key; your chats stay
+  open.
+- Sign-ins to MCP servers survive restarts: Kiro Studio offers Kiro its secret storage.
+- The setting `kiroStudio.mcp.addFromChat` (on by default, user settings only) turns the cards and Kiro's instructions
+  for them (about 900 tokens per answer) off.
+
+### Changed
+
+- Pages Kiro asks to open no longer open without asking. The sign-in page opens by itself only within 90 seconds of
+  adding a server from the chat or clicking _Sign in in browser_; any other page shows a notification with _Open_ and
+  _Copy link_.
+- The state of MCP servers is tracked per session, as Kiro reports it, instead of one list for the window.
 
 ### Fixed
 
@@ -22,6 +41,16 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   its clean-up; React threw when the list closed and removed the whole page.
 - An error while the chat is drawn no longer leaves it empty: the chat says what happened, writes the error to the
   protocol log and offers to show the chat again.
+- Adding a server in the MCP panel with a name the file already has is refused instead of overwriting that server, and a
+  `mcp.json` that is not valid JSON is no longer edited blindly.
+
+### Security
+
+- Autopilot leaves changes to MCP servers to you: a request that touches `.kiro/settings` or runs `kiro-cli mcp add` (or
+  `import`, `remove`, `powers install` and the like) asks, with a note why.
+- Kiro cannot write `.kiro/settings/mcp.json` through Kiro Studio; it is told to propose servers as a card instead.
+- The protocol log hides the secrets Kiro stores and the API keys you entered.
+- The MCP panel no longer adds, switches or removes servers in an untrusted window.
 
 ## [0.1.0] - 2026-10-25
 
