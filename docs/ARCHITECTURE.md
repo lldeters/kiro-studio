@@ -43,6 +43,7 @@ VS Code window (extension host, extensionKind: workspace)
 │   ├─ promptContext.ts ... pickers (files, folders, the selection, steering, specs) and readers (git diff,
 │   │                       problems) for attachments
 │   ├─ editorCommands.ts .. the editor in the chat: add the selection or files, Explain, Fix, the quick fix
+│   ├─ terminalOutput.ts .. the last commands of each terminal and their output (shell integration), for `#terminal`
 │   ├─ diffProvider.ts .... virtual documents for VS Code's diff editors and read-only texts
 │   ├─ panel/ ............. panel.ts (state, commands, actions), kiroFiles.ts (VS Code reader, watcher on `.kiro`),
 │   │                       treeProvider.ts (nodes -> tree items)
@@ -264,7 +265,11 @@ attachments into the draft of the session on screen (the chat is shown, a sessio
 that is still loading gets them once it is ready); _Explain_, _Fix_ and the quick fix _Fix with Kiro_ send a prompt with
 the selected lines (whole lines, unsaved text included, with the problems VS Code knows of in them) to the session on
 screen when it is free, else to a new one. A selection is an attachment of its own (`selection`: path, lines, text),
-sent as a text block with the file, the lines and a fence longer than any run of backticks in it.
+sent as a text block with the file, the lines and a fence longer than any run of backticks in it. `#terminal` works the same way:
+VS Code gives a command's output only while it runs, so `TerminalRecorder` reads every command of every terminal as it
+streams (`onDidStartTerminalShellExecution`, available since 1.93) and keeps the end of the output of the last ten per
+terminal; the attachment holds the command, its exit code and the output without colour and cursor codes. A terminal
+without shell integration cannot be read, and the message says how to turn it on.
 
 Permission questions are shown above the input with exactly the options Kiro offered and are answered by kind. While a
 chat webview is showing, the QuickPick stays closed; when the chat is hidden, the question moves to the picker.

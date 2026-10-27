@@ -72,9 +72,11 @@ describe('composerMenu', () => {
       'selection',
       'problems',
       'gitDiff',
+      'terminal',
       'steering',
       'spec',
     ]);
+    expect(computeMenu('#term', 5, commands, identityT)?.items.map((i) => i.id)).toEqual(['terminal']);
     expect(all).toMatchObject({ start: 8, end: 9 });
     expect(computeMenu('#sel', 4, commands, identityT)?.items.map((i) => i.id)).toEqual(['selection']);
     expect(computeMenu('#git', 4, commands, identityT)?.items.map((i) => i.id)).toEqual(['gitDiff']);

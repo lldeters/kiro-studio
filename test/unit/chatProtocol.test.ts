@@ -3,6 +3,7 @@ import {
   MAX_ATTACHMENTS,
   MAX_IMAGE_BASE64_CHARS,
   MAX_SELECTION_CHARS,
+  MAX_TERMINAL_OUTPUT_CHARS,
   MCP_ACTIONS,
   WEBVIEW_COMMANDS,
   parseWebviewMessage,
@@ -26,6 +27,7 @@ describe('messages from the webview', () => {
       { type: 'compact', sessionId: 's1' },
       { type: 'pickContext', kind: 'steering' },
       { type: 'pickContext', kind: 'selection' },
+      { type: 'pickContext', kind: 'terminal' },
       { type: 'openDiff', sessionId: 's1', toolCallId: 't1', index: 0 },
       { type: 'viewChanges', sessionId: 's1', checkpointId: '2' },
       { type: 'viewChanges', sessionId: 's1', checkpointId: '2', path: 'src/a.ts' },
@@ -144,12 +146,15 @@ describe('attachments', () => {
   const image = { kind: 'image', mimeType: 'image/png', data: 'AAAA', name: 'a.png' };
 
   const selection = { kind: 'selection', path: 'a.ts', startLine: 2, endLine: 4, text: 'two\nthree\nfour' };
+  const terminal = { kind: 'terminal', command: 'npm test', output: 'FAIL a.test.ts', exitCode: 1, truncated: true };
 
   it('accepts files, folders, selections, problems, the git diff and images', () => {
     const attachments = [
       { kind: 'file', path: 'a.ts' },
       { kind: 'folder', path: 'src' },
       selection,
+      terminal,
+      { kind: 'terminal', command: 'ls', output: '' },
       { kind: 'problems' },
       { kind: 'gitDiff' },
       image,
@@ -181,6 +186,10 @@ describe('attachments', () => {
     [{ ...selection, endLine: 1 }],
     [{ ...selection, text: undefined }],
     [{ ...selection, text: 'x'.repeat(MAX_SELECTION_CHARS + 1) }],
+    [{ ...terminal, output: 'x'.repeat(MAX_TERMINAL_OUTPUT_CHARS + 1) }],
+    [{ ...terminal, command: 42 }],
+    [{ ...terminal, exitCode: 'one' }],
+    [{ ...terminal, truncated: 'yes' }],
   ])('rejects %j', (attachments) => {
     expect(send(attachments)).toBeUndefined();
   });

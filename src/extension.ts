@@ -12,7 +12,7 @@ import { KiroPanel, PANEL_VIEWS, type PanelViewId } from './host/panel/panel';
 import { PlanStatusBar, PlanUsageService } from './host/planUsage';
 import { SpecsFeature } from './host/specs/specsFeature';
 import { createProtocolChannel } from './host/logger';
-import { trackCurrentFile } from './host/promptContext';
+import { trackCurrentFile, trackTerminals } from './host/promptContext';
 import { SetupController, type UiState } from './host/setup';
 import type { SpecWorkflow } from './workspace/specPrompts';
 import { Settings } from './host/settings';
@@ -113,6 +113,7 @@ export function activate(context: vscode.ExtensionContext): KiroStudioApi {
     statusBar,
     view,
     trackCurrentFile(),
+    trackTerminals(),
     vscode.window.registerTreeDataProvider('kiroStudio.status', view),
     vscode.workspace.onDidGrantWorkspaceTrust(() => void setup.check()),
     vscode.workspace.onDidChangeConfiguration((event) => {

@@ -1,5 +1,5 @@
 import { IMAGE_TYPES, MAX_IMAGE_BASE64_CHARS, type AttachmentView } from '../../src/shared/chatProtocol';
-import { selectionLabel } from '../../src/shared/format';
+import { selectionLabel, terminalLabel } from '../../src/shared/format';
 
 /** `file:///c%3A/ws/a.ts` or `file:///home/me/a.ts` to a path. Other schemes give undefined. */
 export function fileUriToPath(uri: string): string | undefined {
@@ -59,6 +59,8 @@ export function attachmentLabel(attachment: AttachmentView): string {
       return `${attachment.path.split(/[\\/]/).filter(Boolean).pop() ?? attachment.path}/`;
     case 'selection':
       return selectionLabel(attachment);
+    case 'terminal':
+      return terminalLabel(attachment);
     case 'problems':
       return 'Problems';
     case 'gitDiff':

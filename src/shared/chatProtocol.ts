@@ -18,16 +18,21 @@ export type AttachmentView =
   | { kind: 'folder'; path: string }
   /** Lines of a file as they were when they were attached (an editor may hold them unsaved). Lines are 1-based. */
   | { kind: 'selection'; path: string; startLine: number; endLine: number; text: string }
+  /** A command run in a terminal and what it printed, as recorded through shell integration. */
+  | { kind: 'terminal'; command: string; output: string; exitCode?: number; truncated?: boolean }
   | { kind: 'problems' }
   | { kind: 'gitDiff' }
   /** `data` is base64. */
   | { kind: 'image'; mimeType: string; data: string; name: string };
 
 /** What the user can pick through the host (a file list, a folder dialog, the open editor, `.kiro` files). */
-export type ContextKind = 'file' | 'folder' | 'current' | 'selection' | 'steering' | 'spec';
+export type ContextKind = 'file' | 'folder' | 'current' | 'selection' | 'terminal' | 'steering' | 'spec';
 
 export const MAX_ATTACHMENTS = 12;
 export const MAX_SELECTION_CHARS = 100_000;
+/** The end of a command's output that is kept, and the longest command line. */
+export const MAX_TERMINAL_OUTPUT_CHARS = 100_000;
+export const MAX_COMMAND_CHARS = 10_000;
 export const MAX_IMAGE_BASE64_CHARS = 7_000_000;
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'] as const;
 
@@ -329,7 +334,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const MAX_COPY_CHARS = 1_000_000;
 const MAX_ERROR_CHARS = 4_000;
-const CONTEXT_KINDS: readonly string[] = ['file', 'folder', 'current', 'selection', 'steering', 'spec'];
+const CONTEXT_KINDS: readonly string[] = ['file', 'folder', 'current', 'selection', 'terminal', 'steering', 'spec'];
 const isLine = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 1;
 
 /** Missing means no attachments; anything malformed rejects the whole message. */
@@ -362,6 +367,24 @@ function parseAttachments(raw: unknown): AttachmentView[] | undefined {
           startLine: entry.startLine,
           endLine: entry.endLine,
           text: entry.text,
+        });
+        break;
+      case 'terminal':
+        if (
+          typeof entry.command !== 'string' ||
+          entry.command.length > MAX_COMMAND_CHARS ||
+          typeof entry.output !== 'string' ||
+          entry.output.length > MAX_TERMINAL_OUTPUT_CHARS ||
+          (entry.exitCode !== undefined && !Number.isInteger(entry.exitCode)) ||
+          (entry.truncated !== undefined && typeof entry.truncated !== 'boolean')
+        )
+          return undefined;
+        result.push({
+          kind: 'terminal',
+          command: entry.command,
+          output: entry.output,
+          ...(typeof entry.exitCode === 'number' ? { exitCode: entry.exitCode } : {}),
+          ...(entry.truncated === true ? { truncated: true } : {}),
         });
         break;
       case 'problems':

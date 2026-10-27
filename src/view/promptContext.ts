@@ -6,7 +6,7 @@
 import { pathToFileURL } from 'node:url';
 import type { PromptBlock } from '../acp/prompt';
 import type { AttachmentView } from '../shared/chatProtocol';
-import { selectionLabel } from '../shared/format';
+import { selectionLabel, terminalLabel } from '../shared/format';
 import { isInsideAny, normalizeAgentPath, type PlatformKind } from '../util/paths';
 
 export interface ContextDeps {
@@ -133,6 +133,21 @@ export async function resolveAttachments(
           });
           result.labels.push(label);
         }
+        break;
+      }
+      case 'terminal': {
+        const label = terminalLabel(item);
+        const exit = item.exitCode === undefined ? '' : ` (exit code ${item.exitCode})`;
+        const output = item.output.trim() === '' ? '' : item.output.replace(/\s+$/, '');
+        const fence = codeFence(output);
+        const cut = item.truncated === true ? 'The end of its output:' : 'Its output:';
+        result.blocks.push({
+          type: 'text',
+          text:
+            `A command run in the terminal${exit}:\n${fence}\n${item.command}\n${fence}\n` +
+            (output === '' ? 'It printed nothing.' : `${cut}\n${fence}\n${output}\n${fence}`),
+        });
+        result.labels.push(label);
         break;
       }
       case 'problems': {

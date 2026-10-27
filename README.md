@@ -25,11 +25,11 @@ real Kiro session._
 - **Chat** in the sidebar or an editor tab, with sessions as tabs. Streaming Markdown, highlighted code, Mermaid diagrams,
   Kiro's reasoning as it streams (when the CLI sends it), "Kiro is thinking…" until a turn shows something, tool calls
   as cards with diffs, the plan, `/` commands, `#` context (files, folders, the open file, the selected lines, problems,
-  `git diff`, steering files, specs) and pasted or dropped images. ↑ and ↓ in the empty input bring back earlier
-  messages. Agent, model and effort are picked in the input box; Supervised/Autopilot, the context fill (with tokens) and
-  the credits of the session sit below it, and a chip above it opens Kiro's latest changes. Under every answer: the
-  credits it cost and how long it took. At the bottom right, in the chat and in the status bar, an overview of your plan:
-  monthly credits used, the reset day and bonus credits.
+  `git diff`, a command in the terminal with its output, steering files, specs) and pasted or dropped images. ↑ and ↓
+  in the empty input bring back earlier messages. Agent, model and effort are picked in the input box;
+  Supervised/Autopilot, the context fill (with tokens) and the credits of the session sit below it, and a chip above it
+  opens Kiro's latest changes. Under every answer: the credits it cost and how long it took. At the bottom right, in the
+  chat and in the status bar, an overview of your plan: monthly credits used, the reset day and bonus credits.
 - **From the editor:** _Kiro Studio_ in the editor's context menu adds the selected lines or the file to the chat, or
   asks Kiro to explain or fix the selection; the explorer adds files and folders. Errors and warnings offer _Fix with
   Kiro_ among their quick fixes. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd>)
