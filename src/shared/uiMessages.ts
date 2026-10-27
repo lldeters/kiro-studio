@@ -31,6 +31,8 @@ export const UI_MESSAGES = [
   'Restart the connection',
   'No session yet.',
   'Start a session to talk to Kiro.',
+  'The chat ran into an error: {0}',
+  'Show the chat again',
   // Transcript
   'You',
   'Kiro',

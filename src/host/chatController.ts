@@ -218,6 +218,9 @@ export class ChatController implements vscode.Disposable {
         case 'command':
           await vscode.commands.executeCommand(message.command);
           return;
+        case 'error':
+          this.log?.info(`The chat page ran into an error: ${message.message}`);
+          return;
       }
     } catch (error) {
       void vscode.window.showErrorMessage(vscode.l10n.t('Kiro Studio: {0}', describeError(error)));
