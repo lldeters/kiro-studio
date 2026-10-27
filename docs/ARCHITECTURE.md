@@ -385,7 +385,8 @@ review the workflow is about.
 A shadow Git repository per workspace folder in the extension's global storage (`checkpoints/<hash of the folder path>`,
 bare, with the folder as work tree) records the workspace without touching the user's repository. Two windows on the
 same folder share it, objects included, but nothing they write to: each window has an index (`index-<window>`, started
-from the newest one another window left so that unchanged files are not read again), an exclude file
+from the newest one of a window whose chain is still kept, so that unchanged files are not read again; the index of a
+window that was let go can name pruned objects, which Git would take as there), an exclude file
 (`exclude-<window>`, as `core.excludesFile`) and a chain of snapshots (`refs/windows/<window>`). `KiroAgent` calls turn hooks:
 `before` just before the prompt is sent, `after` once it has settled and before the session goes idle, so the marker
 comes before the next message. Each is a snapshot (`git add --all`, `write-tree`, `commit-tree`); `.gitignore` and a
