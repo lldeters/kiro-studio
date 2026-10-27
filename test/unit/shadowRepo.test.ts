@@ -157,6 +157,28 @@ describe('ShadowRepo', () => {
     expect(refs.trim().split('\n').sort()).toEqual(['refs/windows/one', 'refs/windows/two']);
   });
 
+  it('takes over the index of a window whose chain is kept, never one whose objects may be pruned', async () => {
+    const gitDir = path.join(root, 'pruned');
+    const refs = () =>
+      execFileSync('git', ['--git-dir', gitDir, 'for-each-ref', '--format=%(refname)'], { encoding: 'utf8' }).trim();
+    await write('a.txt', 'kept by the earlier window\n');
+    // An hour old, so that Git trusts the index instead of reading a file it just saw change.
+    const hourAgo = new Date(Date.now() - 3600_000);
+    await fs.utimes(path.join(ws, 'a.txt'), hourAgo, hourAgo);
+    const earlier = new ShadowRepo(gitDir, ws, { window: 'earlier' });
+    await earlier.snapshot('earlier');
+    await earlier.idle();
+    // The earlier window's chain is let go and its objects pruned, but its index is still there and names them.
+    execFileSync('git', ['--git-dir', gitDir, 'update-ref', '-d', 'refs/windows/earlier']);
+    execFileSync('git', ['--git-dir', gitDir, 'prune', '--expire=now']);
+    expect(refs()).toBe('');
+
+    const window = new ShadowRepo(gitDir, ws, { window: 'later' });
+    const before = await window.snapshot('later');
+    expect((await window.blob(before, 'a.txt'))?.toString('utf8')).toBe('kept by the earlier window\n');
+    await window.idle();
+  });
+
   it('does not touch the repository of the user', async () => {
     const git = (...args: string[]) => execFileSync('git', args, { cwd: ws, encoding: 'utf8' });
     git('init', '-q');

@@ -197,8 +197,8 @@ export class ShadowRepo {
     if (created.code !== 0) throw new Error(`git init failed: ${created.stderr.trim()}`);
     await fs.mkdir(path.join(this.gitDir, 'info'), { recursive: true });
     await fs.writeFile(path.join(this.gitDir, 'info', 'exclude'), `${EXCLUDE.join('\n')}\n`);
-    // Versions before this one kept every window's snapshots on one chain from HEAD (and in reflogs), shared one index
-    // and wrote their exclude list into info/exclude; those become unreachable and are pruned below.
+    // Versions before this one kept every window's snapshots on one chain from HEAD (and in reflogs) and shared one
+    // index; those become unreachable and are pruned below, and that index is not taken over.
     await this.run(['update-ref', '-d', 'HEAD']);
     await fs.rm(path.join(this.gitDir, 'logs'), { recursive: true, force: true });
     await this.seedIndex();
@@ -225,16 +225,21 @@ export class ShadowRepo {
 
   /**
    * Starts this window's index from the newest one another window left: Git then knows which files did not change and
-   * does not read them all again for the first snapshot.
+   * does not read them all again for the first snapshot. Only the index of a window whose chain is still kept qualifies:
+   * an index names objects (and trees it wrote before) that Git takes as there, and only a kept chain keeps them from
+   * being pruned.
    */
   private async seedIndex(): Promise<void> {
     if (await fs.stat(this.indexFile).catch(() => undefined)) return;
+    const cutoff = Date.now() - this.expireMs;
+    const refs = await this.ok(['for-each-ref', '--format=%(refname) %(committerdate:unix)', WINDOW_REFS]);
     let newest: { file: string; time: number } | undefined;
-    for (const name of await fs.readdir(this.gitDir)) {
-      if (!/^index(-|$)/.test(name)) continue;
-      const file = path.join(this.gitDir, name);
-      const stat = await fs.stat(file).catch(() => undefined);
-      if (stat && (newest === undefined || stat.mtimeMs > newest.time)) newest = { file, time: stat.mtimeMs };
+    for (const line of refs.split('\n')) {
+      const [ref, seconds] = line.trim().split(' ');
+      const time = Number(seconds) * 1000;
+      if (!ref?.startsWith(WINDOW_REFS) || !(time > cutoff)) continue;
+      const file = path.join(this.gitDir, `index-${ref.slice(WINDOW_REFS.length)}`);
+      if (newest === undefined || time > newest.time) newest = { file, time };
     }
     if (newest) await fs.copyFile(newest.file, this.indexFile).catch(() => undefined);
   }

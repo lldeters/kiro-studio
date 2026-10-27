@@ -29,6 +29,8 @@ import { Settings } from './settings';
 import type { SetupController } from './setup';
 
 const FLUSH_MS = 30;
+/** How long attachments from a command wait for a chat page that is loading. */
+const CONTEXT_WAIT_MS = 10_000;
 
 /** One open webview: what it has been sent is kept by its `ChatSync`. */
 class Sink {
@@ -154,10 +156,9 @@ export class ChatController implements vscode.Disposable {
         strings: Object.fromEntries(UI_MESSAGES.map((message) => [message, vscode.l10n.t(message)])),
       }),
     );
-    if (this.waitingContext.length > 0) {
-      sink.send({ type: 'contextPicked', attachments: this.waitingContext });
-      this.waitingContext = [];
-    }
+    const waiting = this.waitingContext;
+    this.waitingContext = undefined;
+    if (waiting && waiting.until > Date.now()) sink.send({ type: 'contextPicked', attachments: waiting.attachments });
   }
 
   private flush(sink: Sink): void {
@@ -197,6 +198,8 @@ export class ChatController implements vscode.Disposable {
           await this.host.closeSession(message.id);
           return;
         case 'send':
+          // What was waiting for a page went out with this message, or was removed from the draft.
+          this.waitingContext = undefined;
           await this.send(sink, message.sessionId, message.text, message.attachments);
           return;
         case 'pickContext': {
@@ -422,8 +425,12 @@ export class ChatController implements vscode.Disposable {
     await this.host.newSession();
   }
 
-  /** Attachments from a command outside the chat, waiting for a chat page that is still loading. */
-  private waitingContext: AttachmentView[] = [];
+  /**
+   * Attachments from a command outside the chat, also kept for a page that is (re)loading while they are sent: a chat
+   * that was hidden loads anew when it is shown, and a message posted meanwhile can be lost. The page ignores attachments
+   * its draft already has, so getting them twice does no harm.
+   */
+  private waitingContext: { attachments: AttachmentView[]; until: number } | undefined;
 
   /**
    * Adds attachments to the draft of the session on screen, from a command outside the chat (the editor's selection,
@@ -432,10 +439,11 @@ export class ChatController implements vscode.Disposable {
   async addContext(attachments: AttachmentView[]): Promise<void> {
     if (attachments.length === 0) return;
     if (!this.host.activeSession) await this.host.newSession();
+    const earlier =
+      this.waitingContext && this.waitingContext.until > Date.now() ? this.waitingContext.attachments : [];
+    this.waitingContext = { attachments: [...earlier, ...attachments], until: Date.now() + CONTEXT_WAIT_MS };
     await vscode.commands.executeCommand('kiroStudio.chat.focus');
-    const shown = [...this.sinks].filter((sink) => sink.ready && sink.visible);
-    if (shown.length === 0) this.waitingContext.push(...attachments);
-    for (const sink of shown) sink.send({ type: 'contextPicked', attachments });
+    for (const sink of this.sinks) if (sink.ready && sink.visible) sink.send({ type: 'contextPicked', attachments });
   }
 
   /**
