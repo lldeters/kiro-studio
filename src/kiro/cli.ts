@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { isRecord, str, type JsonObject } from '../util/json';
+import { launchSpec, type LaunchSpec } from '../util/launch';
 import { currentPlatform, type PlatformKind } from '../util/paths';
 
 export interface ExecResult {
@@ -43,13 +44,21 @@ export function nodeCliEnvironment(): CliEnvironment {
     },
     exec(command, args, timeoutMs, options = {}) {
       return new Promise((resolve) => {
+        let launch: LaunchSpec;
+        try {
+          launch = launchSpec(command, args, currentPlatform());
+        } catch (error) {
+          resolve({ exitCode: 'EINVAL', stdout: '', stderr: error instanceof Error ? error.message : String(error) });
+          return;
+        }
         execFile(
-          command,
-          [...args],
+          launch.command,
+          launch.args,
           {
             timeout: timeoutMs,
             windowsHide: true,
             maxBuffer: 8 * 1024 * 1024,
+            shell: launch.shell,
             ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
           },
           (error, stdout, stderr) => {
@@ -90,7 +99,8 @@ export interface LocateResult {
   tried: string[];
 }
 
-const EXECUTABLE_NAMES = { win32: ['kiro-cli.exe'], posix: ['kiro-cli'] } as const;
+/** On Windows the program first; a `.cmd` shim (npm, Scoop) is started through `cmd.exe` (see `launchSpec`). */
+const EXECUTABLE_NAMES = { win32: ['kiro-cli.exe', 'kiro-cli.cmd'], posix: ['kiro-cli'] } as const;
 
 export function knownInstallLocations(env: CliEnvironment): string[] {
   const p = env.platform === 'win32' ? path.win32 : path.posix;

@@ -433,8 +433,10 @@ checkpoint, marked; "Revert" lists them and offers to put back only the files fr
   that the chat page loads (script, style, content security policy), setup states, agent start, session, restart, and a
   turn that writes a file: checkpoint recorded (real Git, real storage) and session exported, the panel showing the
   sessions of the agent and the `.kiro` fixtures of the test workspace, opening an earlier session, the CodeLens over a `tasks.md`, starting a spec (agent and prompt), running a task, and that the
-  spec view opens once and its page loads. The fake CLI is a shell
-  script, so those tests are skipped on Windows. They need a VS Code download, which is why CI runs them.
+  spec view opens once and its page loads, _Fix with Kiro_ among the quick fixes of an error, and _Explain_ sending the
+  selected lines. The fake CLI is a shell script, and on Windows a `kiro-cli.cmd` that the extension starts through
+  `cmd.exe` as it would an npm shim, so the tests run on all three systems. They need a VS Code download, which is why CI
+  runs them.
 - **Package check:** `npm run package` ends with `scripts/check-vsix.ts`: the files that must be in the `.vsix`, the ones
   that must not (sources, maps, tests, dependencies), its size and the images of the README (rules in
   `scripts/vsix-rules.ts`, tested).

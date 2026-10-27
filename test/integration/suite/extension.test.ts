@@ -2,16 +2,7 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import {
-  activate,
-  canRunFakeCli,
-  createFakeCli,
-  EXTENSION_ID,
-  recheck,
-  setCliPath,
-  waitFor,
-  waitForAsync,
-} from '../support';
+import { activate, createFakeCli, EXTENSION_ID, recheck, setCliPath, waitFor, waitForAsync } from '../support';
 
 interface Manifest {
   contributes: { commands: { command: string }[]; views: Record<string, { id: string }[]> };
@@ -93,11 +84,7 @@ suite('Kiro Studio', () => {
     await vscode.commands.executeCommand('kiroStudio.restart');
   });
 
-  suite('with a fake CLI', function () {
-    suiteSetup(function () {
-      if (!canRunFakeCli) this.skip();
-    });
-
+  suite('with a fake CLI', () => {
     test('is ready when the CLI offers V3 and is signed in', async () => {
       const api = await activate();
       await setCliPath(createFakeCli('ready'));
@@ -203,11 +190,7 @@ suite('Kiro Studio', () => {
       assert.deepStrictEqual(await titles(), ['$(sparkle) Update tasks', '$(play) Start task']);
     });
 
-    suite('with a fake CLI', function () {
-      suiteSetup(function () {
-        if (!canRunFakeCli) this.skip();
-      });
-
+    suite('with a fake CLI', () => {
       test('starts a spec in the agent of the workflow and asks for its first document', async () => {
         const api = await activate();
         await setCliPath(createFakeCli('ready'));

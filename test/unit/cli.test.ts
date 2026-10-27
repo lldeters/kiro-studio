@@ -90,6 +90,17 @@ describe('locateCli', () => {
     expect((await locateCli(undefined, win.env)).found).toEqual({ path: 'D:\\tools\\kiro-cli.exe', source: 'path' });
   });
 
+  it('takes an npm or Scoop shim (kiro-cli.cmd) on Windows, but the program first', async () => {
+    const shim = fake({ platform: 'win32', executables: ['C:\\npm\\kiro-cli.cmd'], path: 'C:\\npm' });
+    expect((await locateCli(undefined, shim.env)).found).toEqual({ path: 'C:\\npm\\kiro-cli.cmd', source: 'path' });
+    const both = fake({
+      platform: 'win32',
+      executables: ['C:\\npm\\kiro-cli.cmd', 'C:\\npm\\kiro-cli.exe'],
+      path: 'C:\\npm',
+    });
+    expect((await locateCli(undefined, both.env)).found?.path).toBe('C:\\npm\\kiro-cli.exe');
+  });
+
   it('asks the login shell when the PATH of a GUI-launched editor is too short', async () => {
     const f = fake({
       executables: ['/Users/me/.local/share/kiro/kiro-cli'],
