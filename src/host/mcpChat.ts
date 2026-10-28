@@ -286,6 +286,7 @@ export class McpChat implements vscode.Disposable {
 
     let { name, entry, secrets } = plan;
     const collision = collisionOf(before, name, entry);
+    let replacing = false;
     if (collision === 'same') {
       session.addNotice('info', t('"{0}" is already set up in {1}.', name, this.label(file)));
       session.updateMcpLocal(name, { scope: target.scope });
@@ -298,7 +299,7 @@ export class McpChat implements vscode.Disposable {
       if (choice === 'rename') {
         name = plan.alternativeName;
         ({ entry, secrets } = planEntry(plan.proposal, name));
-      }
+      } else replacing = true;
     }
 
     // Cancelling a key writes nothing, so all keys are asked for first.
@@ -307,6 +308,13 @@ export class McpChat implements vscode.Disposable {
     // The key prompt can stay open for minutes, so the file is read once more right before it is written.
     const text = await this.readForWrite(file);
     if (text === undefined) return;
+    // Meanwhile the name may have been taken (or the other name already was); only a Replace the user chose overwrites.
+    if (!replacing && collisionOf(text, name, entry) === 'different') {
+      void vscode.window.showWarningMessage(
+        t('"{0}" already exists in {1} with a different setup.', name, this.label(file)),
+      );
+      return;
+    }
     await this.storeKeys(keys, name, file);
     await this.write(file, addServerEntry(text, name, entry, { disabled: target.disabled }));
 
