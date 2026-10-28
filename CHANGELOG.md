@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.3.0] - 2026-10-31
 
 ### Added
 
@@ -10,40 +10,47 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
   asks Kiro to explain or fix the selection (with the problems VS Code knows of in it); the explorer and the editor tab
   add files and folders; `#selection` attaches the selected lines from the input. Errors and warnings offer _Fix with
   Kiro_ among their quick fixes (setting `kiroStudio.quickFix`).
-- Keys: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> on macOS) adds the selection to
-  the chat, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts a session while the
-  chat has the focus. _Stop the Running Turn_ is a command.
+- Keys: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> on macOS) adds the
+  selection to the chat, or opens the chat when nothing is selected; <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>N</kbd> starts
+  a session while the chat has the focus. _Stop the Running Turn_ is a command.
 - ↑ and ↓ in the empty input bring back the earlier messages of the session.
-- A long session opens with its last 200 items; earlier ones come when you scroll to the top (or with _Show earlier
-  messages_), so the first view of a session of a thousand turns no longer waits for all of it.
 - `#terminal` attaches a recent command of the active terminal and what it printed (the end of it, without colour codes),
   recorded through VS Code's shell integration.
 - _Delete Session…_ in the Sessions view, when the CLI offers `session/delete` (2.33.1 does), after a confirmation. An open
   session is closed first.
-- On Windows a `kiro-cli.cmd` (an npm or Scoop shim) is found on the `PATH` and can be chosen as the CLI; it is started
-  through `cmd.exe`. The integration tests with the stand-in CLI therefore run on Windows too.
 - Checkpoints record every folder of a multi-root workspace, not only the first; with several folders a file is shown
   after its folder's name.
 - `kiroStudio.checkpoints.exclude` leaves more files out of checkpoints (`.gitignore` syntax), and
   `kiroStudio.checkpoints.maxFileSizeMB` (default 10) leaves out new files that are larger. A turn that creates such a
   file gets a notice in the chat, because Revert cannot put it back.
+- On Windows a `kiro-cli.cmd` (an npm or Scoop shim) is found on the `PATH` and can be chosen as the CLI; it is started
+  through `cmd.exe`.
+
+### Changed
+
+- A long session opens with its last 200 items; earlier ones come when you scroll to the top (or with _Show earlier
+  messages_), so the first view of a session of a thousand turns no longer waits for all of it.
+- The debug commands of the first phase (_Debug: New Session_, _Send Prompt_, _Cancel Turn_) are no longer in the command
+  palette; they are only there while the extension is being developed.
 
 ### Fixed
 
-- The debug commands of the first phase (_Debug: New Session_, _Send Prompt_, _Cancel Turn_) were in every user's command
-  palette. They are only there while the extension is being developed.
-- Two windows on the same folder shared the index and the chain of snapshots of the checkpoint repository: their snapshots
-  could fail on the index lock and switch checkpoints off, and each new window cut off the other's chain. Every window now
-  has an index, an exclude list and a chain of its own; the objects are still shared.
 - _Revert_ of a turn also put back what a second session changed in the same folder while the turn ran, without a word,
   because a checkpoint compares the whole folder. A file that only the other session's tool calls named is now left to
   that session's checkpoint, and both cards say that another session worked at the same time. Files that no tool call of
   the turn named (a command Kiro ran, or your own edits during the turn) are marked on the card, and _Revert_ lists them
   and offers to put back only the files from tool calls.
+- Two windows on the same folder shared the index and the chain of snapshots of the checkpoint repository: their snapshots
+  could fail on the index lock and switch checkpoints off, and each new window cut off the other's chain. Every window now
+  has an index, an exclude list and a chain of its own; the objects are still shared.
+- A file or folder whose name starts with two dots (`..cache`) was taken for a way out of the workspace, and Kiro could not
+  read or write it. It is allowed now.
+
+### Security
+
 - Kiro could read and write files outside the workspace through a symbolic link inside it (`link -> ~/.ssh`, say): the
   check compared paths only as they were written. It now compares where the file really is, and so does the refusal to
-  write `.kiro/settings/mcp.json`, which a link to `.kiro/settings` got around. A file or folder whose name starts with
-  two dots (`..cache`) was taken for a way out of the workspace and refused; it is allowed now.
+  write `.kiro/settings/mcp.json`, which a link to `.kiro/settings` got around.
 
 ## [0.2.0] - 2026-10-28
 
