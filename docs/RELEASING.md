@@ -89,8 +89,8 @@ Ohne beides lässt der Workflow Open VSX mit einem Hinweis aus.
 ## 2. Abnahme mit der echten Kiro CLI (vor dem ersten Release)
 
 Bisher ist alles gegen eine nachgebaute CLI getestet, in der CI auf Windows, macOS und Linux; die echte CLI kennt nur der
-Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13 und 15, A1 bis A32) und
-die Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
+Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13, 15 und 16, A1 bis
+A35) und die Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
 
 **Vorbereiten:** `npm ci`, `npm run package`, `code --install-extension dist/kiro-studio.vsix`, VS Code neu laden, einen
 Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
@@ -159,6 +159,26 @@ Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
       kopieren*.
 - [ ] Die Probe-Läufe P1 bis P6 (`protocol-notes.md` Abschnitt 17) und mir `summary.json` und `wire.ndjson` schicken;
       damit hebe ich die `[C]` auf `[V]` oder korrigiere sie.
+
+**Neu in 0.3.0** (PLAN.md Abschnitt 16)
+
+- [ ] Zwei Sitzungen gleichzeitig je eine andere Datei ändern lassen: Jede Checkpoint-Karte nennt nur ihre Datei und sagt
+      beim Aufklappen, dass gleichzeitig eine andere Sitzung gearbeitet hat; _Zurücknehmen_ der einen lässt die Datei der
+      anderen stehen.
+- [ ] Während Kiro arbeitet, selbst eine andere Datei speichern: Sie steht auf der Karte mit „nicht aus einem
+      Werkzeugaufruf“, und _Zurücknehmen_ bietet „Nur Dateien aus Werkzeugaufrufen“ an. Ist auch eine Datei so markiert,
+      die Kiro sichtbar mit einem Werkzeug geschrieben hat, bitte melden (A34).
+- [ ] Im Editor Zeilen markieren, Rechtsklick _Kiro Studio → Auswahl erklären_: Die Nachricht trägt den Anhang
+      `datei:von-bis`, und Kiro erklärt genau diese Zeilen. <kbd>Strg</kbd>+<kbd>Alt</kbd>+<kbd>K</kbd> hängt eine Auswahl
+      an den Entwurf; bei einem Fehler bietet die Glühbirne _Mit Kiro beheben_ an.
+- [ ] Im Terminal einen Befehl ausführen (etwa `npm test`), dann im Chat `#terminal`: Befehl, Exit-Code und Ausgabe kommen
+      ohne Farbcodes an (A35).
+- [ ] _Sitzung löschen …_ in der Sitzungsliste: Die Sitzung verschwindet und kommt nach _Aktualisieren_ nicht wieder (A33).
+- [ ] Eine lange Sitzung (über 300 Einträge) öffnen: Sie steht sofort mit ihrem Ende da; Hochscrollen oder _Frühere
+      Nachrichten zeigen_ lädt den Rest, ohne dass die Liste springt.
+- [ ] Zwei VS-Code-Fenster auf demselben Ordner, in beiden ein Durchlauf mit Änderungen: Beide Karten erscheinen, keine
+      Meldung „Checkpoints sind aus“.
+- [ ] Unter Windows, falls die CLI per npm installiert ist (`kiro-cli.cmd`): Kiro Studio findet und startet sie.
 
 **Darstellung**
 
