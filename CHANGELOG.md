@@ -2,7 +2,10 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.3.0] - 2026-10-31
+## [0.3.1] - 2026-10-31
+
+The first published version with these changes. A tag `v0.3.0` exists, but it names a commit before the release, so
+its release was never published.
 
 ### Added
 
