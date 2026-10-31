@@ -160,7 +160,7 @@ Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
 - [ ] Die Probe-Läufe P1 bis P6 (`protocol-notes.md` Abschnitt 17) und mir `summary.json` und `wire.ndjson` schicken;
       damit hebe ich die `[C]` auf `[V]` oder korrigiere sie.
 
-**Neu in 0.3.0** (PLAN.md Abschnitt 16)
+**Neu in 0.3.1** (PLAN.md Abschnitt 16; als 0.3.0 vorbereitet, aber nie veröffentlicht)
 
 - [ ] Zwei Sitzungen gleichzeitig je eine andere Datei ändern lassen: Jede Checkpoint-Karte nennt nur ihre Datei und sagt
       beim Aufklappen, dass gleichzeitig eine andere Sitzung gearbeitet hat; _Zurücknehmen_ der einen lässt die Datei der
