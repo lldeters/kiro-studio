@@ -337,9 +337,9 @@ Specs, steering, hooks, MCP settings and custom agents are plain files under `.k
 | Sessions | `session/list` (all pages), then the live `_kiro/sessions/changed` broadcasts, merged by `sessionId` (they carry partial objects) *(proven shape)* | open (`session/load`, the replay fills a chat tab), fork and rename only when the CLI offers them, search, workspace/all folders |
 | Specs | `.kiro/specs/<name>/{requirements,bugfix,design,tasks}.md`; the tasks of `tasks.md` as children of the task document, with their state | new spec (assistant), open the spec view, start a task, update tasks, open documents |
 | Steering | `.kiro/steering/*.md`, `~/.kiro/steering`, and the built-in documents of `_kiro/steering/documents_changed` (`uri: builtin:…`) | new file, delete, let Kiro write the foundational files (a prompt), show built-in text |
-| Hooks | `.kiro/hooks/*.kiro.hook`, `~/.kiro/hooks`; they only run when `kiroStudio.hooks.enabled` is on (decision E4), and the view offers the switch | new, turn one on or off, open |
+| Hooks | `.kiro/hooks/*.json` (the `v1` format of Kiro CLI 3, several hooks per file) and legacy `*.kiro.hook` files, also in `~/.kiro/hooks`; they only run when `kiroStudio.hooks.enabled` is on (decision E4), and the view offers the switch | new (`v1`), turn one on or off, convert a legacy file, open |
 | MCP | `.kiro/settings/mcp.json`, `~/.kiro/settings/mcp.json`; live state from the `_kiro/mcp/status` broadcast | add (always switched off first; servers added from the chat are on, PLAN.md decision E6), turn on or off, remove, open |
-| Agents | the agents of the active session (`mode` option) and `.kiro/agents/*.json`, `~/.kiro/agents` | use in this session, new, open |
+| Agents | the agents of the active session (`mode` option) and `.kiro/agents/*.json` and `*.md`, `~/.kiro/agents` | use in this session, new (format of Kiro CLI 3), open |
 
 What a view says is decided by pure functions (`src/view/panelTrees.ts`); the files are read through a `FileReader` so
 that the readers (`src/workspace`) are tested with a map. `.kiro` of the workspace is watched (changes merged to one

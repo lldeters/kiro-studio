@@ -2,6 +2,48 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - unreleased
+
+For Kiro CLI 3. Since 3.0 (2026-11-03) the V3 engine is Kiro's default; Kiro Studio has always started it explicitly, so
+the connection works as before. What changed in hooks, agents and the protocol is taken from Kiro's documentation
+(_Migrate an ACP client to CLI V3_, the hook and agent references, the changelog up to 3.5.0), not from a run against a
+CLI 3.x. Note that from Kiro CLI 3.5 on, empty `kiroStudio.defaultMode` and `kiroStudio.defaultModel` mean your
+`chat.defaultAgent` and `chat.defaultModel`, which Kiro now applies to sessions that ACP clients start.
+
+### Added
+
+- Hooks in the format of Kiro CLI 3 and Kiro IDE 1.0: `.kiro/hooks/*.json` files (`"version": "v1"`), in the workspace
+  and in `~/.kiro/hooks`. Every hook of a file is listed and switched on or off on its own. The view names the triggers of
+  Kiro CLI 3, also `SessionEnd`, `PreCompact` and `PostCompact` (3.1) and `PermissionRequest` (3.4).
+- _Convert Hook to the Current Format_ on a `.kiro.hook` file (the format of Kiro IDE 0.x, and what Kiro Studio created
+  up to 0.3.1) writes a `.json` file next to it with Kiro's trigger names, turns its glob patterns into the regular
+  expression the current format matches against the path, and offers to move the old file to the trash. A hook you start
+  yourself has no equivalent there and is not converted.
+- Custom agents written in Markdown (`.kiro/agents/*.md`, front matter and prompt) are listed with their name,
+  description, model and MCP servers.
+- In a workspace with several folders, a new or loaded session gets the other folders as `additionalDirectories` when
+  the CLI offers it (`sessionCapabilities.additionalDirectories`), so Kiro can work in all of them.
+- A tool call that was refused or cancelled says so on its card, when Kiro gives the reason (`_meta.kiro.failureReason`).
+- Kiro's notices of a rate limit and of a custom agent that is missing or has an error in its configuration
+  (`_kiro/error/rate_limit`, `_kiro/customAgent/not_found`, `_kiro/customAgent/config_error`) appear in the chat of the
+  session, also when they arrive before the session has started.
+
+### Changed
+
+- _New Hook…_ writes `.kiro/hooks/<name>.json` in the current format (switched off, as before). Up to 0.3.1 it wrote a
+  `.kiro.hook` file, which Kiro CLI 3 does not load: its documentation names only `*.json` files. Such files are still
+  listed, marked _old format_.
+- _New Agent…_ writes the format of Kiro CLI 3 (`tools` as tags and a `permissions` block that lets the agent read the
+  workspace). Kiro CLI 3 rewrites an agent without `permissions` when a session starts and leaves a `.json.bak`; the view
+  now marks such agents (_format of Kiro CLI 2_) and says so.
+- A Kiro CLI 3.x counts as having the V3 engine even if its `acp --help` no longer lists the engines.
+
+### Fixed
+
+- Signed out (or with a sign-in that ran out), Kiro CLI 2.37 and later refuse every request with "Authentication
+  required". The chat now says to sign in, and Kiro Studio checks the sign-in again, so that the status bar and the views
+  offer it.
+
 ## [0.3.1] - 2026-10-31
 
 The first published version with these changes. A tag `v0.3.0` exists, but it names a commit before the release, so

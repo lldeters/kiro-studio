@@ -654,3 +654,60 @@ Linux, macOS und Windows mit VS Code 1.93 und stable), aber wie bisher nicht geg
   angekündigt). Ein Knopf „Neu starten“ in der MCP-Ansicht kann darauf aufbauen, sobald A28 auf deiner CLI bestätigt ist.
 - **Steer** (`_session/steer`): von 2.33.1 nicht angekündigt.
 - **Abnahme mit deiner CLI** (Abschnitte 9 bis 13 und 15) und die Probe-Läufe aus Abschnitt 8 bleiben der größte offene Punkt.
+
+## 17. Kiro CLI 3 (2026-11-19, Version 0.4.0)
+
+Auf deine Bitte, das Projekt an die vielen Änderungen der Kiro CLI seit dem letzten Release anzupassen. Seit 0.3.1 kamen
+die CLI 2.35 bis 2.37 und 3.0 bis 3.5. `kiro.dev` ist jetzt erreichbar; die Grundlage ist Kiros eigene Dokumentation,
+vor allem [Migrate an ACP client to CLI V3](https://kiro.dev/docs/cli/v3/acp-migration), die Referenzen zu Hooks und
+Agents und das Changelog (in `protocol-notes.md` Abschnitt 18, Kennzeichen **[K]**). Eine CLI 3.x lief hier nicht: Der
+Download-Server der CLI ist für diese Umgebung gesperrt.
+
+**Das Wichtigste vorweg:** Kiro Studio startete die V3-Engine schon immer ausdrücklich (`--agent-engine=v3`) und hält sich
+an das, was die Anleitung von einem V3-Client verlangt (Fähigkeiten aus `initialize`, `session/set_config_option`,
+`session/list`, Ende eines Durchlaufs an der Antwort von `session/prompt`, MCP-Status als Schnappschuss). Die Verbindung
+selbst musste nicht geändert werden. Geändert haben sich vor allem die Dateiformate in `.kiro`.
+
+### Was gebaut ist
+
+| Bereich | Umgesetzt |
+| --- | --- |
+| Hooks | Kiro CLI 3 und Kiro IDE 1.0 lesen Hooks aus `.kiro/hooks/*.json` (`"version": "v1"`, mehrere Hooks je Datei, Auslöser wie `PostFileSave`, `PreToolUse`, neu `PreCompact`, `PostCompact`, `PermissionRequest`). Kiro Studio kannte nur `*.kiro.hook` (IDE 0.x) und legte neue Hooks in diesem Format an. Jetzt: beide Formate werden gelistet, jeder Hook einer Datei einzeln geschaltet, neue Hooks im aktuellen Format angelegt, alte als „altes Format“ markiert und per Befehl umgewandelt (Auslöser nach Kiros Tabelle, Glob-Muster als regulärer Ausdruck auf den Pfad, die alte Datei auf Wunsch in den Papierkorb). |
+| Agents | Agents als Markdown (`.kiro/agents/*.md`, Front Matter plus Prompt) werden gelistet. Neue Agents bekommen das Format von CLI 3 (`permissions`), damit Kiro sie nicht beim nächsten Start umschreibt und eine `.json.bak` hinterlässt; Agents im Format von CLI 2 sind markiert. |
+| Einrichtung | Eine CLI 3.x gilt als V3-fähig, auch wenn `acp --help` die Engines nicht mehr aufzählt. |
+| Anmeldung | Seit CLI 2.37 lehnt ein abgemeldetes `kiro-cli acp` alles mit „Authentication required“ ab. Der Chat sagt jetzt „Bitte anmelden“, und Kiro Studio prüft die Anmeldung neu, damit Statusleiste und Ansichten die Anmeldung anbieten. |
+| Mehrere Ordner | Ein Arbeitsbereich mit mehreren Ordnern gibt Kiro die übrigen Ordner als `additionalDirectories`, wenn die CLI `sessionCapabilities.additionalDirectories` ankündigt, bei neuen und geladenen Sitzungen. |
+| Werkzeugkarten | `_meta.kiro.failureReason`: abgelehnte und abgebrochene Aufrufe stehen als „Abgelehnt“ und „Abgebrochen“ auf der Karte. |
+| Meldungen | `_kiro/error/rate_limit`, `_kiro/customAgent/not_found` und `_kiro/customAgent/config_error` erscheinen als Hinweis im Chat, auch wenn sie vor der Antwort auf `session/new` kommen. |
+
+### Annahmen (nicht auf deiner CLI geprüft)
+
+| # | Annahme | Was passiert, wenn sie falsch ist |
+| --- | --- | --- |
+| A36 | Kiro CLI 3 lädt Hooks nur aus `*.json`, nicht mehr aus `*.kiro.hook` (die Doku nennt nur `*.json`). | Ein alter Hook liefe weiter; nach dem Umwandeln liefe er doppelt, bis die alte Datei weg ist (der Dialog bietet das an). |
+| A37 | Der `matcher` eines Datei-Auslösers ist ein regulärer Ausdruck auf den Pfad, absolut oder relativ (so dokumentiert). Die Umwandlung macht aus `**/*.ts` den Ausdruck `(?:^\|[\\/])[^\\/]*\.ts$`. | Der umgewandelte Hook reagiert auf zu viele oder zu wenige Dateien; der `matcher` lässt sich in der Datei anpassen. |
+| A38 | CLI 3 kündigt `sessionCapabilities.additionalDirectories` an, wenn sie das Feld annimmt (ACP-Standard; Kiros Doku sagt nur, dass V3 es annimmt). | Ohne Ankündigung bleibt alles wie bisher: Kiro arbeitet im ersten Ordner. |
+| A39 | Die Felder von `_kiro/error/rate_limit` und `_kiro/customAgent/*` heißen `message` / `error` / `reason` und `agentName` / `agent` / `name` (nicht dokumentiert). | Der Hinweis erscheint ohne Namen und Einzelheiten. |
+| A40 | „Authentication required“ kommt als ACP-Fehler `-32000` mit diesem Text (ACPs `auth_required`). | Der Chat zeigt die Fehlermeldung wie bisher, ohne den Hinweis zur Anmeldung. |
+| A41 | Ein Agent mit `permissions` gilt für CLI 3 als aktuell und wird nicht umgeschrieben; die Regel `fs_read` auf `./**` ist gültig (so schreibt es Kiros eigene Umwandlung). | Kiro schreibt den neuen Agent beim ersten Start um und legt eine `.json.bak` an; er funktioniert trotzdem. |
+
+### Bewusst noch nicht umgesetzt
+
+- **Nachrichten während Kiro arbeitet** (`_session/steer`, Kinds `steering_*`): Die Methode ist dokumentiert, ihre
+  Parameter nicht. Ein Probe-Lauf mit CLI 3 würde sie zeigen.
+- **Planübersicht über `_kiro/account/getUsage`:** von Kiro als Ersatz für `/usage` genannt, aber ohne Antwortformat. Die
+  Übersicht liest weiter `kiro-cli chat --no-interactive /usage`.
+- **„Immer erlauben“ mit Umfang** (`_meta.kiro.consent` mit `scope` und `resource` in der Antwort) und die Anzeige von
+  `_meta.kiro.mcpTool` in Freigaben.
+- **Agent, Modell und Aufwand gleich in `session/new`** (`_meta.kiro.modeId` usw.): Kiro prüft ein Modell dort nicht vorab,
+  Kiro Studio schreibt die Voreinstellungen daher weiter nach dem Start, nachdem es sie mit dem Angebot verglichen hat.
+- **Anmeldung über ACP** (Terminal-Methode „Log in to Kiro“ seit 2.37): Kiro Studio meldet über `kiro-cli login` im
+  Terminal an, wie bisher.
+- Workflows, Memory, Cloud-Sitzungen, Sandbox und die Schwelle für das automatische Verdichten
+  (`compaction.autoCompactionThreshold`) haben noch keine eigene Oberfläche.
+
+### Abnahme bei dir
+
+In [RELEASING.md](RELEASING.md), Abschnitt 2, unter „Neu in 0.4.0“. Am meisten hilft ein Probe-Lauf mit CLI 3
+(`npm run probe -- --no-prompt`): `summary.json` zeigt, welche Methoden und Fähigkeiten deine CLI wirklich ankündigt.
+

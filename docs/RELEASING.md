@@ -89,8 +89,8 @@ Ohne beides lässt der Workflow Open VSX mit einem Hinweis aus.
 ## 2. Abnahme mit der echten Kiro CLI (vor dem ersten Release)
 
 Bisher ist alles gegen eine nachgebaute CLI getestet, in der CI auf Windows, macOS und Linux; die echte CLI kennt nur der
-Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13, 15 und 16, A1 bis
-A35) und die Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
+Probe-Lauf. Die folgenden Punkte bestätigen die Annahmen in [PLAN.md](PLAN.md) (Abschnitte 9 bis 13 und 15 bis 17, A1
+bis A41) und die Fixes aus dem Code-Review. Am besten auf deinem Windows-Rechner, mit einem kleinen Test-Repository.
 
 **Vorbereiten:** `npm ci`, `npm run package`, `code --install-extension dist/kiro-studio.vsix`, VS Code neu laden, einen
 Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
@@ -179,6 +179,26 @@ Ordner öffnen (vertrauen). In der Statusleiste steht *Kiro* mit Häkchen.
 - [ ] Zwei VS-Code-Fenster auf demselben Ordner, in beiden ein Durchlauf mit Änderungen: Beide Karten erscheinen, keine
       Meldung „Checkpoints sind aus“.
 - [ ] Unter Windows, falls die CLI per npm installiert ist (`kiro-cli.cmd`): Kiro Studio findet und startet sie.
+
+**Neu in 0.4.0** (Kiro CLI 3; PLAN.md Abschnitt 17, Annahmen A36 bis A41)
+
+- [ ] `kiro-cli --version` zeigt 3.x. Kiro Studio meldet in der Statusleiste *Kiro* mit Häkchen, nicht „zu alt“.
+- [ ] *Hooks → Neuer Hook …*: Es entsteht `.kiro/hooks/<name>.json` (`"version": "v1"`, ausgeschaltet). Hooks für Kiro
+      Studio und den Hook einschalten, Kiro eine `.ts`-Datei ändern lassen: Kiro prüft sie danach. In einem Terminal mit
+      `kiro-cli` erscheint der Hook unter `/hooks` (A36).
+- [ ] Eine alte `.kiro.hook`-Datei (etwa von Kiro Studio 0.3) ist als „altes Format“ markiert. Rechtsklick *Hook ins
+      aktuelle Format umwandeln*: Die `.json` öffnet sich, die alte Datei geht auf Wunsch in den Papierkorb, und der Hook
+      reagiert auf dieselben Dateien wie vorher (A37).
+- [ ] *Agents → Neuer Agent …*, dann eine neue Sitzung: Neben der Datei entsteht **keine** `.json.bak` (A41). Ein Agent
+      als `.md`-Datei mit Front Matter erscheint in der Liste.
+- [ ] Ein Arbeitsbereich mit zwei Ordnern (*Datei → Ordner zum Arbeitsbereich hinzufügen*): Kiro liest und ändert auf
+      Bitte eine Datei im **zweiten** Ordner. Im Protokoll (`kiroStudio.logging.level` auf `verbose`) trägt `session/new`
+      das Feld `additionalDirectories` (A38).
+- [ ] Eine Freigabe ablehnen: Die Werkzeugkarte zeigt „Abgelehnt“ statt „Fehlgeschlagen“.
+- [ ] `kiro-cli logout`, dann im Chat etwas senden: „Kiro braucht deine Anmeldung …“, und die Statusleiste zeigt „nicht
+      angemeldet“ mit *Bei Kiro anmelden* (A40). Danach wieder anmelden.
+- [ ] Probe mit CLI 3: `npm run probe -- --no-prompt`, mir `summary.json` schicken (vorher durchsehen). Daraus lese ich
+      `extensionMethods`, `sessionCapabilities` und ob `_session/steer` und `_kiro/account/getUsage` angekündigt sind.
 
 **Darstellung**
 

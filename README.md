@@ -8,8 +8,9 @@ specs, steering files, hooks, MCP servers and agents.
 > by AWS or Kiro. "Kiro" is a trademark of its owner. This project ships no Kiro logos or other Kiro assets.
 
 > **Preview.** All phases of the plan are built and tested against a scripted stand-in for the CLI and, for the parts
-> that do not need it, against real Git and a real VS Code. Apart from the author's probe runs it has not been tried
-> against a real Kiro CLI, so expect rough edges. [docs/PLAN.md](docs/PLAN.md) lists what is assumed and how to check it.
+> that do not need it, against real Git and a real VS Code. Apart from the author's probe runs (on CLI 2.33) it has not
+> been tried against a real Kiro CLI; what is new for Kiro CLI 3 follows Kiro's documentation. Expect rough edges.
+> [docs/PLAN.md](docs/PLAN.md) lists what is assumed and how to check it.
 
 <p align="center">
   <img src="docs/images/chat-dark.png" alt="The Kiro Studio chat in a dark theme: a streaming answer with a diagram, a checkpoint card, the plan and a question from Kiro" width="300">
@@ -45,7 +46,9 @@ real Kiro session._
   field and VS Code's secret storage, never into a file.
 - **Kiro panel:** your earlier sessions (open, search, fork and delete where the CLI allows it), and your specs, steering files,
   hooks, MCP servers and custom agents, read from `.kiro` and `~/.kiro`, with the actions to create, switch on and off,
-  and remove them. Edits keep your comments and formatting.
+  and remove them. Hooks and agents are written in the format of Kiro CLI 3 (`.kiro/hooks/*.json`, agents with
+  `permissions`; agents in Markdown are listed too), and a hook of the old `.kiro.hook` format can be converted. Edits
+  keep your comments and formatting.
 - **Specs:** an assistant starts a spec (feature with requirements or design first, bug fix, quick spec) in the right
   Kiro agent. A view per spec shows requirements, design (diagrams drawn) and tasks with progress, and lets you approve a
   document or ask for changes. _Start task_ over every open task in `tasks.md` asks Kiro to do it.
@@ -59,8 +62,8 @@ real Kiro session._
 
 ## Requirements
 
-- **Kiro CLI with the V3 engine**, signed in (`kiro-cli login`). Run `kiro-cli update` if yours is older. The headless mode
-  that needs `KIRO_API_KEY` is deliberately not used.
+- **Kiro CLI 3** (or a 2.x that offers the V3 engine), signed in (`kiro-cli login`). Run `kiro-cli update` if yours is
+  older. The headless mode that needs `KIRO_API_KEY` is deliberately not used.
 - **VS Code 1.93** or newer. Windows 11, macOS and Linux. A real file system (no virtual workspaces) and a trusted workspace.
 - **Git** for checkpoints (everything else works without it).
 
@@ -76,21 +79,21 @@ real Kiro session._
 
 ## Settings
 
-| Setting                                                   | Default      | What it does                                                                                                                             |
-| --------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `kiroStudio.cliPath`                                      | empty        | Full path to `kiro-cli`. Empty searches `PATH` and the usual install locations.                                                          |
-| `kiroStudio.autonomy`                                     | `supervised` | `supervised`: Kiro asks before it changes files and shows a review at the end of a turn. `autopilot`: no review. User settings only.     |
-| `kiroStudio.autoAllowInAutopilot`                         | on           | In Autopilot, answer each permission request that offers "allow once" with "allow once". Never a permanent "always". User settings only. |
-| `kiroStudio.checkpoints.enabled`                          | on           | Record what each turn changes, for _View changes_ and _Revert_.                                                                          |
-| `kiroStudio.checkpoints.exclude`                          | empty        | More files and folders checkpoints leave out, in `.gitignore` syntax (`*.log`, `data/`).                                                 |
-| `kiroStudio.checkpoints.maxFileSizeMB`                    | `10`         | New files larger than this are left out of checkpoints (the chat says so). `0`: no limit.                                                |
-| `kiroStudio.hooks.enabled`                                | off          | Let Kiro load and run hooks, **including your global ones**. User settings only.                                                         |
-| `kiroStudio.mcp.addFromChat`                              | on           | Let Kiro suggest MCP servers as cards you add with a click (about 900 tokens per answer). User settings only.                            |
-| `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                        |
-| `kiroStudio.specs.codeLens`                               | on           | _Start task_ and _Update tasks_ above the tasks in `tasks.md`.                                                                           |
-| `kiroStudio.quickFix`                                     | on           | _Fix with Kiro_ among the quick fixes of an error or warning.                                                                            |
-| `kiroStudio.defaultMode`, `defaultModel`, `defaultEffort` | empty        | Agent, model and effort to select in new sessions. Empty keeps Kiro's default. The agent: user settings only.                            |
-| `kiroStudio.logging.level`                                | `messages`   | How much of the conversation with the CLI goes to the _Kiro Studio: Protocol_ output channel.                                            |
+| Setting                                                   | Default      | What it does                                                                                                                                                           |
+| --------------------------------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kiroStudio.cliPath`                                      | empty        | Full path to `kiro-cli`. Empty searches `PATH` and the usual install locations.                                                                                        |
+| `kiroStudio.autonomy`                                     | `supervised` | `supervised`: Kiro asks before it changes files and shows a review at the end of a turn. `autopilot`: no review. User settings only.                                   |
+| `kiroStudio.autoAllowInAutopilot`                         | on           | In Autopilot, answer each permission request that offers "allow once" with "allow once". Never a permanent "always". User settings only.                               |
+| `kiroStudio.checkpoints.enabled`                          | on           | Record what each turn changes, for _View changes_ and _Revert_.                                                                                                        |
+| `kiroStudio.checkpoints.exclude`                          | empty        | More files and folders checkpoints leave out, in `.gitignore` syntax (`*.log`, `data/`).                                                                               |
+| `kiroStudio.checkpoints.maxFileSizeMB`                    | `10`         | New files larger than this are left out of checkpoints (the chat says so). `0`: no limit.                                                                              |
+| `kiroStudio.hooks.enabled`                                | off          | Let Kiro load and run hooks, **including your global ones**. User settings only.                                                                                       |
+| `kiroStudio.mcp.addFromChat`                              | on           | Let Kiro suggest MCP servers as cards you add with a click (about 900 tokens per answer). User settings only.                                                          |
+| `kiroStudio.planUsage.enabled`                            | on           | Plan overview at the bottom right, from `kiro-cli chat --no-interactive /usage` (may leave an empty CLI session).                                                      |
+| `kiroStudio.specs.codeLens`                               | on           | _Start task_ and _Update tasks_ above the tasks in `tasks.md`.                                                                                                         |
+| `kiroStudio.quickFix`                                     | on           | _Fix with Kiro_ among the quick fixes of an error or warning.                                                                                                          |
+| `kiroStudio.defaultMode`, `defaultModel`, `defaultEffort` | empty        | Agent, model and effort to select in new sessions. Empty keeps Kiro's default (from CLI 3.5: `chat.defaultAgent`, `chat.defaultModel`). The agent: user settings only. |
+| `kiroStudio.logging.level`                                | `messages`   | How much of the conversation with the CLI goes to the _Kiro Studio: Protocol_ output channel.                                                                          |
 
 ## Privacy and safety
 
@@ -112,8 +115,10 @@ real Kiro session._
 
 ## Known limits
 
-- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 13, 15
-  and 16) lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
+- Not yet checked against a real CLI beyond the author's probe runs; [docs/PLAN.md](docs/PLAN.md) (sections 9 to 13 and
+  15 to 17) lists every assumption, for example the format of `tasks.md` and what the CLI does when you reject a review.
+- The support for Kiro CLI 3 (hooks, agents, `additionalDirectories`, the new notices) is built on Kiro's documentation
+  of 2026-11-19, not on a run of a CLI 3.x.
 - Adding MCP servers from the chat is built on reading the shipped code of Kiro CLI 2.34.2, not on a run. A CLI that
   cannot start a sign-in for Kiro Studio says so on the card and asks you to update it.
 - Sessions of a remote Kiro are listed but not driven specially.

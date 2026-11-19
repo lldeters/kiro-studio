@@ -3,7 +3,8 @@
 Working notes on how `kiro-cli acp` actually behaves, as opposed to how the task description says it
 behaves. Whenever the installed CLI disagrees with this file, the CLI wins and this file gets fixed.
 
-Status: **Phase 0. One verification run on a real CLI exists** (tag **[V]**). Everything without **[V]** still
+Status: **Phase 0. One verification run on a real CLI exists** (tag **[V]**). Since 2026-11-19 `kiro.dev` is reachable,
+and section 18 holds what Kiro documents for CLI 3 (tag **[K]**); where it settles a **[P]** below, that section says so. Everything without **[V]** still
 comes from the task description, third-party recordings or the SDK source. `kiro-cli` is not installed in the
 cloud container this was written in, and `kiro.dev` / `agentclientprotocol.com` are blocked by its network
 policy, so the Kiro docs were never read at the source. Further probe runs are listed in section 17. The MCP facts
@@ -22,6 +23,7 @@ Every statement below carries one of these tags.
 | **[S]** | Read from the source of `@agentclientprotocol/sdk` 2.0.1 or checked by running its schemas. |
 | **[V]** | Verified by this project's probe (`scripts/probe-acp.ts`) on the owner's machine: `kiro-cli` **2.33.1** (`--version` prints `kiro-cli-chat 2.33.1`), Kiro Agent Server 0.66.58, Windows 11 (10.0.26300), Google social login, 2026-10-23. One run, one OS, one account type: anything about other platforms or logins stays unverified. |
 | **[C]** | Read in the shipped code of `kiro-cli` **2.34.2** (Linux build of 2026-10-26; its V3 engine is `@kiro/agent` **0.66.62**, `dist/server/acp-server.js`), **not run**. Minified code read statically: a [C] statement says what the code does on the paths that were read, for that version only. It is newer than the verified 2.33.1. Probes P1 to P6 (section 17) are to raise each [C] to [V] or correct it. |
+| **[K]** | Read in Kiro's own documentation at kiro.dev on 2026-11-19: _Migrate an ACP client to CLI V3_, the ACP and CLI command references, hooks, agent configuration, and the CLI changelog 2.35.0 to 3.5.0. First-hand for what Kiro promises, but documentation, not a run; section 18 collects it. |
 | **[P]** | Unknown. A further probe run or a test has to answer it. |
 
 Search-result snippets of the Kiro docs also confirmed: V3 uses `session/set_config_option` with
@@ -36,8 +38,9 @@ Search-result snippets of the Kiro docs also confirmed: V3 uses `session/set_con
 - `acp --help` of 2.33.1 lists `--agent-engine <v1|v2|v3>` with **default `v2`**, so the flag is required there, and
   `--auth-method <cli|client>` (`cli` is the default for v3 and "uses the `kiro-cli login` session"; `client` forwards
   the engine's token requests to the ACP client). `--agent`, `--model`, `--effort`, `--trust-all-tools` and
-  `--trust-tools` are still listed; V3 rejects them. **[V][T]** Whether a CLI 3.0 default makes `--agent-engine=v3`
-  redundant, and whether the flag is still accepted there: **[P]**
+  `--trust-tools` are still listed; V3 rejects them. **[V][T]** CLI 3.0 makes V3 the default for new ACP clients, keeps
+  `--agent-engine <v1|v2|v3>` (it overrides the setting `acp.agentEngine`), and Kiro's migration guide still tells clients
+  to pass `--agent-engine=v3`. **[K]** (section 18)
 - The V3 engine is a separate process, the "Kiro Agent Server" (`kas.server.starting … 0.66.58` on stderr, running on
   Node). Its stderr says `Auth: --auth=acp-callback (host-mediated refresh via _kiro/auth/getAccessToken)`: that
   callback runs between `kiro-cli` and the agent server. With `--auth-method=cli` the client saw neither
@@ -640,3 +643,97 @@ npm run probe -- --env-expansion --no-prompt   # P6: a 127.0.0.1 server that ans
 `agent_thought_chunk` updates; list scopes and pagination; workspace steering `uri`/`scope`; the MCP flow with an
 organisation registry or governance; other platforms and login types. Phase 1 and 2 integration tests cover them. MCP
 sign-in, `_kiro/mcp/resetServer` and the status entry shape are no longer blank: they are [C] and P1 to P6 check them.
+
+## 18. Kiro CLI 3, from Kiro's documentation **[K]**
+
+Kiro CLI 3.0.0 (2026-11-03) made V3 the default engine and retired the Classic interface and the desktop app; 3.5.0
+(2026-11-17) was the latest release when this was read. Kiro now documents the V3 ACP server for client authors in
+[Migrate an ACP client to CLI V3](https://kiro.dev/docs/cli/v3/acp-migration). Everything here is **[K]**: what Kiro
+writes, read on 2026-11-19, not run.
+
+### Launch and sign-in
+
+- `kiro-cli acp --agent-engine=v3`, with `--auth-method cli` (the default) or `client`. The V2-only flags `--agent`,
+  `--model`, `--effort`, `--trust-all-tools`, `--trust-tools` are rejected with V3. `kiro-cli acp` is hidden from
+  `kiro-cli --help`. New: `--login` signs in in the terminal and exits. Kiro Studio's arguments are unchanged.
+- Since **2.37**, a signed-out `kiro-cli acp` answers `initialize` with one authentication method and every other request
+  with an authentication-required error. A client that declares terminal authentication
+  (`clientCapabilities.auth.terminal: true`) is offered "Log in to Kiro", which runs `kiro-cli login` in a terminal. This
+  answers "behaviour when logged out" of section 1. Kiro Studio keeps checking `whoami` before it starts, and turns that
+  error into "sign in" plus a new check (`errors.ts`, `isAuthRequired`).
+- `kiro-cli doctor` is gone (it points to `kiro-cli diagnostic`); Kiro Studio never called it.
+
+### Sessions
+
+- `session/new` and `session/load` take `cwd`, `mcpServers`, the standard `additionalDirectories` and, for Kiro-aware
+  clients, initial `_meta.kiro.modeId`, `modelId` and `effortLevel`. Kiro keeps neither client MCP servers nor directories
+  with the session, so a load sends them again; the load response need not repeat the session id. Kiro Studio sends the
+  other workspace folders as `additionalDirectories` when `sessionCapabilities.additionalDirectories` is advertised
+  (ACP's capability for it), and still writes agent, model and effort after the session exists.
+- From **3.5.0** a session created with `session/new` starts with the user's `chat.defaultAgent` and `chat.defaultModel`
+  unless `_meta.kiro` names a mode or model; Kiro waits up to 10 s for the model change before it answers. `--agent` and
+  `--model` of `acp` are V2 only.
+- Sessions are discovered with `session/list`, never from files; local and remote sessions share no client-readable
+  layout. Matches what Kiro Studio does (section 9).
+- `noReplay: true` on a local load suppresses the transcript, not current-state updates; a remote load does not connect
+  the live stream. Kiro Studio does not use `noReplay`.
+
+### Updates, turns, errors
+
+- Update types: `user_message_chunk`, `agent_message_chunk`, `agent_thought_chunk`, `tool_call`, `tool_call_update`,
+  `available_commands_update`, `current_mode_update`, `config_option_update`, `session_info_update` (by
+  `_meta.kiro.kind`: `context_usage`, `turn_completion`, lifecycle kinds). `turn_end` does **not** end a turn; the
+  `session/prompt` response does (as section 4 found). After a dropped transport: register the update handler, then
+  `session/load`, never resend the prompt.
+- Steering during a turn: `_session/steer` keeps that name; `session_info_update` kinds `steering_queued`,
+  `steering_injected`, `steering_cleared`. Its parameters are not documented: Kiro Studio does not steer yet.
+- Failed tool updates can carry `_meta.kiro.failureReason`: `cancelled`, `denied` or `error`. Kiro Studio shows denied and
+  cancelled on the card and treats anything else as an error.
+- Retired with V2 and not to be synthesised: `retry_warning`, `stream_stall_notice`, `stream_discarded`.
+- Notifications that replace V2 APIs: `_kiro/error/rate_limit`, `_kiro/customAgent/not_found`,
+  `_kiro/customAgent/config_error`, `_kiro/mcp/governance_disabled` plus `_kiro/governance/state`. Their fields are not
+  documented; Kiro Studio shows the first three as notices and reads `message` / `error` / `reason` and `agentName` /
+  `agent` / `name` leniently (PLAN.md A39).
+
+### Permissions
+
+- Render only the `options[]` Kiro sends; return a one-time option at once. For an offered persistent option a client
+  may return the `optionId` with `_meta.kiro.consent { scope, resource, workspaceRoot }`; Kiro validates it, stores the
+  rule and evaluates the call again. Kiro Studio returns only the `optionId`, as before.
+- `_meta.kiro.mcpTool { version: 1, identity { serverName, toolName }, annotations? }` on requests for MCP tools; the
+  annotations are untrusted hints and must never approve anything. Not used yet.
+- Removed V2 fields: `_meta.trustOptions`, `_meta.trustOption`, `_meta.fsReadPaths`, `_meta.feedback`.
+
+### Commands and extension methods
+
+Kiro's replacement table for V2 slash commands names, among others: `/usage` → advertised `_kiro/account/getUsage`;
+`/context` → `_kiro/session/context`; `/compact` → `_kiro/session/compact`; `/hooks` → `_kiro/hooks/list`; `/rewind` →
+`session/fork` at the message, then load the fork; `/goal` → `_kiro/workflow/*`; `/mcp` → render `_kiro/mcp/status`.
+Every optional method is gated on `extensionMethods`. `getUsage` has no documented result shape, so the plan overview
+still reads `kiro-cli chat --no-interactive /usage` (section 13).
+
+### MCP
+
+The documented interactive sign-in is the flow of section 11: a `failed` status with `failedAuthorization: true`, then
+`_kiro/mcp/resetServer` with `startOAuth: true`, then `_kiro/openExternalUrl` with the page; status notifications are
+full snapshots. This confirms the **[C]** reading of 2.34.2 at the level of the documentation. New in 3.5.0: one
+organisation sign-in for every server set to it (`kiro-cli mcp idp setup`), and `kiro-cli mcp add --oauth-client-id`.
+3.2.0 signs in to servers without dynamic client registration through Kiro's client metadata document.
+
+### Files in `.kiro`
+
+- **Hooks:** standalone files `.kiro/hooks/*.json` (and `~/.kiro/hooks/*.json` for CLI V3):
+  `{ "version": "v1", "hooks": [ { name, description?, trigger, matcher?, action: { type: "command" | "agent", command |
+  prompt }, timeout?, enabled?, confirm? } ] }`. Triggers are PascalCase: `SessionStart`, `SessionEnd`, `UserPromptSubmit`,
+  `Stop`, `PreToolUse`, `PostToolUse`, `PermissionRequest` (3.4), `PreCompact` and `PostCompact` (3.1), `PostFileCreate`,
+  `PostFileSave`, `PostFileDelete`, `PreTaskExec`, `PostTaskExec`, `Manual`; camelCase aliases such as `agentSpawn` and
+  `permissionRequest` are accepted. For file triggers `matcher` is a regex against the file path; for tool triggers a tool
+  selector or a regex against the tool id. The IDE 0.x format `*.kiro.hook` (`when` / `then`) is replaced; Kiro's table
+  maps `fileEdited` → `PostFileSave`, `agentStop` → `Stop`, `promptSubmit` → `UserPromptSubmit` and so on, and
+  `userTriggered` has no equivalent.
+- **Agents:** JSON, or Markdown with the configuration in front matter and the prompt as text. `tools` takes tags (`read`,
+  `write`, `shell`, `web`, `@builtin`, `*`), `permissions.rules` holds `{ capability, match, effect, exclude? }`.
+  `toolsSettings` and `allowedTools` are V2. Since 2.37 a V3 start rewrites V2-format agents in `.kiro/agents` and
+  `~/.kiro/agents` in place after saving `<file>.json.bak`, unless `chat.enableAutoAgentUpgrade` is `false`; a file with
+  `permissions` is not upgraded.
+
