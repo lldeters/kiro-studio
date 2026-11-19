@@ -766,6 +766,9 @@ div.disclosure-toggle {
 .state.waiting {
   color: var(--vscode-editorWarning-foreground);
 }
+.state.cancelled {
+  color: var(--vscode-descriptionForeground);
+}
 .tool-body {
   border-top: 1px solid var(--vscode-panel-border, var(--vscode-widget-border, transparent));
 }

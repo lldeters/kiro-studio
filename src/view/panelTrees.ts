@@ -301,40 +301,75 @@ export function steeringTree(input: SteeringInput, t: Translate = identityTransl
 // Hooks
 // ---------------------------------------------------------------------------------------------------------------
 
-const KNOWN_EVENTS = new Set([
-  'fileEdited',
-  'fileCreated',
-  'fileDeleted',
-  'userTriggered',
-  'promptSubmit',
-  'agentStop',
-  'preToolUse',
-  'postToolUse',
-]);
+/**
+ * The triggers of the current format (Kiro CLI 3, Kiro IDE 1.0) and the names they had before, which Kiro still
+ * accepts or which legacy `.kiro.hook` files use, by their lower-case spelling.
+ */
+const EVENT_KEYS: Readonly<Record<string, string>> = {
+  sessionstart: 'SessionStart',
+  agentspawn: 'SessionStart',
+  sessionend: 'SessionEnd',
+  userpromptsubmit: 'UserPromptSubmit',
+  promptsubmit: 'UserPromptSubmit',
+  stop: 'Stop',
+  agentstop: 'Stop',
+  pretooluse: 'PreToolUse',
+  posttooluse: 'PostToolUse',
+  permissionrequest: 'PermissionRequest',
+  precompact: 'PreCompact',
+  postcompact: 'PostCompact',
+  postfilecreate: 'PostFileCreate',
+  filecreated: 'PostFileCreate',
+  postfilesave: 'PostFileSave',
+  fileedited: 'PostFileSave',
+  postfiledelete: 'PostFileDelete',
+  filedeleted: 'PostFileDelete',
+  pretaskexec: 'PreTaskExec',
+  pretaskexecution: 'PreTaskExec',
+  posttaskexec: 'PostTaskExec',
+  posttaskexecution: 'PostTaskExec',
+  manual: 'Manual',
+  usertriggered: 'Manual',
+};
 
 export function eventText(hook: HookInfo, t: Translate): string | undefined {
   if (hook.event === undefined) return undefined;
-  const text = KNOWN_EVENTS.has(hook.event) ? describeEvent(hook.event, t) : hook.event;
+  const known = EVENT_KEYS[hook.event.toLowerCase()];
+  const text = known === undefined ? hook.event : describeEvent(known, t);
   return hook.patterns.length > 0 ? `${text}: ${hook.patterns.join(', ')}` : text;
 }
 
 function describeEvent(event: string, t: Translate): string {
   // Literal calls, so that the messages are found for translation.
   switch (event) {
-    case 'fileEdited':
-      return t('when a file is saved');
-    case 'fileCreated':
-      return t('when a file is created');
-    case 'fileDeleted':
-      return t('when a file is deleted');
-    case 'userTriggered':
-      return t('when you run it');
-    case 'promptSubmit':
+    case 'SessionStart':
+      return t('when a session starts');
+    case 'SessionEnd':
+      return t('when a session ends');
+    case 'UserPromptSubmit':
       return t('when you send a prompt');
-    case 'agentStop':
+    case 'Stop':
       return t('when Kiro finishes');
-    case 'preToolUse':
+    case 'PreToolUse':
       return t('before a tool runs');
+    case 'PermissionRequest':
+      return t('when a tool asks for permission');
+    case 'PreCompact':
+      return t('before Kiro compacts the conversation');
+    case 'PostCompact':
+      return t('after Kiro compacted the conversation');
+    case 'PostFileCreate':
+      return t('when a file is created');
+    case 'PostFileSave':
+      return t('when a file is saved');
+    case 'PostFileDelete':
+      return t('when a file is deleted');
+    case 'PreTaskExec':
+      return t('before a spec task starts');
+    case 'PostTaskExec':
+      return t('after a spec task finished');
+    case 'Manual':
+      return t('when you run it');
     default:
       return t('after a tool ran');
   }
@@ -359,15 +394,30 @@ export function hooksTree(
     });
   }
   for (const hook of input.hooks) {
+    const legacy = hook.format === 'legacy';
     nodes.push({
-      id: `hook/${hook.path}`,
+      id: `hook/${hook.path}#${hook.index ?? 0}`,
       label: hook.name,
-      description: hook.error ?? [eventText(hook, t), hook.enabled ? undefined : t('off')].filter(Boolean).join(' · '),
-      tooltip: [hook.description, hook.path].filter(Boolean).join('\n'),
+      description:
+        hook.error ??
+        [eventText(hook, t), hook.enabled ? undefined : t('off'), legacy ? t('old format') : undefined]
+          .filter(Boolean)
+          .join(' · '),
+      tooltip: [
+        hook.description,
+        legacy
+          ? t(
+              'This hook is in the format of Kiro IDE 0.x (.kiro.hook). Kiro CLI 3 reads hooks from .kiro/hooks/*.json; convert it to use it there.',
+            )
+          : undefined,
+        hook.path,
+      ]
+        .filter(Boolean)
+        .join('\n'),
       icon: hook.error ? 'error' : hook.enabled ? 'zap' : 'circle-slash',
-      ...(hook.error ? { iconColor: BAD } : {}),
-      contextValue: `hook ${hook.enabled ? 'hookOn' : 'hookOff'}`,
-      data: { path: hook.path },
+      ...(hook.error ? { iconColor: BAD } : legacy ? { iconColor: WARN } : {}),
+      contextValue: `hook ${hook.enabled ? 'hookOn' : 'hookOff'}${legacy && hook.error === undefined ? ' legacyHook' : ''}`,
+      data: { path: hook.path, ...(hook.index === undefined ? {} : { index: String(hook.index) }) },
       command: { id: 'kiroStudio.openFile', args: [hook.path], title: t('Open') },
     });
   }
@@ -502,11 +552,20 @@ export function agentsTree(input: AgentsInput, t: Translate = identityTranslate)
       children: input.custom.map((a): PanelNode => ({
         id: `agent/${a.path}`,
         label: a.name,
-        description: a.error ?? (a.scope === 'global' ? t('all workspaces') : undefined) ?? '',
+        description:
+          a.error ??
+          [a.scope === 'global' ? t('all workspaces') : undefined, a.v2Format ? t('format of Kiro CLI 2') : undefined]
+            .filter(Boolean)
+            .join(' · '),
         tooltip: [
           a.description,
           a.model === undefined ? undefined : t('Model: {0}', a.model),
           a.mcpServers.length > 0 ? t('MCP servers: {0}', a.mcpServers.join(', ')) : undefined,
+          a.v2Format
+            ? t(
+                'Kiro CLI 3 converts this agent to its current format when a session starts and keeps the old file as .json.bak, unless you turned that off (chat.enableAutoAgentUpgrade).',
+              )
+            : undefined,
           baseName(a.path),
         ]
           .filter(Boolean)

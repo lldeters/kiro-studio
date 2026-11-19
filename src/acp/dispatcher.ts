@@ -55,6 +55,14 @@ export type BroadcastEvent =
   | { type: 'powers'; sessionId?: string; status?: string; powers: unknown[] }
   | { type: 'progressiveContext'; sessionId?: string; status?: string; items: unknown[] }
   | { type: 'openExternalUrl'; url: string }
+  | {
+      /** `_kiro/error/rate_limit`, `_kiro/customAgent/not_found`, `_kiro/customAgent/config_error` (Kiro CLI 3). */
+      type: 'agentNotice';
+      notice: 'rateLimit' | 'agentNotFound' | 'agentConfigError';
+      sessionId?: string;
+      agent?: string;
+      message?: string;
+    }
   | { type: 'hooks'; method: string; params: unknown }
   | { type: 'unknown'; method: string; params: unknown };
 
@@ -147,6 +155,25 @@ export function parseBroadcast(method: string, params: unknown): BroadcastEvent 
       const url = str(body.url);
       return url === undefined ? { type: 'unknown', method, params } : { type: 'openExternalUrl', url };
     }
+    case '_kiro/error/rate_limit':
+    case '_kiro/customAgent/not_found':
+    case '_kiro/customAgent/config_error':
+      // Kiro's guide names these notifications but not their fields, so the usual names are tried.
+      return {
+        type: 'agentNotice',
+        notice:
+          method === '_kiro/error/rate_limit'
+            ? 'rateLimit'
+            : method === '_kiro/customAgent/not_found'
+              ? 'agentNotFound'
+              : 'agentConfigError',
+        ...sessionId,
+        ...opt('agent', str(body.agentName) ?? str(body.agent) ?? str(body.name) ?? str(rec(body.agent).name)),
+        ...opt(
+          'message',
+          str(body.message) ?? str(body.error) ?? str(rec(body.error).message) ?? str(body.reason) ?? str(body.detail),
+        ),
+      };
     default:
       if (method.startsWith('_kiro/hooks/')) return { type: 'hooks', method, params };
       return { type: 'unknown', method, params };

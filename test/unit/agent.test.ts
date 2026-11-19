@@ -274,6 +274,30 @@ describe('prompt', () => {
     expect(session.transcript[session.transcript.length - 1]).toMatchObject({ kind: 'notice', level: 'error' });
   });
 
+  it('says that a sign-in is needed when Kiro refuses for lack of one, and lets the host check again', async () => {
+    let checks = 0;
+    const h = make({ onAuthRequired: () => void checks++ });
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.on('session/prompt', () => {
+      throw new RpcError(-32000, 'Authentication required');
+    });
+    const outcome = await h.agent.prompt(session.id, 'hi');
+    expect(outcome.error).toBe(
+      'Kiro needs you to sign in (Authentication required). Choose "Sign In to Kiro", then try again.',
+    );
+    h.fake.on('session/new', () => {
+      throw new RpcError(-32000, 'Authentication required');
+    });
+    await expect(h.agent.newSession({ cwd: '/ws', applyDefaults: false })).rejects.toThrow(/Sign In to Kiro/);
+    expect(checks).toBe(2);
+    // Other turn failures stay as they were.
+    h.fake.on('session/prompt', () => {
+      throw new RpcError(-32000, 'Throttled', { errorType: 'ThrottlingError' });
+    });
+    expect((await h.agent.prompt(session.id, 'again')).error).toBe('Throttled (ThrottlingError)');
+    expect(checks).toBe(2);
+  });
+
   it('refuses a second prompt while a turn runs', async () => {
     const turn: TurnScript = async (ctx) => {
       ctx.startTurn();
@@ -627,6 +651,81 @@ describe('load session', () => {
     const h = make();
     h.fake.on('initialize', () => ({ protocolVersion: 1, agentCapabilities: { loadSession: false } }));
     await expect(h.agent.loadSession('sess_old', '/ws')).rejects.toThrow('does not support loading sessions');
+  });
+});
+
+describe('notices Kiro sends about rate limits and custom agents', () => {
+  const notices = (h: Harness, sessionId = SESSION_ID) =>
+    (h.agent.store.get(sessionId)?.transcript ?? []).flatMap((item) =>
+      item.kind === 'notice' ? [{ level: item.level, text: item.text }] : [],
+    );
+
+  it('shows a notice that came before the session/new response once the session exists', async () => {
+    const h = make();
+    h.fake.on('session/new', async () => {
+      h.fake.notify('_kiro/customAgent/not_found', { sessionId: SESSION_ID, agentName: 'reviewer' });
+      h.fake.notify('_kiro/customAgent/config_error', {
+        sessionId: SESSION_ID,
+        agent: { name: 'broken' },
+        error: { message: 'tools must be a list' },
+      });
+      await sleep(10);
+      return sessionResult(SESSION_ID);
+    });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(notices(h)).toEqual([
+      { level: 'warning', text: 'Kiro did not find the agent "reviewer".' },
+      { level: 'error', text: 'The configuration of the agent "broken" has an error. tools must be a list' },
+    ]);
+  });
+
+  it('shows a rate limit once in the session it names, and in the busy sessions when it names none', async () => {
+    const h = make();
+    const session = await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    h.fake.notify('_kiro/error/rate_limit', { sessionId: session.id, message: 'Too many requests.' });
+    h.fake.notify('_kiro/error/rate_limit', { sessionId: session.id, message: 'Too many requests.' });
+    await until(() => notices(h).length > 0, 2000, 'the notice');
+    await sleep(20);
+    expect(notices(h)).toEqual([
+      {
+        level: 'warning',
+        text: 'Kiro reports a rate limit, so answers may be slow or fail. Try again in a moment. Too many requests.',
+      },
+    ]);
+    // An idle session is not told about a rate limit that names no session.
+    h.fake.notify('_kiro/error/rate_limit', {});
+    await sleep(20);
+    expect(notices(h)).toHaveLength(1);
+  });
+});
+
+describe('folders of a multi-root workspace', () => {
+  const dirsOf = (h: Harness, method: string) =>
+    h.fake.requestsOf(method).map((m) => rec(m.params).additionalDirectories);
+
+  it('sends the other workspace folders with a new and a loaded session when Kiro offers it', async () => {
+    const h = make({
+      workspaceRoots: ['/ws', '/shared', '/docs'],
+      fake: { sessionCapabilities: { additionalDirectories: {} } },
+    });
+    await h.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    await h.agent.loadSession('sess_old', '/shared');
+    expect(dirsOf(h, 'session/new')).toEqual([['/shared', '/docs']]);
+    expect(dirsOf(h, 'session/load')).toEqual([['/ws', '/docs']]);
+    expect(h.agent.capabilities?.session.additionalDirectories).toBe(true);
+    await h.agent.dispose();
+  });
+
+  it('sends none to a CLI that does not offer it, or when there is one folder', async () => {
+    const old = make({ workspaceRoots: ['/ws', '/shared'] });
+    await old.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(old.fake.requestsOf('session/new')[0]?.params).not.toHaveProperty('additionalDirectories');
+    await old.agent.dispose();
+
+    const single = make({ fake: { sessionCapabilities: { additionalDirectories: {} } } });
+    await single.agent.newSession({ cwd: '/ws', applyDefaults: false });
+    expect(single.fake.requestsOf('session/new')[0]?.params).not.toHaveProperty('additionalDirectories');
+    await single.agent.dispose();
   });
 });
 

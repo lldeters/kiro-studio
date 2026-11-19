@@ -168,11 +168,19 @@ export function toolView(tool: ToolCallState, waiting: boolean, platform: Platfo
   const diffs = content.filter((c): c is Extract<ToolContentView, { type: 'diff' }> => c.type === 'diff');
   const input = pretty(tool.rawInput, MAX_INPUT_CHARS);
   const output = pretty(tool.rawOutput, MAX_OUTPUT_CHARS);
+  const state = toolState(tool, waiting);
+  const failure =
+    state !== 'failed' || tool.failureReason === undefined
+      ? undefined
+      : tool.failureReason === 'cancelled' || tool.failureReason === 'denied'
+        ? tool.failureReason
+        : 'error';
   return {
     toolCallId: tool.toolCallId,
     rev: tool.rev,
     title: tool.title,
-    state: toolState(tool, waiting),
+    state,
+    ...(failure === undefined ? {} : { failure }),
     locations: tool.locations.map((l) => ({
       path: normalizeAgentPath(l.path, platform) ?? l.path,
       ...(l.line === undefined ? {} : { line: l.line }),

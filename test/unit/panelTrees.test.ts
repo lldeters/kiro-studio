@@ -172,22 +172,25 @@ describe('steering tree', () => {
 describe('hooks tree', () => {
   const hook = {
     name: 'Lint',
-    path: '/h/lint.kiro.hook',
+    path: '/h/lint.json',
+    format: 'v1' as const,
+    index: 0,
     enabled: true,
-    event: 'fileEdited',
-    patterns: ['**/*.ts'],
-    action: 'askAgent',
+    event: 'PostFileSave',
+    patterns: ['\\.ts$'],
+    action: 'agent',
   };
 
   it('says when a hook runs and whether it is off', () => {
     const nodes = hooksTree({ hooks: [hook, { ...hook, name: 'Off', enabled: false }], featureEnabled: true });
     expect(nodes[0]).toMatchObject({
-      description: 'when a file is saved: **/*.ts',
+      description: 'when a file is saved: \\.ts$',
       icon: 'zap',
       contextValue: 'hook hookOn',
+      data: { path: '/h/lint.json', index: '0' },
     });
     expect(nodes[1]).toMatchObject({
-      description: 'when a file is saved: **/*.ts · off',
+      description: 'when a file is saved: \\.ts$ · off',
       icon: 'circle-slash',
       contextValue: 'hook hookOff',
     });
@@ -196,7 +199,14 @@ describe('hooks tree', () => {
   it('shows a file that does not parse, with its error', () => {
     const nodes = hooksTree({
       hooks: [
-        { name: 'bad', path: '/h/bad.kiro.hook', enabled: false, patterns: [], error: 'The file is not valid JSON.' },
+        {
+          name: 'bad',
+          path: '/h/bad.json',
+          format: 'v1',
+          enabled: false,
+          patterns: [],
+          error: 'The file is not valid JSON.',
+        },
       ],
       featureEnabled: true,
     });
@@ -210,6 +220,42 @@ describe('hooks tree', () => {
       command: { id: 'kiroStudio.hooks.toggleFeature' },
     });
     expect(nodes).toHaveLength(2);
+  });
+
+  it('marks a hook of the old format, which can be converted', () => {
+    const legacy = {
+      ...hook,
+      path: '/h/lint.kiro.hook',
+      format: 'legacy' as const,
+      event: 'fileEdited',
+      patterns: ['**/*.ts'],
+    };
+    const { index: _index, ...withoutIndex } = legacy;
+    const [node] = hooksTree({ hooks: [withoutIndex], featureEnabled: true });
+    expect(node).toMatchObject({
+      description: 'when a file is saved: **/*.ts · old format',
+      contextValue: 'hook hookOn legacyHook',
+      data: { path: '/h/lint.kiro.hook' },
+    });
+    expect(node?.tooltip).toContain('.kiro/hooks/*.json');
+  });
+
+  it('describes the triggers of Kiro CLI 3, in either spelling', () => {
+    const describe = (event: string) =>
+      hooksTree({ hooks: [{ ...hook, event, patterns: [] }], featureEnabled: true })[0]?.description;
+    expect(describe('PreCompact')).toBe('before Kiro compacts the conversation');
+    expect(describe('PostCompact')).toBe('after Kiro compacted the conversation');
+    expect(describe('PermissionRequest')).toBe('when a tool asks for permission');
+    expect(describe('SessionEnd')).toBe('when a session ends');
+    expect(describe('agentSpawn')).toBe('when a session starts');
+    expect(describe('permissionRequest')).toBe('when a tool asks for permission');
+    expect(describe('PreTaskExec')).toBe('before a spec task starts');
+  });
+
+  it('gives each hook of a file a node of its own', () => {
+    const nodes = hooksTree({ hooks: [hook, { ...hook, name: 'Second', index: 1 }], featureEnabled: true });
+    expect(new Set(nodes.map((n) => n.id)).size).toBe(2);
+    expect(nodes[1]?.data).toEqual({ path: '/h/lint.json', index: '1' });
   });
 
   it('shows an event it does not know as it is', () => {

@@ -9,7 +9,7 @@ import { TimeoutError, withTimeout } from '../util/async';
 import { Emitter } from '../util/emitter';
 import { arr, errorMessage, opt, rec, str, type JsonObject } from '../util/json';
 import type { ProtocolLog } from '../util/log';
-import { currentPlatform, type PlatformKind } from '../util/paths';
+import { currentPlatform, samePath, type PlatformKind } from '../util/paths';
 import { identityTranslate, type Translate } from '../util/translate';
 import { parseMcpStatus } from '../workspace/mcp';
 import { MCP_STEERING_NAME } from '../workspace/mcpInstructions';
@@ -17,7 +17,7 @@ import { isWebUrl } from '../workspace/mcpUrl';
 import type { Capabilities } from './capabilities';
 import { KiroConnection, type ClientFeatures, type ConnectionClosed } from './connection';
 import { Dispatcher, type BroadcastEvent, type SteeringDocument } from './dispatcher';
-import { describeError, isConnectionClosed } from './errors';
+import { describeError, isAuthRequired, isConnectionClosed } from './errors';
 import { FsHandler, type FileSystemPort, type WriteGate } from './handlers/fs';
 import { SecretBridge, type SecretPort } from './handlers/secrets';
 import type { PromptInput } from './prompt';
@@ -60,6 +60,8 @@ export interface AgentDeps {
    * the page opens or the user is asked, and does the rest without making the answer wait.
    */
   externalUrl(url: string): void;
+  /** Kiro refused a request because nobody is signed in (any more); the host checks the sign-in again. */
+  onAuthRequired?(): void;
   /**
    * The `_meta` of `session/new` and `session/load`: Kiro Studio's client steering document about adding MCP servers
    * (`{kiro: {steering: [...]}}`), or undefined for none. Not asked for while the organisation has switched MCP servers
@@ -119,6 +121,10 @@ const GOVERNANCE_ERROR = /governance|disabled by your organi[sz]ation/i;
 
 /** The broadcasts that belong to the MCP state of one session. */
 type McpBroadcast = Extract<BroadcastEvent, { type: 'mcpStatus' | 'governance' | 'steeringDocuments' }>;
+/** What Kiro reports about a rate limit or a custom agent, shown in the chat of the session. */
+type AgentNotice = Extract<BroadcastEvent, { type: 'agentNotice' }>;
+/** Notices kept per session until it exists; more of them would be the same complaint again. */
+const EARLY_NOTICES = 5;
 
 /**
  * Kiro sends the MCP broadcasts of a new session before the `session/new` response names it. The latest of each kind is
@@ -129,6 +135,7 @@ const EARLY_TTL_MS = 60_000;
 interface EarlyBroadcasts {
   receivedAt: number;
   latest: Map<McpBroadcast['type'], McpBroadcast>;
+  notices: AgentNotice[];
 }
 
 /** Kiro lists Kiro Studio's steering document as `client:<sessionId>:kiro-studio-mcp`. */
@@ -390,11 +397,17 @@ export class KiroAgent {
     applyDefaults?: boolean;
   }): Promise<Session> {
     await this.start();
-    const result = await this.ready.newSession({
-      cwd: options.cwd,
-      ...(options.additionalDirectories === undefined ? {} : { additionalDirectories: options.additionalDirectories }),
-      ...opt('meta', this.sessionMeta()),
-    });
+    const additionalDirectories = this.additionalDirectories(options.cwd, options.additionalDirectories);
+    let result: unknown;
+    try {
+      result = await this.ready.newSession({
+        cwd: options.cwd,
+        ...opt('additionalDirectories', additionalDirectories),
+        ...opt('meta', this.sessionMeta()),
+      });
+    } catch (error) {
+      throw this.signInError(error) ?? error;
+    }
     const sessionId = str(rec(result).sessionId);
     if (sessionId === undefined) throw new Error('The Kiro CLI did not return a session id');
     const session = this.store.create(sessionId, { cwd: options.cwd });
@@ -404,6 +417,35 @@ export class KiroAgent {
     session.applySessionResult(result);
     if (options.applyDefaults !== false) await this.applyDefaults(session);
     return session;
+  }
+
+  /**
+   * The folders a session may work in besides its `cwd`: the ones the caller names, else the other workspace folders, so
+   * that Kiro sees a multi-root workspace as the one project it is to the user. Only for a CLI that offers
+   * `sessionCapabilities.additionalDirectories` (Kiro CLI 3 documents it for `session/new` and `session/load`); Kiro does
+   * not keep them with the session, so a load sends them again.
+   */
+  private additionalDirectories(cwd: string, given: string[] | undefined): string[] | undefined {
+    if (given !== undefined) return given;
+    if (this.capabilities?.session.additionalDirectories !== true) return undefined;
+    const others = this.deps.workspaceRoots().filter((root) => !samePath(root, cwd, this.platform));
+    return others.length === 0 ? undefined : [...others];
+  }
+
+  /**
+   * For an error that says nobody is signed in: tells the host, which checks the sign-in again (the views then offer it),
+   * and returns an error that says what to do. Undefined for any other error.
+   */
+  private signInError(error: unknown): Error | undefined {
+    if (!isAuthRequired(error)) return undefined;
+    try {
+      this.deps.onAuthRequired?.();
+    } catch (failure) {
+      this.deps.log.info(`could not check the sign-in again: ${errorMessage(failure)}`);
+    }
+    return new Error(
+      this.t('Kiro needs you to sign in ({0}). Choose "Sign In to Kiro", then try again.', describeError(error)),
+    );
   }
 
   /** Session ids whose defaults are being written in the background; a prompt waits for them. */
@@ -498,15 +540,14 @@ export class KiroAgent {
       const result = await this.ready.loadSession({
         sessionId,
         cwd,
-        ...(options.additionalDirectories === undefined
-          ? {}
-          : { additionalDirectories: options.additionalDirectories }),
+        ...opt('additionalDirectories', this.additionalDirectories(cwd, options.additionalDirectories)),
         ...opt('meta', this.sessionMeta()),
       });
       session.applySessionResult(result);
       session.restoreCheckpointMarkers();
       await this.beforePrompts(session, () => this.applyAutonomy(session, autonomy));
-    } catch (error) {
+    } catch (caught) {
+      const error = this.signInError(caught) ?? caught;
       // A session that never loaded must not stay behind as a tab that is "starting" for ever; one that was open before
       // is lost again, so that a later reconnect tries once more. Its checkpoints stay reachable meanwhile.
       if (existed) {
@@ -633,7 +674,7 @@ export class KiroAgent {
       // When the process died, the loss handler already told the session; do not report it a second time. (The status
       // was "ready" when the turn began and may have changed since.)
       const lost = isConnectionClosed(error) || (session.status as SessionStatus) === 'lost';
-      outcome = lost ? {} : { error: describeError(error) };
+      outcome = lost ? {} : { error: this.signInError(error)?.message ?? describeError(error) };
     }
     // The turn counts as running until its changes are recorded, so that the checkpoint comes before the next message.
     await this.hook('after', session);
@@ -797,9 +838,50 @@ export class KiroAgent {
       case 'steeringDocuments':
         if (event.sessionId !== undefined) this.routeMcp(event.sessionId, event);
         break;
+      case 'agentNotice': {
+        if (event.sessionId !== undefined) {
+          const session = this.store.get(event.sessionId);
+          if (session) this.showNotice(session, event);
+          else this.keepEarly(event.sessionId, event);
+          break;
+        }
+        // Without a session it concerns whatever runs now.
+        const busy = this.store.all().filter((session) => session.busy);
+        for (const session of busy) this.showNotice(session, event);
+        if (busy.length === 0) this.deps.log.info(`${event.notice} without a session: ${event.message ?? ''}`);
+        break;
+      }
       default:
         break;
     }
+  }
+
+  /** A notice in the chat; the same one right after itself (Kiro may repeat a rate limit) is shown once. */
+  private showNotice(session: Session, event: AgentNotice): void {
+    let level: 'warning' | 'error' = 'warning';
+    let text: string;
+    switch (event.notice) {
+      case 'rateLimit':
+        text = this.t('Kiro reports a rate limit, so answers may be slow or fail. Try again in a moment.');
+        break;
+      case 'agentNotFound':
+        text =
+          event.agent === undefined
+            ? this.t('Kiro did not find the agent it was asked to use.')
+            : this.t('Kiro did not find the agent "{0}".', event.agent);
+        break;
+      case 'agentConfigError':
+        level = 'error';
+        text =
+          event.agent === undefined
+            ? this.t('The configuration of an agent has an error.')
+            : this.t('The configuration of the agent "{0}" has an error.', event.agent);
+        break;
+    }
+    if (event.message !== undefined && event.message.trim() !== '') text = `${text} ${event.message.trim()}`;
+    const last = session.transcript[session.transcript.length - 1];
+    if (last?.kind === 'notice' && last.text === text) return;
+    session.addNotice(level, text);
   }
 
   /**
@@ -846,12 +928,14 @@ export class KiroAgent {
     }
   }
 
-  private keepEarly(sessionId: string, event: McpBroadcast): void {
+  private keepEarly(sessionId: string, event: McpBroadcast | AgentNotice): void {
     const now = Date.now();
     for (const [id, entry] of this.early) if (now - entry.receivedAt > EARLY_TTL_MS) this.early.delete(id);
-    const entry = this.early.get(sessionId) ?? { receivedAt: now, latest: new Map() };
+    const entry: EarlyBroadcasts = this.early.get(sessionId) ?? { receivedAt: now, latest: new Map(), notices: [] };
     entry.receivedAt = now;
-    entry.latest.set(event.type, event);
+    if (event.type === 'agentNotice') {
+      if (entry.notices.length < EARLY_NOTICES) entry.notices.push(event);
+    } else entry.latest.set(event.type, event);
     // Set again so that the map stays ordered by the latest arrival, and the one heard from longest ago goes first.
     this.early.delete(sessionId);
     this.early.set(sessionId, entry);
@@ -865,8 +949,10 @@ export class KiroAgent {
   private applyEarly(session: Session): void {
     const entry = this.early.get(session.id);
     this.early.delete(session.id);
-    if (entry !== undefined && Date.now() - entry.receivedAt <= EARLY_TTL_MS)
+    if (entry !== undefined && Date.now() - entry.receivedAt <= EARLY_TTL_MS) {
       for (const event of entry.latest.values()) this.applyMcp(session, event);
+      for (const notice of entry.notices) this.showNotice(session, notice);
+    }
     if (session.mcp.allowed === undefined && this.lastGovernanceMcp !== undefined)
       session.setMcpAllowed(this.lastGovernanceMcp);
   }

@@ -451,6 +451,11 @@
         "category": "Kiro Studio"
       },
       {
+        "command": "kiroStudio.hooks.convert",
+        "title": "%command.hooks.convert%",
+        "category": "Kiro Studio"
+      },
+      {
         "command": "kiroStudio.mcp.refresh",
         "title": "%command.mcp.refresh%",
         "category": "Kiro Studio",
@@ -647,6 +652,10 @@
           "when": "false"
         },
         {
+          "command": "kiroStudio.hooks.convert",
+          "when": "false"
+        },
+        {
           "command": "kiroStudio.mcp.toggle",
           "when": "false"
         },
@@ -778,6 +787,11 @@
           "command": "kiroStudio.hooks.toggle",
           "when": "view == kiroStudio.hooks && viewItem =~ /^hook /",
           "group": "1_toggle"
+        },
+        {
+          "command": "kiroStudio.hooks.convert",
+          "when": "view == kiroStudio.hooks && viewItem =~ /legacyHook/",
+          "group": "2_convert"
         },
         {
           "command": "kiroStudio.mcp.toggle",

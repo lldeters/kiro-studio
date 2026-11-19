@@ -83,6 +83,25 @@ describe('tool views', () => {
     expect(toolView(s.tools.get('t1')!, false, 'posix').state).toBe('failed');
   });
 
+  it('says why a tool failed when Kiro does, and nothing before it failed', () => {
+    const reasonOf = (reason: string) => {
+      const s = make();
+      apply(s, u.toolCall('t1'));
+      apply(s, u.toolUpdate('t1', { status: 'pending', _meta: { kiro: { failureReason: reason } } }));
+      const before = toolView(s.tools.get('t1')!, false, 'posix').failure;
+      apply(s, u.toolUpdate('t1', { status: 'failed' }));
+      return [before, toolView(s.tools.get('t1')!, false, 'posix').failure];
+    };
+    expect(reasonOf('denied')).toEqual([undefined, 'denied']);
+    expect(reasonOf('cancelled')).toEqual([undefined, 'cancelled']);
+    expect(reasonOf('error')).toEqual([undefined, 'error']);
+    expect(reasonOf('something-new')).toEqual([undefined, 'error']);
+    const plain = make();
+    apply(plain, u.toolCall('t1'));
+    apply(plain, u.toolUpdate('t1', { status: 'failed' }));
+    expect(toolView(plain.tools.get('t1')!, false, 'posix')).not.toHaveProperty('failure');
+  });
+
   it('shows a tool as waiting while its approval is open', () => {
     const s = make();
     apply(s, u.toolCall('t1'));

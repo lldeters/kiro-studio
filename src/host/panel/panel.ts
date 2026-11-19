@@ -19,7 +19,14 @@ import {
   type PanelNode,
 } from '../../view/panelTrees';
 import { agentTemplate, readAgents, type AgentFile } from '../../workspace/agents';
-import { hookTemplate, parseHook, readHooks, type HookInfo } from '../../workspace/hooks';
+import {
+  convertLegacyHook,
+  enabledPath,
+  hookTemplate,
+  parseHookFile,
+  readHooks,
+  type HookInfo,
+} from '../../workspace/hooks';
 import { setJsonValue } from '../../workspace/jsonEdit';
 import {
   addHttpServer,
@@ -386,7 +393,8 @@ export class KiroPanel implements vscode.Disposable {
     // Hooks
     command('hooks.refresh', () => this.refresh('hooks'));
     command('hooks.new', () => this.newHook());
-    command('hooks.toggle', (node) => this.toggleHook(data(node).path));
+    command('hooks.toggle', (node) => this.toggleHook(data(node)));
+    command('hooks.convert', (node) => this.convertHook(data(node).path));
     command('hooks.toggleFeature', async () => {
       await this.deps.settings.setHooksEnabled(!this.deps.settings.hooksEnabled());
       this.refresh('hooks');
@@ -548,15 +556,67 @@ export class KiroPanel implements vscode.Disposable {
     if (where === undefined) return;
     const name = await vscode.window.showInputBox({ prompt: t('Name of the hook'), validateInput: validName });
     if (name === undefined) return;
-    await this.createFile(`${where}/hooks/${slug(name)}.kiro.hook`, hookTemplate(name.trim()));
+    await this.createFile(`${where}/hooks/${slug(name)}.json`, hookTemplate(name.trim()));
     this.refresh('hooks');
   }
 
-  private async toggleHook(file: string | undefined): Promise<void> {
+  /** Turns one hook on or off; a file of the current format can hold several, and only that one changes. */
+  private async toggleHook(node: Record<string, string>): Promise<void> {
+    const file = node.path;
     if (file === undefined) return;
     const text = await reader.readText(file);
     if (text === undefined) return;
-    await this.writeFile(file, setJsonValue(text, ['enabled'], !parseHook(text, file).enabled));
+    const index = node.index === undefined ? undefined : Number(node.index);
+    const hook = parseHookFile(text, file).find((h) => h.index === index);
+    if (hook === undefined || hook.error !== undefined) return;
+    await this.writeFile(file, setJsonValue(text, enabledPath(hook), !hook.enabled));
+    this.refresh('hooks');
+  }
+
+  /**
+   * Writes a legacy `.kiro.hook` as a file of the current format next to it, which Kiro CLI 3 reads, and moves the old
+   * file to the trash once the user agrees. Nothing is overwritten.
+   */
+  private async convertHook(file: string | undefined): Promise<void> {
+    if (file === undefined) return;
+    const text = await reader.readText(file);
+    if (text === undefined) return;
+    const converted = convertLegacyHook(text);
+    if ('error' in converted) {
+      let why: string;
+      switch (converted.error) {
+        case 'notJson':
+          why = t('The file is not valid JSON.');
+          break;
+        case 'manual':
+          why = t(
+            'a hook you start yourself has no equivalent in the current format; a steering file can do the same.',
+          );
+          break;
+        case 'event':
+          why = t('the event "{0}" has no equivalent in the current format.', converted.detail);
+          break;
+        case 'action':
+          why = t('the action "{0}" has no equivalent in the current format.', converted.detail);
+          break;
+      }
+      void vscode.window.showWarningMessage(t('This hook cannot be converted: {0}', why));
+      return;
+    }
+    const target = file.replace(/\.kiro\.hook$/i, '.json');
+    if ((await reader.readText(target)) !== undefined) {
+      void vscode.window.showWarningMessage(t('{0} exists already, so nothing was converted.', path.basename(target)));
+      return;
+    }
+    await this.writeFile(target, converted.text);
+    await this.openFile(target);
+    const remove = t('Move to Trash');
+    const answer = await vscode.window.showInformationMessage(
+      t('The hook is now in {0}. Move the old file to the trash?', path.basename(target)),
+      remove,
+      t('Keep'),
+    );
+    if (answer === remove) await vscode.workspace.fs.delete(vscode.Uri.file(file), { useTrash: true });
     this.refresh('hooks');
   }
 

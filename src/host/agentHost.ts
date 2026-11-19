@@ -224,6 +224,8 @@ export class AgentHost implements vscode.Disposable {
       fs: new VsCodeFileSystemPort(),
       workspaceRoots: () => (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
       externalUrl: (url) => this.onExternalUrl(url),
+      // The status bar and the views then say that the user is signed out, and offer to sign in.
+      onAuthRequired: () => void this.deps.setup.check(),
       sessionMeta: () => this.sessionMeta(),
       ...(this.deps.secrets === undefined ? {} : { secrets: this.deps.secrets }),
       clientInfo: { name: 'kiro-studio', title: 'Kiro Studio', version: this.deps.version },

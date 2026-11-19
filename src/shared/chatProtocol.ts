@@ -68,6 +68,8 @@ export interface ToolView {
   title: string;
   kind?: string;
   state: ToolState;
+  /** For a failed tool, why, when Kiro says so; an unknown reason counts as `error`. */
+  failure?: 'cancelled' | 'denied' | 'error';
   locations: { path: string; line?: number }[];
   content: ToolContentView[];
   /** Pretty-printed and shortened for display. */

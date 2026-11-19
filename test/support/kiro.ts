@@ -87,7 +87,7 @@ export function configOptions(
 }
 
 export function initializeResult(
-  overrides: { extensionMethods?: string[]; protocolVersion?: number } = {},
+  overrides: { extensionMethods?: string[]; protocolVersion?: number; sessionCapabilities?: JsonObject } = {},
 ): JsonObject {
   return {
     protocolVersion: overrides.protocolVersion ?? 1,
@@ -95,7 +95,13 @@ export function initializeResult(
       loadSession: true,
       promptCapabilities: { image: true, embeddedContext: true },
       mcpCapabilities: { http: true, sse: true },
-      sessionCapabilities: { list: {}, close: {}, delete: {}, fork: { _meta: { kiro: { messageId: true } } } },
+      sessionCapabilities: {
+        list: {},
+        close: {},
+        delete: {},
+        fork: { _meta: { kiro: { messageId: true } } },
+        ...overrides.sessionCapabilities,
+      },
       _meta: {
         kiro: {
           checkpoints: true,

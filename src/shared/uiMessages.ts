@@ -43,6 +43,8 @@ export const UI_MESSAGES = [
   'Working…',
   'Done',
   'Failed',
+  'Denied',
+  'Cancelled',
   'Input',
   'Output',
   'Plan',

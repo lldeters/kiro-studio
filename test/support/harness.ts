@@ -17,6 +17,8 @@ export interface HarnessOptions {
   cancelHoldMs?: number;
   logLevel?: LogLevel;
   workspace?: string;
+  /** Every folder of the workspace; just `workspace` by default. */
+  workspaceRoots?: string[];
   shutdownGraceMs?: number;
   files?: Record<string, string>;
   /** Symbolic links, path to target. With it the file system resolves links (every path counts as existing). */
@@ -32,6 +34,8 @@ export interface HarnessOptions {
   sessionMeta?: () => JsonObject | undefined;
   /** Replaces recording the pages Kiro asks for in `opened`. */
   externalUrl?: (url: string) => void;
+  /** Called when Kiro refuses a request because nobody is signed in. */
+  onAuthRequired?: () => void;
   /** Offers Kiro a secret storage, kept in `secrets` of the harness. */
   secretStorage?: boolean;
   mcpResetTimeoutMs?: number;
@@ -110,8 +114,9 @@ export function createHarness(options: HarnessOptions = {}) {
     log,
     settings: agentSettings,
     fs: fsPort,
-    workspaceRoots: () => [workspace],
+    workspaceRoots: () => options.workspaceRoots ?? [workspace],
     externalUrl: options.externalUrl ?? ((url) => void opened.push(url)),
+    ...(options.onAuthRequired === undefined ? {} : { onAuthRequired: options.onAuthRequired }),
     clientInfo: { name: 'kiro-studio-test', version: '0.0.0' },
     platform: options.platform ?? 'posix',
     ...(options.writeGate === undefined ? {} : { writeGate: options.writeGate }),
