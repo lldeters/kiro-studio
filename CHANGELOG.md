@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.4.0] - unreleased
+## [0.4.0] - 2026-11-19
 
 For Kiro CLI 3. Since 3.0 (2026-11-03) the V3 engine is Kiro's default; Kiro Studio has always started it explicitly, so
 the connection works as before. What changed in hooks, agents and the protocol is taken from Kiro's documentation
