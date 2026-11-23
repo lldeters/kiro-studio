@@ -94,6 +94,26 @@ describe('session updates', () => {
 });
 
 describe('broadcasts', () => {
+  it('reads the notices of Kiro CLI 3 about rate limits and custom agents leniently', () => {
+    expect(parseBroadcast('_kiro/error/rate_limit', { sessionId: 's', message: 'slow down' })).toEqual({
+      type: 'agentNotice',
+      notice: 'rateLimit',
+      sessionId: 's',
+      message: 'slow down',
+    });
+    expect(parseBroadcast('_kiro/customAgent/not_found', { name: 'x' })).toEqual({
+      type: 'agentNotice',
+      notice: 'agentNotFound',
+      agent: 'x',
+    });
+    expect(parseBroadcast('_kiro/customAgent/config_error', { agentName: 'y', reason: 'bad' })).toEqual({
+      type: 'agentNotice',
+      notice: 'agentConfigError',
+      agent: 'y',
+      message: 'bad',
+    });
+  });
+
   it('reads the MCP status snapshot', () => {
     expect(parseBroadcast('_kiro/mcp/status', { sessionId: 's', servers: [{ name: 'git' }] })).toEqual({
       type: 'mcpStatus',

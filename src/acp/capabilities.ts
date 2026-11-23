@@ -27,6 +27,8 @@ export interface Capabilities {
     /** `_meta.kiro.messageId` on the fork capability: a session can be forked at a given message. */
     forkAtMessage: boolean;
     resume: boolean;
+    /** `additionalDirectories` on `session/new` and `session/load`: more folders than the `cwd`. */
+    additionalDirectories: boolean;
   };
   /** Methods named in `_meta.kiro.extensionMethods`. */
   extensionMethods: ReadonlySet<string>;
@@ -77,6 +79,7 @@ export function parseInitializeResult(result: unknown): Capabilities {
       fork: present(sessionCaps.fork),
       forkAtMessage: kiroMeta(sessionCaps.fork).messageId === true,
       resume: present(sessionCaps.resume),
+      additionalDirectories: present(sessionCaps.additionalDirectories),
     },
     extensionMethods: new Set(strings(kiro.extensionMethods)),
     kiro: {

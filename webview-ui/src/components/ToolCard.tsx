@@ -18,8 +18,12 @@ const KIND_ICONS: Record<string, string> = {
 
 const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
-function StateIcon({ state }: { state: ToolView['state'] }) {
+function StateIcon({ state, failure }: { state: ToolView['state']; failure?: ToolView['failure'] }) {
   const t = useT();
+  if (state === 'failed' && failure === 'denied')
+    return <span className="codicon codicon-circle-slash state failed" role="img" aria-label={t('Denied')} />;
+  if (state === 'failed' && failure === 'cancelled')
+    return <span className="codicon codicon-debug-stop state cancelled" role="img" aria-label={t('Cancelled')} />;
   switch (state) {
     case 'running':
       return <span className="spinner small" role="img" aria-label={t('Working…')} />;
@@ -64,7 +68,7 @@ export function ToolCard({ tool, sessionId }: { tool: ToolView; sessionId: strin
           <span className="added">+{tool.added}</span> <span className="removed">−{tool.removed ?? 0}</span>
         </span>
       )}
-      <StateIcon state={tool.state} />
+      <StateIcon state={tool.state} {...(tool.failure === undefined ? {} : { failure: tool.failure })} />
     </>
   );
 

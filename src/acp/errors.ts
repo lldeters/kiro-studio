@@ -19,6 +19,16 @@ export function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Kiro CLI 2.37 and later answer every request but `initialize` with "authentication required" (ACP's `-32000`) while
+ * nobody is signed in, and a sign-in that ran out looks the same.
+ */
+export function isAuthRequired(error: unknown): boolean {
+  if (!(error instanceof RequestError) || error.code !== -32000) return false;
+  const type = str(rec(error.data).errorType) ?? '';
+  return /auth(?:entication)?[ _-]?required|not (?:signed|logged) in|unauthenticated/i.test(`${error.message} ${type}`);
+}
+
 export class ExtensionNotAdvertisedError extends Error {
   constructor(readonly method: string) {
     super(`The Kiro CLI did not advertise ${method}`);

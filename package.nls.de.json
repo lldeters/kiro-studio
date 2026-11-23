@@ -93,6 +93,7 @@
   "command.hooks.new": "Neuer Hook …",
   "command.hooks.toggle": "Hook ein- oder ausschalten",
   "command.hooks.toggleFeature": "Hooks für Kiro Studio ein- oder ausschalten",
+  "command.hooks.convert": "Hook ins aktuelle Format umwandeln",
   "command.mcp.refresh": "MCP-Server aktualisieren",
   "command.mcp.openConfig": "MCP-Konfiguration öffnen",
   "command.mcp.add": "MCP-Server hinzufügen …",

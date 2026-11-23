@@ -237,7 +237,9 @@ suite('Kiro Studio', () => {
         (await api.panelLabels(view)).includes(label);
       assert.deepStrictEqual(await api.panelLabels('specs'), ['demo']);
       assert.ok(await has('steering', 'This workspace'));
-      assert.ok(await has('hooks', 'Format on save'));
+      assert.ok(await has('hooks', 'Format on save'), 'a hook of the old format is listed');
+      assert.ok(await has('hooks', 'Lint after a write'), 'every hook of a file of the current format is listed');
+      assert.ok(await has('hooks', 'Save the conversation before compacting'));
       assert.ok(await has('hooks', 'Hooks are off in Kiro Studio'), 'the hooks setting is off by default');
       assert.ok(await has('mcp', 'This workspace'));
       assert.ok(await has('agents', 'Your agents'));

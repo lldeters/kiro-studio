@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Lint after a write",
+      "trigger": "PostToolUse",
+      "matcher": "write",
+      "action": { "type": "command", "command": "npm run lint" },
+      "enabled": false
+    },
+    {
+      "name": "Save the conversation before compacting",
+      "trigger": "PreCompact",
+      "action": { "type": "command", "command": "echo compacting" }
+    }
+  ]
+}

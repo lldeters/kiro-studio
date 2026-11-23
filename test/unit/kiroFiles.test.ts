@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { agentTemplate, parseAgent, readAgents } from '../../src/workspace/agents';
 import { firstHeading, parseFrontMatter } from '../../src/workspace/frontmatter';
-import { hookTemplate, parseHook, readHooks } from '../../src/workspace/hooks';
+import {
+  convertLegacyHook,
+  enabledPath,
+  globToRegex,
+  hookTemplate,
+  parseHook,
+  parseHookFile,
+  readHooks,
+} from '../../src/workspace/hooks';
 import { detectFormatting, setJsonValue } from '../../src/workspace/jsonEdit';
 import {
   addHttpServer,
@@ -159,6 +167,7 @@ describe('hooks', () => {
     expect(parseHook(text, '/ws/.kiro/hooks/lint.kiro.hook')).toEqual({
       name: 'Lint on save',
       path: '/ws/.kiro/hooks/lint.kiro.hook',
+      format: 'legacy',
       description: 'Runs the linter',
       enabled: true,
       event: 'fileEdited',
@@ -181,14 +190,120 @@ describe('hooks', () => {
     expect(parseHook('[1]', '/h/arr.kiro.hook').error).toBeDefined();
   });
 
-  it('lists only .kiro.hook files and makes a disabled template', async () => {
-    const reader = memory({ '/h/a.kiro.hook': text, '/h/b.json': '{}' });
-    expect((await readHooks(reader, '/h')).map((h) => h.name)).toEqual(['Lint on save']);
-    expect(parseHook(hookTemplate('New'), '/h/new.kiro.hook')).toMatchObject({
+  const v1 = JSON.stringify({
+    version: 'v1',
+    hooks: [
+      { name: 'Format', trigger: 'PostFileSave', matcher: '\\.ts$', action: { type: 'command', command: 'fmt' } },
+      {
+        name: 'Guard',
+        trigger: 'PreToolUse',
+        matcher: 'shell',
+        action: { type: 'command', command: 'g' },
+        enabled: false,
+      },
+    ],
+  });
+
+  it('reads every hook of a file of the current format', () => {
+    expect(parseHookFile(v1, '/h/two.json')).toEqual([
+      {
+        name: 'Format',
+        path: '/h/two.json',
+        format: 'v1',
+        index: 0,
+        enabled: true,
+        event: 'PostFileSave',
+        patterns: ['\\.ts$'],
+        action: 'command',
+      },
+      {
+        name: 'Guard',
+        path: '/h/two.json',
+        format: 'v1',
+        index: 1,
+        enabled: false,
+        event: 'PreToolUse',
+        patterns: ['shell'],
+        action: 'command',
+      },
+    ]);
+    expect(enabledPath({ format: 'v1', index: 1 })).toEqual(['hooks', 1, 'enabled']);
+    expect(enabledPath({ format: 'legacy' })).toEqual(['enabled']);
+  });
+
+  it('lists a file of the current format that is broken or has no hooks list, with the error', () => {
+    expect(parseHookFile('{ nope', '/h/bad.json')).toMatchObject([
+      { name: 'bad', error: expect.any(String) as string },
+    ]);
+    expect(parseHookFile('{"version":"v1"}', '/h/empty.json')).toMatchObject([
+      { name: 'empty', error: 'The file has no "hooks" list.' },
+    ]);
+    expect(parseHookFile('{"version":"v1","hooks":[]}', '/h/none.json')).toEqual([]);
+  });
+
+  it('lists both formats but no backups, and makes a disabled template of the current format', async () => {
+    const reader = memory({ '/h/a.kiro.hook': text, '/h/b.json': v1, '/h/c.json.bak': v1, '/h/notes.txt': 'x' });
+    expect((await readHooks(reader, '/h')).map((h) => h.name)).toEqual(['Format', 'Guard', 'Lint on save']);
+    const [created] = parseHookFile(hookTemplate('New'), '/h/new.json');
+    expect(created).toMatchObject({
       name: 'New',
+      format: 'v1',
       enabled: false,
-      event: 'fileEdited',
+      event: 'PostFileSave',
+      action: 'agent',
     });
+    expect(JSON.parse(hookTemplate('New'))).toMatchObject({ version: 'v1' });
+  });
+
+  it("converts a legacy hook with Kiro's trigger names and turns its globs into a regex", () => {
+    const result = convertLegacyHook(text);
+    expect('text' in result).toBe(true);
+    const file = JSON.parse((result as { text: string }).text) as {
+      version: string;
+      hooks: { name: string; trigger: string; matcher: string; action: unknown; enabled: boolean }[];
+    };
+    expect(file.version).toBe('v1');
+    expect(file.hooks[0]).toMatchObject({
+      name: 'Lint on save',
+      description: 'Runs the linter',
+      trigger: 'PostFileSave',
+      action: { type: 'agent', prompt: 'Lint it' },
+      enabled: true,
+    });
+    const matcher = new RegExp(file.hooks[0]?.matcher ?? '');
+    expect(['/ws/src/a.ts', 'C:\\ws\\b.ts', 'a.ts'].every((p) => matcher.test(p))).toBe(true);
+    expect(matcher.test('/ws/a.tsx')).toBe(false);
+  });
+
+  it('converts commands and refuses what has no equivalent', () => {
+    const command = convertLegacyHook(
+      JSON.stringify({ name: 'Done', when: { type: 'agentStop' }, then: { type: 'runCommand', command: 'npm test' } }),
+    );
+    expect(JSON.parse((command as { text: string }).text)).toMatchObject({
+      hooks: [{ trigger: 'Stop', action: { type: 'command', command: 'npm test' } }],
+    });
+    expect(
+      convertLegacyHook(JSON.stringify({ when: { type: 'userTriggered' }, then: { type: 'askAgent', prompt: 'x' } })),
+    ).toEqual({ error: 'manual' });
+    expect(convertLegacyHook('{ nope')).toEqual({ error: 'notJson' });
+    expect(convertLegacyHook(JSON.stringify({ when: { type: 'fileEdited' }, then: { type: 'other' } }))).toEqual({
+      error: 'action',
+      detail: 'other',
+    });
+    expect(
+      convertLegacyHook(JSON.stringify({ when: { type: 'gitCommit' }, then: { type: 'askAgent', prompt: 'x' } })),
+    ).toEqual({ error: 'event', detail: 'gitCommit' });
+  });
+
+  it('turns globs into regexes that match a path ending in them', () => {
+    const matches = (glob: string, path: string) => new RegExp(globToRegex(glob)).test(path);
+    expect(matches('src/**/*.{ts,tsx}', '/w/src/a/b.tsx')).toBe(true);
+    expect(matches('src/**/*.{ts,tsx}', '/w/lib/b.ts')).toBe(false);
+    expect(matches('*.md', 'docs/readme.md')).toBe(true);
+    expect(matches('a.b+c', 'x/a.b+c')).toBe(true);
+    expect(matches('a.b+c', 'x/aXb+c')).toBe(false);
+    expect(matches('docs/[a-c]*.md', 'docs/b1.md')).toBe(true);
+    expect(matches('docs/[a-c]*.md', 'docs/d1.md')).toBe(false);
   });
 });
 
@@ -430,9 +545,59 @@ describe('agents', () => {
     expect(parseAgent('{ nope', '/a/bad.json', 'global').error).toBeDefined();
   });
 
-  it('lists JSON files and makes a template that parses back', async () => {
-    const reader = memory({ '/a/one.json': '{"name":"one"}', '/a/two.md': 'x' });
-    expect((await readAgents(reader, '/a', 'workspace')).map((a) => a.name)).toEqual(['one']);
-    expect(parseAgent(agentTemplate('helper'), '/a/helper.json', 'workspace').name).toBe('helper');
+  it('lists JSON and Markdown agents but no backups, and makes a template of the current format', async () => {
+    const reader = memory({
+      '/a/one.json': '{"name":"one"}',
+      '/a/two.md': 'x',
+      '/a/one.json.bak': '{"name":"old"}',
+      '/a/notes.txt': 'x',
+    });
+    expect((await readAgents(reader, '/a', 'workspace')).map((a) => a.name)).toEqual(['one', 'two']);
+    const template = parseAgent(agentTemplate('helper'), '/a/helper.json', 'workspace');
+    expect(template.name).toBe('helper');
+    expect(template.v2Format).toBeUndefined();
+    expect(JSON.parse(agentTemplate('helper'))).toHaveProperty('permissions.rules');
+  });
+
+  it('reads the front matter of a Markdown agent', () => {
+    const text = [
+      '---',
+      'name: backend-dev',
+      'description: Backend development agent',
+      'model: claude-sonnet-4.6',
+      'tools: ["read", "write"]',
+      'mcpServers:',
+      '  postgres:',
+      '    command: npx',
+      '    args: ["-y", "server"]',
+      '  "linear":',
+      '    url: https://mcp.linear.app/mcp',
+      'welcomeMessage: Ready.',
+      '---',
+      '',
+      'You are a backend developer.',
+    ].join('\n');
+    expect(parseAgent(text, '/a/backend.md', 'global')).toEqual({
+      name: 'backend-dev',
+      path: '/a/backend.md',
+      scope: 'global',
+      description: 'Backend development agent',
+      model: 'claude-sonnet-4.6',
+      mcpServers: ['postgres', 'linear'],
+    });
+    expect(parseAgent('Just a prompt.', '/a/plain.md', 'workspace')).toEqual({
+      name: 'plain',
+      path: '/a/plain.md',
+      scope: 'workspace',
+      mcpServers: [],
+    });
+  });
+
+  it('marks an agent in the format of Kiro CLI 2, which Kiro CLI 3 rewrites', () => {
+    expect(parseAgent('{"name":"a","allowedTools":["fs_read"]}', '/a/a.json', 'workspace').v2Format).toBe(true);
+    expect(parseAgent('{"name":"b","toolsSettings":{}}', '/a/b.json', 'workspace').v2Format).toBe(true);
+    expect(
+      parseAgent('{"name":"c","toolsSettings":{},"permissions":{"rules":[]}}', '/a/c.json', 'workspace').v2Format,
+    ).toBeUndefined();
   });
 });

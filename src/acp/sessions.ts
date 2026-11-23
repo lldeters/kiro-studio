@@ -104,6 +104,8 @@ export interface ToolCallState {
   locations: ToolLocation[];
   /** `_meta.kiro.preview`: final content is known before the write happens. */
   preview?: { file?: string; originalContent?: string; modifiedContent?: string };
+  /** Why a failed tool failed, when Kiro says so (`_meta.kiro.failureReason`): `cancelled`, `denied` or `error`. */
+  failureReason?: string;
   subtaskId?: string;
   replay: boolean;
 }
@@ -469,6 +471,8 @@ export class Session {
     if (event.rawOutput !== undefined) tool.rawOutput = event.rawOutput;
     if (event.content !== undefined) tool.content = event.content;
     if (event.locations !== undefined) tool.locations = event.locations;
+    const failureReason = str(event.meta.kiro.failureReason);
+    if (failureReason !== undefined) tool.failureReason = failureReason;
     if (!event.meta.replay) {
       for (const location of event.locations ?? []) this.noteTouched(location.path);
       for (const item of event.content ?? []) if (item.type === 'diff') this.noteTouched(item.path);

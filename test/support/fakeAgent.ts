@@ -43,6 +43,8 @@ export interface FakeAgentOptions {
   ignoreEndOfInput?: boolean;
   /** Extension methods advertised in `initialize`. */
   extensionMethods?: string[];
+  /** Added to the `sessionCapabilities` advertised in `initialize`. */
+  sessionCapabilities?: JsonObject;
   /** Initial value of the `autopilot` option. */
   autopilot?: 'on' | 'off';
   turn?: TurnScript;
@@ -190,6 +192,9 @@ export class FakeAgent {
       case 'initialize':
         return initializeResult({
           ...(this.options.extensionMethods === undefined ? {} : { extensionMethods: this.options.extensionMethods }),
+          ...(this.options.sessionCapabilities === undefined
+            ? {}
+            : { sessionCapabilities: this.options.sessionCapabilities }),
         });
       case 'session/new':
         return this.newSession(str(params.cwd) ?? '/ws');

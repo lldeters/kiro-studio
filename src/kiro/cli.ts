@@ -172,9 +172,15 @@ export function parseVersion(stdout: string): string | undefined {
   return /\b(\d+\.\d+\.\d+(?:[-+][\w.]+)?)\b/.exec(stdout)?.[1];
 }
 
-/** True when `kiro-cli acp --help` lists the V3 engine as a possible value. */
-export function supportsV3(helpText: string): boolean {
-  return /--agent-engine/.test(helpText) && /\bv3\b/.test(helpText);
+/**
+ * True when `kiro-cli acp --help` lists the V3 engine as a possible value, or the CLI is 3.0 or newer: from 3.0 on V3 is
+ * Kiro's default engine and `--agent-engine` still takes `v3`, so a help text worded differently must not lock the user
+ * out. Capabilities decide the rest once the agent runs.
+ */
+export function supportsV3(helpText: string, version?: string): boolean {
+  if (/--agent-engine/.test(helpText) && /\bv3\b/.test(helpText)) return true;
+  const major = version === undefined ? undefined : Number(/^(\d+)\./.exec(version)?.[1]);
+  return major !== undefined && major >= 3;
 }
 
 export interface Account {
@@ -245,7 +251,7 @@ export async function checkSetup(configuredPath: string | undefined, env: CliEnv
     }
 
     // An old CLI has no `acp` command or no V3 engine. Capabilities decide later; this only gives an early hint.
-    if (helpResult.exitCode !== 0 || !supportsV3(helpResult.stdout)) {
+    if (helpResult.exitCode !== 0 || !supportsV3(helpResult.stdout, version)) {
       return { kind: 'tooOld', path: cli.path, ...withVersion };
     }
 

@@ -63,6 +63,12 @@ describe('parsers', () => {
     expect(supportsV3('--agent-engine <ENGINE> [possible values: v1, v2]')).toBe(false);
     expect(supportsV3('unrecognized subcommand')).toBe(false);
   });
+  it('takes a CLI 3.x for one with the V3 engine, whatever its help text says', () => {
+    expect(supportsV3('Usage: kiro-cli acp [OPTIONS]', '3.5.0')).toBe(true);
+    expect(supportsV3('Usage: kiro-cli acp [OPTIONS]', '3.0.0-beta.2')).toBe(true);
+    expect(supportsV3('Usage: kiro-cli acp [OPTIONS]', '2.37.1')).toBe(false);
+    expect(supportsV3('Usage: kiro-cli acp [OPTIONS]', 'unknown')).toBe(false);
+  });
   it('reads only the first line of whoami output', () => {
     const account = parseWhoami(`${WHOAMI}Profile:\n  name: x\n`);
     expect(account).toMatchObject({ accountType: 'Social', provider: 'Google', email: 'me@example.com' });
@@ -178,6 +184,19 @@ describe('checkSetup', () => {
       exec: (c, a) => (a[0] === 'acp' ? { exitCode: 2, stdout: '', stderr: 'unknown command' } : healthy(c, a)),
     });
     expect(await checkSetup('', noAcp.env)).toMatchObject({ kind: 'tooOld' });
+  });
+
+  it('is ready for a signed-in CLI 3.x whose acp help does not list the engines', async () => {
+    const v3 = fake({
+      ...installed,
+      exec: (c, a) =>
+        a[0] === '--version'
+          ? { exitCode: 0, stdout: 'kiro-cli 3.5.0\n', stderr: '' }
+          : a[0] === 'acp'
+            ? { exitCode: 0, stdout: 'Usage: kiro-cli acp [OPTIONS]\n', stderr: '' }
+            : healthy(c, a),
+    });
+    expect(await checkSetup('', v3.env)).toMatchObject({ kind: 'ready', version: '3.5.0' });
   });
 
   it('reports not signed in when whoami fails or prints no JSON, with the first line as detail', async () => {
